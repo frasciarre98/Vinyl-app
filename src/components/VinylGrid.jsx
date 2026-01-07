@@ -1,0 +1,299 @@
+import React, { useState, useEffect } from 'react';
+import { Search, Loader2, Trash2, CheckSquare, Square } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { VinylCard } from './VinylCard';
+import { BatchAnalysisBanner } from './BatchAnalysisBanner';
+
+export function VinylGrid({ refreshTrigger, onEdit }) {
+    const [vinyls, setVinyls] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [selectedArtist, setSelectedArtist] = useState('');
+    const [selectedGenre, setSelectedGenre] = useState('');
+
+    // Selection Mode State
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
+
+    // Single Active Card State
+    const [flippedCardId, setFlippedCardId] = useState(null);
+
+
+    useEffect(() => {
+        fetchVinyls();
+    }, [refreshTrigger]);
+
+    // Compute Filter Options
+    const uniqueArtists = [...new Set(vinyls.map(v => v.artist).filter(Boolean).sort())];
+    const uniqueGenres = [...new Set(vinyls.map(v => v.genre).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
+
+    const fetchVinyls = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('vinyls')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setVinyls(data || []);
+            // Reset selection on refresh
+            setSelectedIds([]);
+            setIsSelectionMode(false);
+        } catch (err) {
+            console.error('Error fetching vinyls:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateVinyl = (id, updates) => {
+        setVinyls(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+    };
+
+    const handleToggleSelect = (id) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Are you sure you want to delete ${selectedIds.length} albums ? This cannot be undone.`)) return;
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('vinyls')
+                .delete()
+                .in('id', selectedIds);
+
+            if (error) throw error;
+
+            // Optimistic update or refresh
+            fetchVinyls();
+        } catch (err) {
+            console.error('Error deleting vinyls:', err);
+            alert('Failed to delete vinyls');
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedIds([]);
+    };
+
+    const filteredVinyls = vinyls.filter(v => {
+        const matchesSearch = (
+            v.title?.toLowerCase().includes(search.toLowerCase()) ||
+            v.artist?.toLowerCase().includes(search.toLowerCase()) ||
+            v.genre?.toLowerCase().includes(search.toLowerCase()) ||
+            v.tracks?.toLowerCase().includes(search.toLowerCase()) // Search within tracklists
+        );
+        const matchesArtist = selectedArtist ? v.artist === selectedArtist : true;
+        const matchesGenre = selectedGenre ? v.genre?.includes(selectedGenre) : true;
+
+        return matchesSearch && matchesArtist && matchesGenre;
+    });
+
+    // ...
+
+    // --- EMERGENCY RESCUE MODE ---
+    // Set to TRUE to unblock the user. Set back to FALSE after cleanup.
+    const EMERGENCY_MODE = false;
+
+    if (EMERGENCY_MODE) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in zoom-in duration-500">
+                <div className="p-6 bg-red-500/10 border border-red-500/50 rounded-2xl max-w-md">
+                    <h1 className="text-3xl text-red-500 font-bold mb-4">⚠️ Modalità Integrità</h1>
+                    <p className="text-gray-300 mb-6">
+                        Il sistema è sovraccarico (troppi dischi caricati insieme).
+                        Per sbloccare il browser, dobbiamo resettare il database.
+                    </p>
+                    <button
+                        onClick={async () => {
+                            if (!confirm("SEI SICURO? Cancellando tutto perderai i dischi caricati. Usalo solo se sei bloccato.")) return;
+                            try {
+                                const { error } = await supabase.from('vinyls').delete().not('id', 'is', null); // Delete all (Type-safe)
+                                if (error) throw error;
+                                alert("Database pulito con successo! Ricarica la pagina per ricominciare.");
+                                window.location.reload();
+                            } catch (e) {
+                                alert("Errore cancellazione: " + e.message);
+                            }
+                        }}
+                        className="w-full px-6 py-4 bg-red-600 text-white font-bold text-lg rounded-xl hover:bg-red-700 shadow-xl transition-transform active:scale-95 flex items-center justify-center gap-2"
+                    >
+                        <Trash2 className="w-6 h-6" />
+                        CANCELLA TUTTO E RIPARTI
+                    </button>
+                </div>
+            </div>
+        );
+    }
+    // -----------------------------
+
+    return (
+        <div className="space-y-8">
+            <BatchAnalysisBanner
+                vinyls={vinyls}
+                onUpdate={handleUpdateVinyl}
+                onComplete={fetchVinyls}
+            />
+
+            {/* Controls Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center max-w-4xl mx-auto">
+                {/* Search Bar & Filters */}
+                <div className="relative flex-1 w-full gap-4 flex flex-col md:flex-row">
+                    <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search className="h-5 w-5 text-secondary" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 sm:text-sm transition-all shadow-sm hover:shadow-md"
+                        />
+                    </div>
+
+                    {/* Artist Filter */}
+                    <select
+                        value={selectedArtist}
+                        onChange={(e) => setSelectedArtist(e.target.value)}
+                        className="bg-surface border border-border text-primary text-sm rounded-full focus:ring-accent/50 focus:border-accent/50 block p-3 max-w-[200px]"
+                    >
+                        <option value="">All Artists</option>
+                        {uniqueArtists.map((artist, idx) => (
+                            <option key={idx} value={artist}>{artist}</option>
+                        ))}
+                    </select>
+
+                    {/* Genre Filter */}
+                    <select
+                        value={selectedGenre}
+                        onChange={(e) => setSelectedGenre(e.target.value)}
+                        className="bg-surface border border-border text-primary text-sm rounded-full focus:ring-accent/50 focus:border-accent/50 block p-3 max-w-[200px]"
+                    >
+                        <option value="">All Genres</option>
+                        {uniqueGenres.map((genre, idx) => (
+                            <option key={idx} value={genre}>{genre}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Total Count Badge */}
+                <div className="hidden md:flex items-center px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm" title="Total collection size">
+                    <span className="font-bold text-primary mr-1">{vinyls.length}</span> records
+                </div>
+
+                {/* Selection Actions */}
+                <div className="flex items-center gap-2">
+                    {/* REPROCESS ERRORS BUTTON */}
+                    {vinyls.some(v => v.artist === 'Error') && (
+                        <button
+                            onClick={async () => {
+                                const errorIds = vinyls.filter(v => v.artist === 'Error').map(v => v.id);
+                                if (!confirm(`Reset ${errorIds.length} failed items to 'Pending' state?`)) return;
+
+                                setLoading(true);
+                                try {
+                                    await supabase.from('vinyls').update({ artist: 'Pending AI', notes: null }).in('id', errorIds);
+                                    await fetchVinyls();
+                                } catch (e) {
+                                    alert("Error resetting items: " + e.message);
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-yellow-500/10 text-yellow-500 px-4 py-2 rounded-full hover:bg-yellow-500/20 border border-yellow-500/50 transition-colors font-medium text-sm animate-pulse"
+                        >
+                            <Loader2 className="w-4 h-4" />
+                            Fix {vinyls.filter(v => v.artist === 'Error').length} Errors
+                        </button>
+                    )}
+
+                    {/* Bulk Analyze Button - HANDLED BY BANNER NOW */}
+                    {isSelectionMode ? (
+                        <>
+                            <button
+                                onClick={() => {
+                                    if (selectedIds.length === filteredVinyls.length) {
+                                        setSelectedIds([]);
+                                    } else {
+                                        setSelectedIds(filteredVinyls.map(v => v.id));
+                                    }
+                                }}
+                                className="px-4 py-2 text-sm text-secondary hover:text-primary transition-colors border border-border rounded-full"
+                            >
+                                {selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={selectedIds.length === 0}
+                                className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Delete ({selectedIds.length})
+                            </button>
+                            <button
+                                onClick={toggleSelectionMode}
+                                className="px-4 py-2 text-sm text-secondary hover:text-primary transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={toggleSelectionMode}
+                            className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                        >
+                            <CheckSquare className="w-4 h-4" />
+                            Select
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Grid */}
+            {loading ? (
+                <div className="flex justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-secondary" />
+                </div>
+            ) : filteredVinyls.length === 0 ? (
+                <div className="text-center py-20 text-secondary">
+                    <p className="text-xl font-light">No records found.</p>
+                    <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                        {filteredVinyls.map(vinyl => (
+                            <VinylCard
+                                key={vinyl.id}
+                                vinyl={vinyl}
+                                onEdit={onEdit}
+                                onDelete={async (id) => {
+                                    if (confirm('Delete this record?')) {
+                                        await supabase.from('vinyls').delete().eq('id', id);
+                                        setVinyls(prev => prev.filter(v => v.id !== id));
+                                    }
+                                }}
+                                selectionMode={isSelectionMode}
+                                isSelected={selectedIds.includes(vinyl.id)}
+                                onToggleSelect={handleToggleSelect}
+                                // New Props for Single Active Logic
+                                isFlipped={flippedCardId === vinyl.id}
+                                onFlip={() => setFlippedCardId(flippedCardId === vinyl.id ? null : vinyl.id)}
+                            />
+                        ))}
+                    </div>
+
+
+                </div>
+            )}
+        </div>
+    );
+}
