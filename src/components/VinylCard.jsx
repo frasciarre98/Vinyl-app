@@ -47,7 +47,9 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 year: analysis.year,
                 notes: analysis.notes,
                 group_members: analysis.group_members,
+                group_members: analysis.group_members,
                 condition: analysis.condition,
+                average_cost: analysis.average_cost,
                 tracks: analysis.tracks
             };
 
@@ -281,6 +283,10 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 <div>
                                     <span className="block text-[10px] text-gray-500 uppercase">Genre</span>
                                     <span className="text-xs font-medium text-white truncate">{localVinyl.genre || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-[10px] text-gray-500 uppercase">Est. Value</span>
+                                    <span className="text-xs font-medium text-green-400">{localVinyl.average_cost || '-'}</span>
                                 </div>
                             </div>
                         </div>

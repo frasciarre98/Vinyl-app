@@ -3,6 +3,7 @@ import { Search, Loader2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { VinylCard } from './VinylCard';
 import { BatchAnalysisBanner } from './BatchAnalysisBanner';
+import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
 export function VinylGrid({ refreshTrigger, onEdit }) {
     const [vinyls, setVinyls] = useState([]);
@@ -75,6 +76,65 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
             console.error('Error deleting vinyls:', err);
             alert('Failed to delete vinyls');
             setLoading(false);
+        }
+    };
+
+    const handleBatchPriceEstimate = async () => {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+            alert("No API Key found. Please set it in Settings first.");
+            return;
+        }
+
+        if (!confirm(`Calculate Average Price for ${selectedIds.length} records? This will use AI and might take a moment.`)) return;
+
+        setLoading(true);
+        let successCount = 0;
+
+        try {
+            // Get the actual vinyl objects for selected IDs
+            const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
+
+            for (let i = 0; i < selectedVinyls.length; i++) {
+                const vinyl = selectedVinyls[i];
+                // Visual feedback in loading state could be improved, but for now we just wait
+                console.log(`Estimating price for: ${vinyl.title}`);
+
+                try {
+                    // Use existing metadata as hint to ensure accuracy
+                    const hint = `${vinyl.artist} - ${vinyl.title}`;
+                    const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
+
+                    if (analysis.average_cost) {
+                        const { error } = await supabase
+                            .from('vinyls')
+                            .update({ average_cost: analysis.average_cost })
+                            .eq('id', vinyl.id);
+
+                        if (!error) {
+                            successCount++;
+                            // Optimistic update
+                            setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, average_cost: analysis.average_cost } : v));
+                        }
+                    }
+
+                    // Small delay to respect rate limits
+                    await new Promise(r => setTimeout(r, 1000));
+
+                } catch (e) {
+                    console.error(`Failed to estimate for ${vinyl.title}:`, e);
+                }
+            }
+
+            alert(`Estimation complete! Updated ${successCount} records.`);
+
+        } catch (err) {
+            console.error('Batch estimation failed:', err);
+            alert('Batch process failed.');
+        } finally {
+            setLoading(false);
+            setIsSelectionMode(false);
+            setSelectedIds([]);
         }
     };
 
@@ -229,6 +289,13 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                                 className="px-4 py-2 text-sm text-secondary hover:text-primary transition-colors border border-border rounded-full"
                             >
                                 {selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                            <button
+                                onClick={handleBatchPriceEstimate}
+                                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 transition-colors font-medium text-sm"
+                            >
+                                <CheckSquare className="w-4 h-4" />
+                                Average Price ({selectedIds.length})
                             </button>
                             <button
                                 onClick={handleBulkDelete}

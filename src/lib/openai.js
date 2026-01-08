@@ -201,7 +201,7 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
                 body: JSON.stringify({
                     contents: [{
                         parts: [
-                            { text: `Analyze this vinyl album cover. JSON format required with keys: artist, title, genre, year, tracks (list of songs, newline separated), group_members (comma separated string), condition (estimate: Good/Fair/Mint), notes (short description). Do NOT use Markdown code blocks, just raw JSON.${hint ? ` IMPORTANT: The user explicitly identifies this album as '${hint}'. TRUST THIS IDENTIFICATION. Your task is to extract the tracklist, year, and details for '${hint}' from your internal knowledge base, using the image ONLY to confirm the specific edition or condition. If the image text is blurry, ignore it and use the known metadata for '${hint}'.` : ''}` },
+                            { text: `Analyze this vinyl album cover. JSON format required with keys: artist, title, genre, year, tracks (list of songs, newline separated), group_members (comma separated string), condition (estimate: Good/Fair/Mint), average_cost (estimate market value in EUR, e.g. "€20-30"), notes (short description). Do NOT use Markdown code blocks, just raw JSON.${hint ? ` IMPORTANT: The user explicitly identifies this album as '${hint}'. TRUST THIS IDENTIFICATION. Your task is to extract the tracklist, year, and details for '${hint}' from your internal knowledge base, using the image ONLY to confirm the specific edition or condition. If the image text is blurry, ignore it and use the known metadata for '${hint}'.` : ''}` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
                     }],
@@ -277,7 +277,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: `Analyze this vinyl album cover. Return JSON with keys: artist, title, genre, year, tracks (string with newlines), group_members (string), condition, notes.${hint ? ` IMPORTANT: The user explicitly identifies this album as '${hint}'. TRUST THIS IDENTIFICATION. Your task is to extract the tracklist, year, and details for '${hint}' from your internal knowledge base, using the image ONLY to confirm the specific edition or condition. If the image text is blurry, ignore it and use the known metadata for '${hint}'.` : ''}` },
+                            { type: "text", text: `Analyze this vinyl album cover. Return JSON with keys: artist, title, genre, year, tracks (string with newlines), group_members (string), average_cost (estimate market value in EUR), condition, notes.${hint ? ` IMPORTANT: The user explicitly identifies this album as '${hint}'. TRUST THIS IDENTIFICATION. Your task is to extract the tracklist, year, and details for '${hint}' from your internal knowledge base, using the image ONLY to confirm the specific edition or condition. If the image text is blurry, ignore it and use the known metadata for '${hint}'.` : ''}` },
                             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Content}`, detail: "low" } }
                         ]
                     }
@@ -322,6 +322,7 @@ function parseAIResponse(jsonString) {
         group_members: parsed.group_members || "",
         tracks: parsed.tracks || "",
         condition: parsed.condition || "Good",
+        average_cost: parsed.average_cost || "",
         notes: parsed.notes || parsed.note || "Analyzed by AI"
     };
 }

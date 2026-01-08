@@ -13,6 +13,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         genre: '',
         format: 'Vinyl',
         condition: '',
+        average_cost: '',
         notes: '',
         tracks: ''
     });
@@ -38,6 +39,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                 format: vinyl.format || 'Vinyl',
                 group_members: vinyl.group_members || '',
                 condition: vinyl.condition || '',
+                average_cost: vinyl.average_cost || '',
                 notes: vinyl.notes || '',
                 tracks: vinyl.tracks || ''
             });
@@ -347,6 +349,16 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     <option value="Good">Good</option>
                                     <option value="Fair">Fair</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-secondary mb-1">Average Cost</label>
+                                <input
+                                    type="text"
+                                    value={formData.average_cost || ''}
+                                    onChange={e => setFormData({ ...formData, average_cost: e.target.value })}
+                                    placeholder="e.g. €20-30"
+                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                />
                             </div>
                             <div className="col-span-2">
                                 <label className="block text-sm font-medium text-secondary mb-1">Tracks (One per line)</label>
