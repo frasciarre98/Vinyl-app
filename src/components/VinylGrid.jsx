@@ -203,7 +203,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
             />
 
             {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center max-w-4xl mx-auto">
+            <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 mb-6 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-lg transition-all duration-300">
                 {/* Search Bar & Filters */}
                 <div className="relative flex-1 w-full gap-4 flex flex-col md:flex-row">
                     <div className="relative flex-1">

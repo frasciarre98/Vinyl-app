@@ -67,7 +67,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload }) {
                     ⚠️ ATTENZIONE: Riavvia il server (CTRL+C poi 'npm run dev') per caricare le chiavi dal file .env!
                 </div>
             )}
-            <header className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
+            <header className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-50">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="bg-primary/10 p-2 rounded-full">
