@@ -155,7 +155,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                             placeholder="Search..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 sm:text-sm transition-all shadow-sm hover:shadow-md"
+                            className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-base sm:text-sm transition-all shadow-sm hover:shadow-md"
                         />
                     </div>
 
@@ -163,7 +163,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     <select
                         value={selectedArtist}
                         onChange={(e) => setSelectedArtist(e.target.value)}
-                        className="bg-surface border border-border text-primary text-sm rounded-full focus:ring-accent/50 focus:border-accent/50 block p-3 max-w-[200px]"
+                        className="bg-surface border border-border text-primary text-base sm:text-sm rounded-full focus:ring-accent/50 focus:border-accent/50 block p-3 max-w-[200px]"
                     >
                         <option value="">All Artists</option>
                         {uniqueArtists.map((artist, idx) => (
@@ -175,7 +175,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     <select
                         value={selectedGenre}
                         onChange={(e) => setSelectedGenre(e.target.value)}
-                        className="bg-surface border border-border text-primary text-sm rounded-full focus:ring-accent/50 focus:border-accent/50 block p-3 max-w-[200px]"
+                        className="bg-surface border border-border text-primary text-base sm:text-sm rounded-full focus:ring-accent/50 focus:border-accent/50 block p-3 max-w-[200px]"
                     >
                         <option value="">All Genres</option>
                         {uniqueGenres.map((genre, idx) => (

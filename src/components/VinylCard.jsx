@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle } from 'lucide-react';
+import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle, Youtube } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
@@ -147,31 +147,41 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
                     {/* Overlay Controls (Top Right) */}
                     {!selectionMode && (
-                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="absolute top-2 right-2 flex gap-2 z-50 transform-gpu">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onEdit(vinyl); }}
-                                className="p-2 bg-black/60 hover:bg-black/90 text-white rounded-full backdrop-blur-md shadow-lg border border-white/10"
+                                className="p-3 bg-black/60 hover:bg-black/90 active:scale-95 active:bg-black text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Edit"
                             >
-                                <Edit2 className="w-4 h-4" />
+                                <Edit2 className="w-5 h-5" />
                             </button>
                             <button
                                 onClick={handleAnalyze}
-                                className={`p-2 rounded-full backdrop-blur-md shadow-lg border border-white/10 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 text-white'}`}
+                                className={`p-3 rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all active:scale-95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'}`}
                                 title="Magic Analyze"
                                 disabled={analyzing}
                             >
-                                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                                {analyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
                             </button>
                             <a
                                 href={`https://open.spotify.com/search/${encodeURIComponent((localVinyl.artist === 'Pending AI' ? '' : localVinyl.artist || '') + ' ' + (localVinyl.title || ''))}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-2 bg-[#1DB954] hover:bg-[#1ed760] text-black rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-colors"
+                                className="p-3 bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 text-black rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Play on Spotify"
                             >
-                                <PlayCircle className="w-4 h-4 fill-current" />
+                                <PlayCircle className="w-5 h-5 fill-current" />
+                            </a>
+                            <a
+                                href={`https://www.youtube.com/results?search_query=${encodeURIComponent((localVinyl.artist === 'Pending AI' ? '' : localVinyl.artist || '') + ' ' + (localVinyl.title || ''))}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-3 bg-[#FF0000] hover:bg-[#cc0000] active:scale-95 text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                title="Search on YouTube"
+                            >
+                                <Youtube className="w-5 h-5" />
                             </a>
                         </div>
                     )}
