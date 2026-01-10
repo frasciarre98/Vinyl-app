@@ -359,8 +359,13 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                                 onEdit={onEdit}
                                 onDelete={async (id) => {
                                     if (confirm('Delete this record?')) {
-                                        await databases.deleteDocument(DATABASE_ID, 'vinyls', id);
-                                        setVinyls(prev => prev.filter(v => v.id !== id));
+                                        try {
+                                            await databases.deleteDocument(DATABASE_ID, 'vinyls', id);
+                                            setVinyls(prev => prev.filter(v => v.id !== id));
+                                        } catch (e) {
+                                            console.error("Delete failed:", e);
+                                            alert("Delete failed: " + e.message + "\n\nCheck your Appwrite permissions.");
+                                        }
                                     }
                                 }}
                                 selectionMode={isSelectionMode}
