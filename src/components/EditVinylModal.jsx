@@ -41,7 +41,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                 format: vinyl.format || 'Vinyl',
                 group_members: vinyl.group_members || '',
                 condition: vinyl.condition || '',
-                average_cost: vinyl.average_cost || '',
+                average_cost: vinyl.avarege_cost || vinyl.average_cost || '', // Map from DB typo
                 notes: vinyl.notes || '',
                 tracks: vinyl.tracks || ''
             });
@@ -54,7 +54,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         e.preventDefault();
         setSaving(true);
         try {
-            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, formData);
+            // Map average_cost to avarege_cost (DB typo)
+            const payload = { ...formData, avarege_cost: formData.average_cost };
+            delete payload.average_cost;
+
+            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, payload);
             onUpdate();
             onClose();
         } catch (err) {

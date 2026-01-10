@@ -204,7 +204,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                             tracks: aiMetadata.tracks || '',
                             group_members: aiMetadata.group_members || '',
                             condition: aiMetadata.condition || '',
-                            average_cost: aiMetadata.average_cost || '',
+                            avarege_cost: aiMetadata.average_cost || '', // Map to DB typo
                             original_filename: file.name,
                             format: format
                         }

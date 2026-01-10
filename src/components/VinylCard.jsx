@@ -47,8 +47,9 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 year: analysis.year,
                 notes: analysis.notes,
                 group_members: analysis.group_members,
+                group_members: analysis.group_members,
                 condition: analysis.condition,
-                average_cost: analysis.average_cost,
+                avarege_cost: analysis.average_cost, // Map to DB typo
                 tracks: analysis.tracks
             };
 
@@ -277,7 +278,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 </div>
                                 <div>
                                     <span className="block text-[10px] text-gray-500 uppercase">Est. Value</span>
-                                    <span className="text-xs font-medium text-green-400">{localVinyl.average_cost || '-'}</span>
+                                    <span className="text-xs font-medium text-green-400">{localVinyl.avarege_cost || localVinyl.average_cost || '-'}</span>
                                 </div>
                             </div>
                         </div>
