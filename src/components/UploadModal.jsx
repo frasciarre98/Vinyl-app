@@ -206,9 +206,11 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                         {
                             image_url: publicUrl,
                             // Use AI metadata if available, otherwise defaults
-                            artist: aiMetadata.artist || 'Unknown Artist',
+                            // Use AI metadata if available, otherwise defaults to 'Pending AI' for retry later
+                            artist: aiMetadata.artist || (apiKey ? 'Pending AI' : 'Unknown Artist'),
                             title: aiMetadata.title || file.name.replace(/\.[^/.]+$/, ""),
                             genre: aiMetadata.genre || '',
+                            // SAFE CAST for year to String(50) to prevent Appwrite errors
                             year: String(aiMetadata.year || '').substring(0, 50),
                             notes: aiMetadata.notes || '',
                             tracks: aiMetadata.tracks || '',
