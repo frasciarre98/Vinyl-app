@@ -123,9 +123,14 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-12">
                 <div className="container mx-auto px-4 text-center text-secondary text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-30">v1.1 (Fix-Strict)</span></p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-30">v1.2 (STRICT-FIX)</span></p>
                 </div>
             </footer>
+
+            {/* FORCE REFRESH INDICATOR */}
+            <div className="fixed bottom-0 right-0 m-4 bg-green-500 text-black px-4 py-2 rounded-full font-bold shadow-2xl z-[100] animate-bounce">
+                ✅ UPDATED v1.2
+            </div>
         </div>
     );
 }
