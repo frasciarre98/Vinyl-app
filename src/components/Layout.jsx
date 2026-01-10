@@ -123,7 +123,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-12">
                 <div className="container mx-auto px-4 text-center text-secondary text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade.</p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-30">v1.1 (Fix-Strict)</span></p>
                 </div>
             </footer>
         </div>
