@@ -4,10 +4,12 @@ import { SettingsModal } from './components/SettingsModal';
 import { UploadModal } from './components/UploadModal';
 import { VinylGrid } from './components/VinylGrid';
 import { EditVinylModal } from './components/EditVinylModal';
+import { DebugModal } from './components/DebugModal';
 
 function App() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [isDebugOpen, setIsDebugOpen] = useState(false);
     const [editingVinyl, setEditingVinyl] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -19,6 +21,7 @@ function App() {
         <Layout
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenUpload={() => setIsUploadOpen(true)}
+            onOpenDebug={() => setIsDebugOpen(true)}
         >
             <VinylGrid
                 refreshTrigger={refreshTrigger}
@@ -36,6 +39,11 @@ function App() {
                 isOpen={isUploadOpen}
                 onClose={() => setIsUploadOpen(false)}
                 onUploadComplete={handleRefresh}
+            />
+
+            <DebugModal
+                isOpen={isDebugOpen}
+                onClose={() => setIsDebugOpen(false)}
             />
 
             <EditVinylModal

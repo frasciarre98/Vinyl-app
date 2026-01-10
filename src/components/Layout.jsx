@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Disc, Settings, Plus, Download, Loader2 } from 'lucide-react';
+import { Disc, Settings, Plus, Download, Loader2, Bug } from 'lucide-react';
 import { databases, DATABASE_ID, isAppwriteConfigured } from '../lib/appwrite';
 import { Query } from 'appwrite';
 
-export function Layout({ children, onOpenSettings, onOpenUpload }) {
+export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) {
     const isConfigured = isAppwriteConfigured();
     const [isExporting, setIsExporting] = useState(false);
 
@@ -83,6 +83,13 @@ export function Layout({ children, onOpenSettings, onOpenUpload }) {
                     </div>
 
                     <nav className="flex items-center gap-4">
+                        <button
+                            onClick={onOpenDebug}
+                            className="p-2 text-red-500 hover:text-red-400 transition-colors hover:bg-white/5 rounded-full"
+                            title="Debug Tools"
+                        >
+                            <Bug className="w-5 h-5" />
+                        </button>
                         <button
                             onClick={handleExport}
                             disabled={isExporting}

@@ -2,7 +2,7 @@ import { Client, Account, Databases, Storage } from 'appwrite';
 
 export const client = new Client();
 
-export const PROJECT_ID = '67812969000f94b7e551';
+export const PROJECT_ID = '69622969000f94b7e551';
 export const DATABASE_ID = 'vinyl_db';
 export const BUCKET_ID = 'covers';
 
@@ -18,5 +18,5 @@ export const storage = new Storage(client);
 
 // Helper to check if configuration is missing
 export const isAppwriteConfigured = () => {
-    return PROJECT_ID !== 'REPLACE_WITH_PROJECT_ID';
+    return PROJECT_ID !== 'vinyls';
 }

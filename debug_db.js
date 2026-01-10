@@ -10,7 +10,7 @@ global.window = {};
 
 const client = new Client()
     .setEndpoint('https://cloud.appwrite.io/v1')
-    .setProject('67812969000f94b7e551');
+    .setProject('69622969000f94b7e551');
 
 const databases = new Databases(client);
 
