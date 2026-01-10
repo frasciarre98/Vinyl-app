@@ -67,6 +67,12 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
     const fileInputRef = useRef(null);
     const [existingFilenames, setExistingFilenames] = useState(new Set());
     const [format, setFormat] = useState('Vinyl'); // Default format
+    const formatRef = useRef('Vinyl');
+
+    // Keep ref in sync
+    useEffect(() => {
+        formatRef.current = format;
+    }, [format]);
 
     // ENABLE LOGIC AGAIN TO CATCH THE ERROR
     useEffect(() => {
@@ -144,6 +150,10 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                 }
 
                 try {
+                    // Use ref to guarantee freshness
+                    const currentFormat = formatRef.current;
+                    console.log(`Uploading ${file.name} with format: ${currentFormat}`);
+
                     // 0. PREPARE: Client-Side Resize FIRST (Crucial for performance)
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'preparing', progress: 5, error: null } }));
                     console.log(`Preparing ${file.name}...`);
@@ -206,7 +216,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                             condition: aiMetadata.condition || '',
                             avarege_cost: aiMetadata.average_cost || '', // Map to DB typo
                             original_filename: file.name,
-                            format: format
+                            format: currentFormat
                         }
                     );
 
