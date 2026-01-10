@@ -144,38 +144,49 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                 }
 
                 try {
-                    // 1. Client-Side Analysis (Bypasses CORS/Fetch issues)
+                    // 0. PREPARE: Client-Side Resize FIRST (Crucial for performance)
+                    setProgress(prev => ({ ...prev, [file.name]: { status: 'preparing', progress: 5, error: null } }));
+                    console.log(`Preparing ${file.name}...`);
+
+                    const compressedDataUrl = await resizeImage(file);
+                    const compressedBlob = await (await fetch(compressedDataUrl)).blob();
+                    // Create a manageable file object (e.g. < 1MB)
+                    const optimizedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+
+                    // 1. Client-Side AI Analysis (With Timeout)
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'analyzing', progress: 20, error: null } }));
-                    console.log(`Starting analysis for ${file.name}...`);
 
                     let aiMetadata = {};
                     try {
-                        // We analyze the raw file directly in the browser
-                        aiMetadata = await analyzeImage(file);
-                        console.log("AI Analysis Complete:", aiMetadata);
+                        if (apiKey) {
+                            // 10s Timeout Race to prevent hanging
+                            const aiPromise = analyzeImage(optimizedFile);
+                            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Timeout (10s)")), 10000));
+
+                            aiMetadata = await Promise.race([aiPromise, timeoutPromise]);
+                            console.log("AI Analysis Success:", aiMetadata);
+                        } else {
+                            console.log("No API Key, skipping AI analysis.");
+                        }
                     } catch (aiErr) {
-                        console.warn("AI Analysis failed (continuing with basic upload):", aiErr);
+                        console.warn("AI Analysis skipped:", aiErr);
+                        // Don't verify or stop, just continue to upload
                     }
 
                     // 2. Upload to Storage
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 50, error: null } }));
 
-                    // COMPRESS: Client-Side Resize
-                    const compressedDataUrl = await resizeImage(file);
-                    const compressedBlob = await (await fetch(compressedDataUrl)).blob();
-                    const uploadFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
-
                     const fileUpload = await storage.createFile(
                         BUCKET_ID,
                         ID.unique(),
-                        uploadFile
+                        optimizedFile // Upload the optimized file
                     );
 
                     // Get View URL
                     const publicUrlResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
                     const publicUrl = publicUrlResult.href ? publicUrlResult.href : publicUrlResult.toString();
 
-                    // 3. Insert to DB (Final State)
+                    // 3. Insert to DB
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'saving', progress: 80, error: null } }));
 
                     const dbData = await databases.createDocument(
@@ -211,7 +222,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                     console.error("Upload failed:", err);
                     setProgress(prev => ({
                         ...prev,
-                        [file.name]: { status: 'error', progress: 0, error: "Upload failed: " + err.message }
+                        [file.name]: { status: 'error', progress: 0, error: "Error: " + err.message }
                     }));
                 }
             }
@@ -267,7 +278,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                                             {status.status === 'complete' && <CheckCircle className="w-5 h-5 text-green-500" />}
                                             {status.status === 'queued' && <Clock className="w-5 h-5 text-yellow-500" />}
                                             {status.status === 'error' && <X className="w-5 h-5 text-red-500" />}
-                                            {(status.status === 'uploading' || status.status === 'analyzing' || status.status === 'saving') && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+                                            {(status.status === 'uploading' || status.status === 'analyzing' || status.status === 'saving' || status.status === 'preparing') && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
                                             {(status.status === 'retrying' || status.status === 'duplicate_warning') && <Loader2 className={`w-5 h-5 ${status.status === 'retrying' ? 'animate-spin' : ''} text-yellow-500`} />}
                                         </div>
                                     </div>
