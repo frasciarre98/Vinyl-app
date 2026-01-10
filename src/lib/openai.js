@@ -334,35 +334,41 @@ export function resizeImage(fileOrBlob) {
         const img = new Image();
         img.src = url;
 
+        img.crossOrigin = 'Anonymous'; // Check for CORS
         img.onload = () => {
-            const maxWidth = 800;
-            const maxHeight = 800;
-            let width = img.width;
-            let height = img.height;
+            try {
+                const maxWidth = 800;
+                const maxHeight = 800;
+                let width = img.width;
+                let height = img.height;
 
-            if (width > height) {
-                if (width > maxWidth) {
-                    height *= maxWidth / width;
-                    width = maxWidth;
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
                 }
-            } else {
-                if (height > maxHeight) {
-                    width *= maxHeight / height;
-                    height = maxHeight;
-                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Release source memory immediately
+                URL.revokeObjectURL(url);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(dataUrl);
+            } catch (e) {
+                URL.revokeObjectURL(url);
+                reject(new Error("Image processing failed: " + e.message));
             }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // Release source memory immediately
-            URL.revokeObjectURL(url);
-
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-            resolve(dataUrl);
         };
 
         img.onerror = () => {
