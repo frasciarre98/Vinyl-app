@@ -75,12 +75,18 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
         setLoading(true);
         try {
-            // Appwrite doesn't have a bulk delete query yet, so we loop safely
-            const deletePromises = selectedIds.map(id =>
-                databases.deleteDocument(DATABASE_ID, 'vinyls', id)
-            );
-
-            await Promise.all(deletePromises);
+            // Process in batches of 5 to respect Rate Limits
+            const batchSize = 5;
+            for (let i = 0; i < selectedIds.length; i += batchSize) {
+                const chunk = selectedIds.slice(i, i + batchSize);
+                await Promise.all(chunk.map(id =>
+                    databases.deleteDocument(DATABASE_ID, 'vinyls', id)
+                ));
+                // Small delay between batches
+                if (i + batchSize < selectedIds.length) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
 
             // Optimistic update or refresh
             fetchVinyls();
