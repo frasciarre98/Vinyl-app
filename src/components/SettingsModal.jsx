@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2 } from 'lucide-react';
+import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2, Terminal } from 'lucide-react';
 import { saveApiKey, getApiKey, getProvider, setProvider, getGeminiTier, setGeminiTier, resizeImage } from '../lib/openai';
 import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
