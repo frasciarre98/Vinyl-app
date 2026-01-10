@@ -209,7 +209,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                             artist: aiMetadata.artist || 'Unknown Artist',
                             title: aiMetadata.title || file.name.replace(/\.[^/.]+$/, ""),
                             genre: aiMetadata.genre || '',
-                            year: aiMetadata.year || '',
+                            year: String(aiMetadata.year || '').substring(0, 50),
                             notes: aiMetadata.notes || '',
                             tracks: aiMetadata.tracks || '',
                             group_members: aiMetadata.group_members || '',
