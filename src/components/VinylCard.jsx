@@ -52,6 +52,8 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 tracks: analysis.tracks
             };
 
+            // Try Full Update - If this fails, it means Schema is missing attributes in Appwrite.
+            // We want to know WHICH one failed validation.
             try {
                 await databases.updateDocument(
                     DATABASE_ID,
@@ -60,22 +62,10 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                     fullUpdate
                 );
             } catch (fullError) {
-                console.warn("Full update failed (likely missing columns), trying basic update...", fullError.message);
-
-                // Fallback: Basic Update
-                const basicUpdate = {
-                    artist: analysis.artist,
-                    title: analysis.title,
-                    genre: analysis.genre,
-                    year: analysis.year
-                };
-
-                await databases.updateDocument(
-                    DATABASE_ID,
-                    'vinyls',
-                    localVinyl.id,
-                    basicUpdate
-                );
+                console.error("APPWRITE UPDATE FAILED:", fullError);
+                // Alert the user so they see it
+                alert(`Update Failed: ${fullError.message}. Check if 'average_cost', 'tracks', or 'group_members' exist in Appwrite Database Attributes.`);
+                throw fullError;
             }
 
             // Update local view
