@@ -319,8 +319,8 @@ function parseAIResponse(jsonString) {
         title: parsed.title || "Unknown",
         genre: parsed.genre || "Unknown",
         year: parsed.year ? String(parsed.year) : "",
-        group_members: parsed.group_members || "",
-        tracks: parsed.tracks || "",
+        group_members: Array.isArray(parsed.group_members) ? parsed.group_members.join(', ') : (parsed.group_members || ""),
+        tracks: Array.isArray(parsed.tracks) ? parsed.tracks.join('\n') : (parsed.tracks || ""),
         condition: parsed.condition || "Good",
         average_cost: parsed.average_cost || "",
         notes: parsed.notes || parsed.note || "Analyzed by AI"
