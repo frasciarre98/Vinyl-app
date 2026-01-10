@@ -35,6 +35,49 @@ export function setGeminiTier(tier) {
     localStorage.setItem('gemini_tier', tier);
 }
 
+// --- TESTING & VALIDATION ---
+export async function testConnection(provider, apiKey) {
+    if (!apiKey) throw new Error("No API Key provided");
+
+    try {
+        if (provider === 'openai') {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey.trim()}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini",
+                    messages: [{ role: "user", content: "Say 'OK'" }],
+                    max_tokens: 5
+                })
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error?.message || response.statusText);
+            }
+            return true;
+        } else {
+            // Gemini Test
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: "Say OK" }] }]
+                })
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error?.message || response.statusText);
+            }
+            return true;
+        }
+    } catch (e) {
+        throw e;
+    }
+}
+
 // --- CORE ANALYSIS DISPATCHER ---
 
 // Wrapper for Files (Upload Modal)

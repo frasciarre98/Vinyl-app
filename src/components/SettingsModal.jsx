@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2, Terminal } from 'lucide-react';
-import { saveApiKey, getApiKey, getProvider, setProvider, getGeminiTier, setGeminiTier, resizeImage } from '../lib/openai';
+import { saveApiKey, getApiKey, getProvider, setProvider, getGeminiTier, setGeminiTier, resizeImage, testConnection } from '../lib/openai';
 import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
 
@@ -27,8 +27,21 @@ export function SettingsModal({ onClose, onSave }) {
         localStorage.setItem('gemini_tier', geminiTier);
         localStorage.setItem('gemini_model', geminiModel);
 
-        onSave();
         onClose();
+    };
+
+    const [testing, setTesting] = useState(false);
+    const handleTest = async () => {
+        setTesting(true);
+        try {
+            const keyToTest = provider === 'gemini' ? apiKey : openaiKey;
+            await testConnection(provider, keyToTest);
+            alert(`✅ Success! Your ${provider.toUpperCase()} key is working.`);
+        } catch (e) {
+            alert(`❌ Connection Failed:\n${e.message}\n\nCheck if the Key is correct and has credits/quota.`);
+        } finally {
+            setTesting(false);
+        }
     };
 
     const refreshMetadata = async () => {
@@ -392,6 +405,14 @@ export function SettingsModal({ onClose, onSave }) {
 
                 {/* Footer */}
                 <div className="p-4 border-t border-white/10 bg-white/5 flex justify-end">
+                    <button
+                        onClick={handleTest}
+                        disabled={testing}
+                        className="mr-auto flex items-center gap-2 text-secondary hover:text-white px-4 py-2 rounded-lg text-sm transition-colors border border-transparent hover:border-white/10"
+                    >
+                        {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                        {testing ? "Testing..." : "Test Key"}
+                    </button>
                     <button
                         onClick={handleSave}
                         className="flex items-center gap-2 bg-primary text-black px-6 py-2 rounded-lg font-bold hover:bg-white transition-all transform hover:scale-105"
