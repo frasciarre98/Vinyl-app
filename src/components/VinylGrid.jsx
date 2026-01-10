@@ -86,7 +86,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
             fetchVinyls();
         } catch (err) {
             console.error('Error deleting vinyls:', err);
-            alert('Failed to delete vinyls');
+            alert('Failed to delete vinyls: ' + err.message + '\n\nCheck Appwrite Permissions for "Delete".');
             setLoading(false);
         }
     };
