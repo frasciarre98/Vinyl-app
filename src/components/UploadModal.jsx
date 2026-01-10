@@ -144,14 +144,25 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                 }
 
                 try {
-                    setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 10, error: null } }));
+                    // 1. Client-Side Analysis (Bypasses CORS/Fetch issues)
+                    setProgress(prev => ({ ...prev, [file.name]: { status: 'analyzing', progress: 20, error: null } }));
+                    console.log(`Starting analysis for ${file.name}...`);
 
-                    // 1. Upload to Storage
+                    let aiMetadata = {};
+                    try {
+                        // We analyze the raw file directly in the browser
+                        aiMetadata = await analyzeImage(file);
+                        console.log("AI Analysis Complete:", aiMetadata);
+                    } catch (aiErr) {
+                        console.warn("AI Analysis failed (continuing with basic upload):", aiErr);
+                    }
+
+                    // 2. Upload to Storage
+                    setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 50, error: null } }));
+
                     // COMPRESS: Client-Side Resize
                     const compressedDataUrl = await resizeImage(file);
                     const compressedBlob = await (await fetch(compressedDataUrl)).blob();
-
-                    // Appwrite requires File object for createFile, so we reconstruct it from blob
                     const uploadFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
 
                     const fileUpload = await storage.createFile(
@@ -160,32 +171,37 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                         uploadFile
                     );
 
-                    // Get View URL (Public)
-                    // In Appwrite, we construct the URL manually or use getFileView (which returns a URL object)
-                    // The standard pattern is: endpoint/storage/buckets/{bucketId}/files/{fileId}/view?project={projectId}
-                    // But SDK helper easiest is:
+                    // Get View URL
                     const publicUrlResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
-                    const publicUrl = publicUrlResult.href; // Get the string URL
+                    const publicUrl = publicUrlResult.href ? publicUrlResult.href : publicUrlResult.toString();
 
-                    // 2. Insert to DB (Pending State)
+                    // 3. Insert to DB (Final State)
+                    setProgress(prev => ({ ...prev, [file.name]: { status: 'saving', progress: 80, error: null } }));
+
                     const dbData = await databases.createDocument(
                         DATABASE_ID,
                         'vinyls',
                         ID.unique(),
                         {
                             image_url: publicUrl,
-                            artist: 'Pending AI',
-                            title: file.name.replace(/\.[^/.]+$/, ""), // Use filename as tentative title
-                            genre: '',
-                            year: '',
-                            original_filename: file.name, // Track for deduplication
+                            // Use AI metadata if available, otherwise defaults
+                            artist: aiMetadata.artist || 'Unknown Artist',
+                            title: aiMetadata.title || file.name.replace(/\.[^/.]+$/, ""),
+                            genre: aiMetadata.genre || '',
+                            year: aiMetadata.year || '',
+                            notes: aiMetadata.notes || '',
+                            tracks: aiMetadata.tracks || '',
+                            group_members: aiMetadata.group_members || '',
+                            condition: aiMetadata.condition || '',
+                            average_cost: aiMetadata.average_cost || '',
+                            original_filename: file.name,
                             format: format
                         }
                     );
 
                     uploadedRecords.push({ id: dbData.$id, file, name: file.name, publicUrl });
 
-                    // 3. Instant Finish
+                    // 4. Complete
                     setProgress(prev => ({
                         ...prev,
                         [file.name]: { status: 'complete', progress: 100, dbId: dbData.$id, publicUrl }

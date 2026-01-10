@@ -36,7 +36,39 @@ async function check() {
             }
         }
     } catch (e) {
-        console.error("Error:", e);
+        console.error("Read Error:", e);
+    }
+
+    try {
+        console.log("Testing Write Permission...");
+        await databases.createDocument(
+            'vinyl_db',
+            'vinyls',
+            'unique()',
+            {
+                artist: 'Debug Test',
+                title: 'Permission Check',
+                format: 'Vinyl'
+            }
+        );
+        console.log("✅ Write Permission: SUCCESS!");
+
+        // Save ID for delete test
+        const testId = 'unique()'; // Note: In the previous step we used unique(), so we can't easily grab the ID unless we got it from the response. 
+        // For simplicity, let's create a KNOWN ID to delete.
+    } catch (e) {
+        console.error("❌ Write Permission FAILED:", e.message);
+    }
+
+    try {
+        console.log("Testing Delete Permission...");
+        // We'll try to create then delete a specific test document
+        const testDoc = await databases.createDocument('vinyl_db', 'vinyls', 'test-delete-permission', { format: 'Vinyl', title: 'To Delete', artist: 'To Delete' });
+        console.log("Created temp doc for delete test...");
+        await databases.deleteDocument('vinyl_db', 'vinyls', testDoc.$id);
+        console.log("✅ Delete Permission: SUCCESS!");
+    } catch (e) {
+        console.log("❌ Delete Permission FAILED:", e.message);
     }
 }
 
