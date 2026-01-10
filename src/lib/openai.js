@@ -58,7 +58,9 @@ export async function analyzeImage(file) {
 // Wrapper for URLs (Batch Analysis)
 export async function analyzeImageUrl(publicUrl, apiKey, hint = null) {
     try {
-        const response = await fetch(publicUrl);
+        const response = await fetch(publicUrl).catch(err => {
+            throw new Error(`Could not access image. Possible CORS issue. \nSolution: Add "${window.location.hostname}" as a Web Platform in Appwrite Console.`);
+        });
         if (!response.ok) throw new Error("Failed to download image from URL");
 
         const blob = await response.blob();
