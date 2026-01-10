@@ -265,7 +265,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 </div>
                                 <div>
                                     <span className="block text-[10px] text-gray-500 uppercase">Format</span>
-                                    <span className="text-xs font-bold text-accent">{localVinyl.format || 'Vinyl'}</span>
+                                    <span className="text-xs font-bold text-accent">{localVinyl.format || '-'}</span>
                                 </div>
                                 <div>
                                     <span className="block text-[10px] text-gray-500 uppercase">Year</span>
