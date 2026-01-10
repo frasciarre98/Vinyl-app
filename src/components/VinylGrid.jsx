@@ -75,16 +75,16 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
         setLoading(true);
         try {
-            // Process in batches of 5 to respect Rate Limits
-            const batchSize = 5;
+            // Process 1 by 1 to be absolutely safe against Rate Limits
+            const batchSize = 1;
             for (let i = 0; i < selectedIds.length; i += batchSize) {
                 const chunk = selectedIds.slice(i, i + batchSize);
                 await Promise.all(chunk.map(id =>
                     databases.deleteDocument(DATABASE_ID, 'vinyls', id)
                 ));
-                // Small delay between batches
+                // 1000ms delay between EACH deletion
                 if (i + batchSize < selectedIds.length) {
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 1000));
                 }
             }
 

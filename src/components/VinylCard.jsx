@@ -75,6 +75,9 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
         } catch (err) {
             console.error("Analysis failed:", err);
+            // Explicitly alert the user to the failure reason (e.g. API Key missing or Quota)
+            alert(`Analysis Failed: ${err.message}`);
+
             const msg = err.message.toLowerCase();
             if (msg.includes("quota") || msg.includes("limit") || msg.includes("429")) {
                 setError("Limit hit. Wait 30s.");
