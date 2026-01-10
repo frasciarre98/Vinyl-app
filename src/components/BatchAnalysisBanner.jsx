@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Wand2, Play, Pause, X, Loader2, AlertTriangle, Terminal } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { databases, DATABASE_ID } from '../lib/appwrite';
 import { analyzeImageUrl, getApiKey, getProvider, getGeminiTier } from '../lib/openai';
 
 export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vinyls, onUpdate, onComplete }) {
@@ -105,12 +105,15 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     tracks: analysis.tracks
                 };
 
-                const { error: fullError } = await supabase
-                    .from('vinyls')
-                    .update(fullUpdate)
-                    .eq('id', item.id);
-
-                if (fullError) {
+                // Appwrite Update
+                try {
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        'vinyls',
+                        item.id,
+                        fullUpdate
+                    );
+                } catch (fullError) {
                     // Fallback to basic
                     const basicUpdate = {
                         artist: analysis.artist,
@@ -118,11 +121,12 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                         genre: analysis.genre,
                         year: analysis.year
                     };
-                    const { error: basicError } = await supabase.from('vinyls').update(basicUpdate).eq('id', item.id);
-
-                    if (basicError) {
-                        throw new Error(`DB Write Failed: ${basicError.message} `);
-                    }
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        'vinyls',
+                        item.id,
+                        basicUpdate
+                    );
                 }
 
                 addLog(`✓ Success: ${analysis.artist} - ${analysis.title} `, "success");
@@ -152,7 +156,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     if (consecutiveRetries > 20) {
                         addLog("❌ Critical: Too many retries (20). Skipping item to save browser.", "error");
                         failedIdsRef.current.add(item.id);
-                        await supabase.from('vinyls').update({ artist: 'Error', notes: 'Max retries exceeded' }).eq('id', item.id);
+                        await databases.updateDocument(DATABASE_ID, 'vinyls', item.id, { artist: 'Error', notes: 'Max retries exceeded' });
                         consecutiveRetries = 0;
                         setIsRetrying(false);
                         continue; // Proceed to next item
@@ -192,7 +196,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     if (shouldSkipRef.current) {
                         addLog(`⚠ Item skipped by user.`, "error");
                         failedIdsRef.current.add(item.id);
-                        await supabase.from('vinyls').update({ artist: 'Error', notes: 'Skipped by user' }).eq('id', item.id);
+                        await databases.updateDocument(DATABASE_ID, 'vinyls', item.id, { artist: 'Error', notes: 'Skipped by user' });
                         consecutiveRetries = 0;
                         setIsRetrying(false);
                     } else if (!shouldStopRef.current) {
@@ -204,7 +208,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                 } else {
                     addLog(`✗ Error: ${err.message} `, "error");
                     failedIdsRef.current.add(item.id);
-                    await supabase.from('vinyls').update({ artist: 'Error', notes: err.message }).eq('id', item.id);
+                    await databases.updateDocument(DATABASE_ID, 'vinyls', item.id, { artist: 'Error', notes: err.message });
                     consecutiveRetries = 0; // Reset for next
                 }
             }

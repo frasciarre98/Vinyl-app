@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Disc, Settings, Plus, Download, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+// import { supabase } from '../lib/supabase'; // Removed
 
 export function Layout({ children, onOpenSettings, onOpenUpload }) {
     const isConfigured = !import.meta.env.VITE_SUPABASE_URL?.includes('placeholder') && import.meta.env.VITE_SUPABASE_URL;

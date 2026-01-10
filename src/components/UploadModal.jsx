@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock } from 'lucide-react';
 import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
-import { supabase } from '../lib/supabase';
+import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
+import { ID, Query } from 'appwrite';
 
 // Error Boundary for debugging
 class ErrorBoundary extends React.Component {
@@ -74,10 +75,14 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
             setProgress({});
             const fetchExisting = async () => {
                 try {
-                    const { data, error } = await supabase.from('vinyls').select('original_filename');
-                    if (error) throw error;
-                    if (data) {
-                        setExistingFilenames(new Set(data.map(d => d.original_filename).filter(Boolean)));
+                    const response = await databases.listDocuments(
+                        DATABASE_ID,
+                        'vinyls',
+                        [Query.select(['original_filename']), Query.limit(1000)]
+                    );
+
+                    if (response.documents) {
+                        setExistingFilenames(new Set(response.documents.map(d => d.original_filename).filter(Boolean)));
                     }
                 } catch (err) {
                     console.error("Failed to check duplicates:", err);
@@ -128,8 +133,6 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
         const apiKey = getApiKey();
         const uploadedRecords = [];
 
-        // Helper for synchronous analysis with retry
-        // Renamed to reflect its blocking nature in the current flow
         try {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -144,55 +147,48 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 10, error: null } }));
 
                     // 1. Upload to Storage
-                    const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
-
-                    // COMPRESS: Client-Side Resize to prevent OOM on Grid
+                    // COMPRESS: Client-Side Resize
                     const compressedDataUrl = await resizeImage(file);
                     const compressedBlob = await (await fetch(compressedDataUrl)).blob();
 
-                    const { data: uploadData, error: uploadError } = await supabase.storage
-                        .from('covers')
-                        .upload(fileName, compressedBlob, {
-                            contentType: 'image/jpeg',
-                            upsert: false
-                        });
+                    // Appwrite requires File object for createFile, so we reconstruct it from blob
+                    const uploadFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
 
-                    if (uploadError) throw uploadError;
+                    const fileUpload = await storage.createFile(
+                        BUCKET_ID,
+                        ID.unique(),
+                        uploadFile
+                    );
 
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('covers')
-                        .getPublicUrl(fileName);
+                    // Get View URL (Public)
+                    // In Appwrite, we construct the URL manually or use getFileView (which returns a URL object)
+                    // The standard pattern is: endpoint/storage/buckets/{bucketId}/files/{fileId}/view?project={projectId}
+                    // But SDK helper easiest is:
+                    const publicUrlResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
+                    const publicUrl = publicUrlResult.href; // Get the string URL
 
                     // 2. Insert to DB (Pending State)
-                    const { data: dbData, error: dbError } = await supabase
-                        .from('vinyls')
-                        .insert({
+                    const dbData = await databases.createDocument(
+                        DATABASE_ID,
+                        'vinyls',
+                        ID.unique(),
+                        {
                             image_url: publicUrl,
                             artist: 'Pending AI',
                             title: file.name.replace(/\.[^/.]+$/, ""), // Use filename as tentative title
                             genre: '',
                             year: '',
-                            original_filename: file.name // Track for deduplication
-                        })
-                        .select()
-                        .single();
+                            original_filename: file.name, // Track for deduplication
+                            format: format
+                        }
+                    );
 
-                    if (dbError) throw dbError;
+                    uploadedRecords.push({ id: dbData.$id, file, name: file.name, publicUrl });
 
-                    uploadedRecords.push({ id: dbData.id, file, name: file.name, publicUrl });
-
-
-
-
-                    // 3. Instant Finish (Handover to Background Banner)
-                    // We simply finish here. The BatchAnalysisBanner in the grid will detect
-                    // the 'Pending AI' items and process them in the background queue.
-                    // This allows "Caricare molti file" without blocking the UI.
-
-                    // Show as "Saved" - Complete
+                    // 3. Instant Finish
                     setProgress(prev => ({
                         ...prev,
-                        [file.name]: { status: 'complete', progress: 100, dbId: dbData.id, publicUrl }
+                        [file.name]: { status: 'complete', progress: 100, dbId: dbData.$id, publicUrl }
                     }));
 
                 } catch (err) {
@@ -203,9 +199,6 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                     }));
                 }
             }
-            // END OF UPLOAD LOOP - No Phase 2
-
-
         } catch (e) {
             console.error("Upload error:", e);
         } finally {

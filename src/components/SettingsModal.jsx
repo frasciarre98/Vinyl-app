@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2 } from 'lucide-react';
 import { saveApiKey, getApiKey, getProvider, setProvider, getGeminiTier, setGeminiTier, resizeImage } from '../lib/openai';
-import { supabase } from '../lib/supabase';
+import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
+import { Query } from 'appwrite';
 
 export function SettingsModal({ onClose, onSave }) {
     const [apiKey, setApiKey] = useState('');
@@ -35,13 +36,24 @@ export function SettingsModal({ onClose, onSave }) {
 
         setCleaning(true);
         try {
-            // Reset all to Pending AI
-            const { error } = await supabase
-                .from('vinyls')
-                .update({ artist: 'Pending AI', notes: null, tracks: null }) // Clear old data to force re-fetch
-                .not('id', 'is', null);
+            // Appwrite: Fetch all documents first
+            const { documents } = await databases.listDocuments(
+                DATABASE_ID,
+                'vinyls',
+                [Query.limit(1000)]
+            );
 
-            if (error) throw error;
+            // Loop updates (Appwrite doesn't have bulk update)
+            const promises = documents.map(doc =>
+                databases.updateDocument(
+                    DATABASE_ID,
+                    'vinyls',
+                    doc.$id,
+                    { artist: 'Pending AI', notes: null, tracks: null }
+                )
+            );
+
+            await Promise.all(promises);
 
             alert("All records reset! The AI will now start re-analyzing them to find tracks.");
             window.location.reload();
@@ -62,12 +74,11 @@ export function SettingsModal({ onClose, onSave }) {
         setCompressing(true);
         try {
             // 1. Fetch all vinyls
-            const { data: vinyls, error } = await supabase
-                .from('vinyls')
-                .select('id, image_url, title, artist')
-                .not('image_url', 'is', null);
-
-            if (error) throw error;
+            const { documents: vinyls } = await databases.listDocuments(
+                DATABASE_ID,
+                'vinyls',
+                [Query.isNotNull('image_url'), Query.limit(1000)]
+            );
 
             setCompressProgress({ current: 0, total: vinyls.length });
 
@@ -91,27 +102,29 @@ export function SettingsModal({ onClose, onSave }) {
                     const compressedDataUrl = await resizeImage(blob);
                     const compressedBlob = await (await fetch(compressedDataUrl)).blob();
 
-                    // Upload (Overwrite or New?)
-                    // Safest is New + Update DB to avoid cache issues
+                    // Reconstruct File for Appwrite
                     const ext = v.image_url.split('.').pop().split('?')[0] || 'jpg';
-                    const fileName = `compressed_${v.id}_${Date.now()}.${ext}`;
+                    const fileName = `compressed_${v.$id}_${Date.now()}.${ext}`;
+                    const uploadFile = new File([compressedBlob], fileName, { type: 'image/jpeg' });
 
-                    const { data: uploadData, error: uploadError } = await supabase.storage
-                        .from('covers')
-                        .upload(fileName, compressedBlob, { contentType: 'image/jpeg' });
-
-                    if (uploadError) throw uploadError;
+                    // Upload
+                    const fileUpload = await storage.createFile(
+                        BUCKET_ID,
+                        'unique()',
+                        uploadFile
+                    );
 
                     // Get Public URL
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('covers')
-                        .getPublicUrl(fileName);
+                    const publicUrl = storage.getFileView(BUCKET_ID, fileUpload.$id).href;
+
 
                     // Update DB
-                    await supabase
-                        .from('vinyls')
-                        .update({ image_url: publicUrl })
-                        .eq('id', v.id);
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        'vinyls',
+                        v.$id,
+                        { image_url: publicUrl }
+                    );
 
                 } catch (err) {
                     console.error(`Failed to compress ${v.title}:`, err);
@@ -137,16 +150,13 @@ export function SettingsModal({ onClose, onSave }) {
 
         setCleaning(true);
         try {
-            const { data: vinyls, error } = await supabase
-                .from('vinyls')
-                .select('id, artist, title, created_at, notes, image_url, year, genre')
-                .not('artist', 'is', null)
-                .not('title', 'is', null);
-
-            if (error) throw error;
+            const { documents: vinyls } = await databases.listDocuments(
+                DATABASE_ID,
+                'vinyls',
+                [Query.isNotNull('artist'), Query.isNotNull('title'), Query.limit(1000)]
+            );
 
             const groups = {};
-            let duplicatesCount = 0;
             const toDelete = [];
 
             vinyls.forEach(v => {
@@ -167,18 +177,21 @@ export function SettingsModal({ onClose, onSave }) {
                         const aScore = (a.image_url ? 2 : 0) + (a.year && a.year.length === 4 ? 2 : 0) + (a.notes && a.notes.length > 20 ? 1 : 0);
                         const bScore = (b.image_url ? 2 : 0) + (b.year && b.year.length === 4 ? 2 : 0) + (b.notes && b.notes.length > 20 ? 1 : 0);
                         if (aScore !== bScore) return bScore - aScore; // Higher score wins
-                        return new Date(a.created_at) - new Date(b.created_at); // Oldest wins
+                        return new Date(a.$createdAt) - new Date(b.$createdAt); // Oldest wins - Appwrite timestamp is $createdAt
                     });
 
                     // Keep [0], delete rest
                     const losers = group.slice(1);
-                    losers.forEach(l => toDelete.push(l.id));
+                    losers.forEach(l => toDelete.push(l.$id));
                 }
             });
 
             if (toDelete.length > 0) {
-                const { error: delError } = await supabase.from('vinyls').delete().in('id', toDelete);
-                if (delError) throw delError;
+                const deletePromises = toDelete.map(id =>
+                    databases.deleteDocument(DATABASE_ID, 'vinyls', id)
+                );
+                await Promise.all(deletePromises);
+
                 alert(`Successfully removed ${toDelete.length} duplicate vinyls!`);
                 window.location.reload();
             } else {
@@ -355,6 +368,24 @@ export function SettingsModal({ onClose, onSave }) {
                         <p className="text-[10px] text-secondary text-center">
                             Reduces size of ALL existing vinyl covers to ~300KB.
                         </p>
+
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const { documents } = await databases.listDocuments(DATABASE_ID, 'vinyls', [Query.limit(1)]);
+                                    if (documents.length > 0) {
+                                        alert(JSON.stringify(documents[0], null, 2));
+                                    } else {
+                                        alert("No vinyls found.");
+                                    }
+                                } catch (e) {
+                                    alert(e.message);
+                                }
+                            }}
+                            className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors flex justify-center items-center gap-2 text-sm font-medium mt-4"
+                        >
+                            <Terminal className="w-4 h-4" /> Debug: Inspect 1st Item
+                        </button>
                     </div>
 
                 </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Loader2, Trash2, CheckSquare, Square } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { databases, DATABASE_ID } from '../lib/appwrite';
+import { Query } from 'appwrite';
 import { VinylCard } from './VinylCard';
 import { BatchAnalysisBanner } from './BatchAnalysisBanner';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
@@ -31,13 +32,24 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const fetchVinyls = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('vinyls')
-                .select('*')
-                .order('created_at', { ascending: false });
+            // Appwrite: listDocuments
+            const response = await databases.listDocuments(
+                DATABASE_ID,
+                'vinyls',
+                [
+                    Query.orderDesc('$createdAt'),
+                    Query.limit(100) // Appwrite creates pagination by default, limit 100 for now
+                ]
+            );
 
-            if (error) throw error;
-            setVinyls(data || []);
+            // Appwrite returns { total, documents }. Map documents to match expected structure if needed
+            // Our vinyl structure maps 1:1 mostly, but id is $id
+            const mappedData = response.documents.map(doc => ({
+                ...doc,
+                id: doc.$id // Map $id to id for compatibility
+            }));
+
+            setVinyls(mappedData || []);
             // Reset selection on refresh
             setSelectedIds([]);
             setIsSelectionMode(false);
@@ -63,12 +75,12 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('vinyls')
-                .delete()
-                .in('id', selectedIds);
+            // Appwrite doesn't have a bulk delete query yet, so we loop safely
+            const deletePromises = selectedIds.map(id =>
+                databases.deleteDocument(DATABASE_ID, 'vinyls', id)
+            );
 
-            if (error) throw error;
+            await Promise.all(deletePromises);
 
             // Optimistic update or refresh
             fetchVinyls();
@@ -106,16 +118,16 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
                     if (analysis.average_cost) {
-                        const { error } = await supabase
-                            .from('vinyls')
-                            .update({ average_cost: analysis.average_cost })
-                            .eq('id', vinyl.id);
+                        await databases.updateDocument(
+                            DATABASE_ID,
+                            'vinyls',
+                            vinyl.id, // Using mapped 'id' which is '$id'
+                            { average_cost: analysis.average_cost }
+                        );
 
-                        if (!error) {
-                            successCount++;
-                            // Optimistic update
-                            setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, average_cost: analysis.average_cost } : v));
-                        }
+                        successCount++;
+                        // Optimistic update
+                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, average_cost: analysis.average_cost } : v));
                     }
 
                     // Small delay to respect rate limits
@@ -175,8 +187,8 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                         onClick={async () => {
                             if (!confirm("SEI SICURO? Cancellando tutto perderai i dischi caricati. Usalo solo se sei bloccato.")) return;
                             try {
-                                const { error } = await supabase.from('vinyls').delete().not('id', 'is', null); // Delete all (Type-safe)
-                                if (error) throw error;
+                                const list = await databases.listDocuments(DATABASE_ID, 'vinyls', [Query.limit(100)]);
+                                await Promise.all(list.documents.map(doc => databases.deleteDocument(DATABASE_ID, 'vinyls', doc.$id)));
                                 alert("Database pulito con successo! Ricarica la pagina per ricominciare.");
                                 window.location.reload();
                             } catch (e) {
@@ -260,7 +272,10 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
                                 setLoading(true);
                                 try {
-                                    await supabase.from('vinyls').update({ artist: 'Pending AI', notes: null }).in('id', errorIds);
+                                    // Appwrite requires individual updates
+                                    await Promise.all(errorIds.map(id =>
+                                        databases.updateDocument(DATABASE_ID, 'vinyls', id, { artist: 'Pending AI', notes: null })
+                                    ));
                                     await fetchVinyls();
                                 } catch (e) {
                                     alert("Error resetting items: " + e.message);
@@ -344,7 +359,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                                 onEdit={onEdit}
                                 onDelete={async (id) => {
                                     if (confirm('Delete this record?')) {
-                                        await supabase.from('vinyls').delete().eq('id', id);
+                                        await databases.deleteDocument(DATABASE_ID, 'vinyls', id);
                                         setVinyls(prev => prev.filter(v => v.id !== id));
                                     }
                                 }}

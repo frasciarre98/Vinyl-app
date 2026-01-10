@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
+import { ID } from 'appwrite';
 import { resizeImage } from '../lib/openai';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../lib/imageUtils';
@@ -12,10 +13,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         year: '',
         genre: '',
         format: 'Vinyl',
-        condition: '',
+        condition: '', // Typo fix if it was missing
         average_cost: '',
         notes: '',
-        tracks: ''
+        tracks: '',
+        group_members: '' // Added missing fields
     });
     const [saving, setSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -52,12 +54,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         e.preventDefault();
         setSaving(true);
         try {
-            const { error } = await supabase
-                .from('vinyls')
-                .update(formData)
-                .eq('id', vinyl.id);
-
-            if (error) throw error;
+            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, formData);
             onUpdate();
             onClose();
         } catch (err) {
@@ -71,8 +68,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         if (!confirm('Are you sure you want to delete this record?')) return;
         setSaving(true);
         try {
-            const { error } = await supabase.from('vinyls').delete().eq('id', vinyl.id);
-            if (error) throw error;
+            await databases.deleteDocument(DATABASE_ID, 'vinyls', vinyl.id);
             onUpdate();
             onClose();
         } catch (err) {
@@ -122,29 +118,21 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             const compressedDataUrl = await resizeImage(file);
             const compressedBlob = await (await fetch(compressedDataUrl)).blob();
 
-            // Upload to Supabase
-            const fileExt = 'webp';
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-            const filePath = `${fileName}`;
+            // Reconstruct File for Appwrite
+            const uploadFile = new File([compressedBlob], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
 
-            const { error: uploadError } = await supabase.storage
-                .from('covers')
-                .upload(filePath, compressedBlob);
-
-            if (uploadError) throw uploadError;
+            // Upload to Appwrite Storage
+            const fileUpload = await storage.createFile(
+                BUCKET_ID,
+                ID.unique(),
+                uploadFile
+            );
 
             // Get Public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('covers')
-                .getPublicUrl(filePath);
+            const publicUrl = storage.getFileView(BUCKET_ID, fileUpload.$id).href;
 
             // Update Vinyl Record immediately
-            const { error: updateError } = await supabase
-                .from('vinyls')
-                .update({ image_url: publicUrl })
-                .eq('id', vinyl.id);
-
-            if (updateError) throw updateError;
+            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { image_url: publicUrl });
 
             onUpdate();
             setIsCropping(false);

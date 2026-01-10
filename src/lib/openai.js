@@ -1,7 +1,7 @@
 /**
  * Service to analyze album covers using AI (Google Gemini or OpenAI).
  */
-import { supabase } from './supabase';
+// import { supabase } from './supabase'; // Removed
 
 const DEFAULT_PROVIDER = 'gemini';
 const MODEL_COOLDOWNS = new Map();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle, Youtube } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { databases, DATABASE_ID } from '../lib/appwrite';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
 export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip }) {
@@ -38,7 +38,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
             const analysis = await analyzeImageUrl(localVinyl.image_url, apiKey, hint);
 
-            // Update Supabase
+            // Update Appwrite
             // Update Supabase (Adaptive: Try Full, Fallback to Basic)
             const fullUpdate = {
                 artist: analysis.artist,
@@ -47,18 +47,19 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 year: analysis.year,
                 notes: analysis.notes,
                 group_members: analysis.group_members,
-                group_members: analysis.group_members,
                 condition: analysis.condition,
                 average_cost: analysis.average_cost,
                 tracks: analysis.tracks
             };
 
-            const { error: fullError } = await supabase
-                .from('vinyls')
-                .update(fullUpdate)
-                .eq('id', localVinyl.id);
-
-            if (fullError) {
+            try {
+                await databases.updateDocument(
+                    DATABASE_ID,
+                    'vinyls',
+                    localVinyl.id,
+                    fullUpdate
+                );
+            } catch (fullError) {
                 console.warn("Full update failed (likely missing columns), trying basic update...", fullError.message);
 
                 // Fallback: Basic Update
@@ -69,12 +70,12 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                     year: analysis.year
                 };
 
-                const { error: basicError } = await supabase
-                    .from('vinyls')
-                    .update(basicUpdate)
-                    .eq('id', localVinyl.id);
-
-                if (basicError) throw basicError; // Real error
+                await databases.updateDocument(
+                    DATABASE_ID,
+                    'vinyls',
+                    localVinyl.id,
+                    basicUpdate
+                );
             }
 
             // Update local view
