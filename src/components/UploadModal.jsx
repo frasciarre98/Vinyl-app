@@ -214,7 +214,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                             tracks: aiMetadata.tracks || '',
                             group_members: aiMetadata.group_members || '',
                             condition: aiMetadata.condition || '',
-                            avarege_cost: aiMetadata.average_cost || '', // Map to DB typo
+                            // Sanitise cost to strict String(50) for DB
+                            avarege_cost: String(aiMetadata.average_cost || '').substring(0, 50),
                             original_filename: file.name,
                             format: currentFormat
                         }

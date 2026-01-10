@@ -54,8 +54,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         e.preventDefault();
         setSaving(true);
         try {
-            // Map average_cost to avarege_cost (DB typo)
-            const payload = { ...formData, avarege_cost: formData.average_cost };
+            // Map average_cost to avarege_cost (DB typo) and sanitize
+            const cleanCost = String(formData.average_cost || '').substring(0, 50);
+            const payload = { ...formData, avarege_cost: cleanCost };
             delete payload.average_cost;
 
             await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, payload);
