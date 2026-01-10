@@ -102,7 +102,8 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     notes: analysis.notes,
                     group_members: analysis.group_members,
                     condition: analysis.condition,
-                    avarege_cost: analysis.average_cost,
+                    // Sanitise cost to strict String(50)
+                    avarege_cost: String(analysis.average_cost || '').substring(0, 50),
                     tracks: analysis.tracks
                 };
 
