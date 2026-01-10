@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { Disc, Settings, Plus, Download, Loader2 } from 'lucide-react';
-// import { supabase } from '../lib/supabase'; // Removed
+import { databases, DATABASE_ID, isAppwriteConfigured } from '../lib/appwrite';
+import { Query } from 'appwrite';
 
 export function Layout({ children, onOpenSettings, onOpenUpload }) {
-    const isConfigured = !import.meta.env.VITE_SUPABASE_URL?.includes('placeholder') && import.meta.env.VITE_SUPABASE_URL;
+    const isConfigured = isAppwriteConfigured();
     const [isExporting, setIsExporting] = useState(false);
 
     const handleExport = async () => {
         setIsExporting(true);
         try {
-            const { data, error } = await supabase.from('vinyls').select('*').order('created_at', { ascending: false });
-            if (error) throw error;
+            // Appwrite: listDocuments (Note: Limit is default 25, need to increase or paginate for full export)
+            // For now, fetching up to 5000 (Appwrite max limit per request)
+            const { documents: data } = await databases.listDocuments(
+                DATABASE_ID,
+                'vinyls',
+                [Query.limit(5000), Query.orderDesc('$createdAt')]
+            );
 
             if (!data || data.length === 0) {
                 alert('No vinyls to export!');
@@ -64,7 +70,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload }) {
         <div className="min-h-screen flex flex-col">
             {!isConfigured && (
                 <div className="bg-red-600 text-white text-center py-2 px-4 font-bold animate-pulse">
-                    ⚠️ ATTENZIONE: Riavvia il server (CTRL+C poi 'npm run dev') per caricare le chiavi dal file .env!
+                    ⚠️ Errore Configurazione: PROJECT_ID mancante in src/lib/appwrite.js
                 </div>
             )}
             <header className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-50">
