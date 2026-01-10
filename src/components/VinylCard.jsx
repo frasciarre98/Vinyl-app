@@ -44,7 +44,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 artist: analysis.artist,
                 title: analysis.title,
                 genre: analysis.genre,
-                year: analysis.year,
+                year: String(analysis.year || '').substring(0, 50),
                 notes: analysis.notes,
                 group_members: analysis.group_members,
                 condition: analysis.condition,
