@@ -347,44 +347,46 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                 messages: [
                     {
                         role: "system",
-                        content: `You are an expert musicologist and archivist. 
-Your goal is to extract EXACT metadata from vinyl record images.
-CRITICAL:
-1. **IF BACK COVER:** You MUST transcribe the visible tracklist exactly. Do not invent tracks.
-2. **IF FRONT COVER:** You **MUST** use your internal database (Discogs). 
-   - PRIORITIZE the **Original Vinyl LP** tracklist.
-   - Do NOT include CD bonus tracks or Reissue extras unless the cover explicitly says "Deluxe" or "Bonus".
-   - Return the standard tracklist for the original release year.
-If you cannot identify the album, return "artist": "Unknown".`
+                        content: `You are an expert musicologist. 
+Your goal is to identify this vinyl record and provide accurate metadata.
+1. **Analyze the Image**: If it's a Back Cover with a tracklist, transcribe it EXACTLY as seen (including unique formatting).
+2. **Internal Knowledge**: If it's a Front Cover (or text is unreadable), use your database to find the **Original Vinyl LP** tracklist (exclude CD bonus tracks).
+3. **Be Precise**: For "Formula 3" or "Dirotta su Cuba", ensure you match the specific Italian original release.`
                     },
                     {
                         role: "user",
                         content: [
                             {
-                                type: "text", text: `Analyze this vinyl record image.
-${hint ? `User Hint: "${hint}"` : ''}
+                                type: "text", text: `Analyze this vinyl record image. ${hint ? `Hint: "${hint}"` : ''}
 
-**INSTRUCTIONS:**
-1. **LOOK** closely at the image. Determine if it is the FRONT or BACK cover.
-2. **IF BACK COVER:** You MUST transcribe the tracklist EXATCLY as printed (e.g. if it says "2 Liberi di- liberida", write EXACTLY that). Do NOT correct typos or "fix" the text. Visual text is the only truth.
-3. **IF FRONT COVER:** Identify the album, then search your internal database for the *specific* edition that matches the artwork style/logos.
-4. **FILL** the JSON metadata.
+**OUTPUT INSTRUCTIONS:**
+- Return a single JSON object.
+- **_visual_evidence**: Briefly list what text you can actually read on the image.
+- **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
+- **year**: Original release year.
 
-**OUTPUT FORMAT:**
-Return a single JSON object (no markdown, no conversation) with these keys:
-{
-  "_visual_evidence": "List 3-4 tracks or text you actually SEE on the image here...",
-  "artist": "Exact Artist Name",
-  "title": "Exact Album Title",
-  "genre": "Genre",
-  "year": "Original Release Year (of this edition)",
-  "tracks": "Full tracklist (newline separated). MUST MATCH THE BACK COVER.",
-  "group_members": "Key members (comma separated)",
-  "average_cost": "Collector Value (e.g. €20-30)",
-  "condition": "Visual Grade (Mint/Good/Fair)",
-  "notes": "Brief trivia"
-}` },
+Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, notes.` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
+                        ]
+                    }
+                ],
+                4. ** FILL ** the JSON metadata.
+
+** OUTPUT FORMAT:**
+                    Return a single JSON object(no markdown, no conversation) with these keys:
+                    {
+                        "_visual_evidence": "List 3-4 tracks or text you actually SEE on the image here...",
+                        "artist": "Exact Artist Name",
+                        "title": "Exact Album Title",
+                        "genre": "Genre",
+                        "year": "Original Release Year (of this edition)",
+                        "tracks": "Full tracklist (newline separated). MUST MATCH THE BACK COVER.",
+                        "group_members": "Key members (comma separated)",
+                        "average_cost": "Collector Value (e.g. €20-30)",
+                        "condition": "Visual Grade (Mint/Good/Fair)",
+                        "notes": "Brief trivia"
+                    }` },
+                            { type: "image_url", image_url: { url: `data: ${ mimeType }; base64, ${ base64Content }`, detail: "high" } }
                         ]
                     }
                 ],
@@ -406,9 +408,9 @@ Return a single JSON object (no markdown, no conversation) with these keys:
             console.error("[OpenAI] Empty Response. Full Choice:", JSON.stringify(choice, null, 2));
             // Check for refusal specifically
             if (choice.message.refusal) {
-                throw new Error(`OpenAI Refusal: ${choice.message.refusal}`);
+                throw new Error(`OpenAI Refusal: ${ choice.message.refusal }`);
             }
-            throw new Error(`OpenAI returned empty content. Reason: ${choice.finish_reason}`);
+            throw new Error(`OpenAI returned empty content.Reason: ${ choice.finish_reason }`);
         }
 
         console.log("[OpenAI] Raw Response:", choice.message.content); // CRITICAL DEBUG LOG
@@ -443,11 +445,11 @@ function parseAIResponse(jsonString) {
             return normalizeParsedData(JSON.parse(jsonCandidate));
         } catch (e2) {
             console.error("[OpenAI] JSON Extraction Failed:", e2);
-            throw new Error(`Invalid JSON from AI: ${e2.message} -- Raw: ${content.substring(0, 100)}...`);
+            throw new Error(`Invalid JSON from AI: ${ e2.message } -- Raw: ${ content.substring(0, 100) }...`);
         }
     }
 
-    throw new Error(`Invalid JSON from AI: No JSON object found in response. Raw: "${content.substring(0, 100)}..."`);
+    throw new Error(`Invalid JSON from AI: No JSON object found in response.Raw: "${content.substring(0, 100)}..."`);
 }
 
 function normalizeParsedData(parsed) {
