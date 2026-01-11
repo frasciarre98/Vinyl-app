@@ -134,6 +134,18 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
         e.target.value = '';
     };
 
+    // Handle closing/reset
+    const handleClose = () => {
+        if (uploading) {
+            if (confirm("Upload in progress. Stop uploads?")) {
+                abortRef.current = true;
+                onClose();
+            }
+        } else {
+            onClose();
+        }
+    };
+
     const processUploads = async () => {
         setUploading(true);
         abortRef.current = false; // Reset abort flag
