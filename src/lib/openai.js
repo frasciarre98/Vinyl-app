@@ -351,7 +351,10 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
 Your goal is to extract EXACT metadata from vinyl record images.
 CRITICAL:
 1. **IF BACK COVER:** You MUST transcribe the visible tracklist exactly. Do not invent tracks.
-2. **IF FRONT COVER:** You **MUST** use your internal database (Discogs) to provide the full tracklist.
+2. **IF FRONT COVER:** You **MUST** use your internal database (Discogs). 
+   - PRIORITIZE the **Original Vinyl LP** tracklist.
+   - Do NOT include CD bonus tracks or Reissue extras unless the cover explicitly says "Deluxe" or "Bonus".
+   - Return the standard tracklist for the original release year.
 If you cannot identify the album, return "artist": "Unknown".`
                     },
                     {
