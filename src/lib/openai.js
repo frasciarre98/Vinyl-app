@@ -268,7 +268,10 @@ Raw JSON only.` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
                     }],
-                    generationConfig: { response_mime_type: "application/json" }
+                    generationConfig: {
+                        response_mime_type: "application/json",
+                        temperature: 0
+                    }
                 }),
                 signal: controller.signal
             });
@@ -343,7 +346,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                 messages: [
                     {
                         role: "system",
-                        content: "You are an expert musicologist. Return ONLY valid JSON. Focus on historical and cataloging metadata. Do not offer financial advice."
+                        content: "You are an expert musicologist specializing in Vinyl. Return ONLY valid JSON. Focus on historical accuracy. Do not offer financial advice. Pay attention to specific local editions (especially Italian presses)."
                     },
                     {
                         role: "user",
@@ -370,7 +373,8 @@ Return JSON with these keys:
                     }
                 ],
                 response_format: { type: "json_object" },
-                max_tokens: 1200
+                max_tokens: 1200,
+                temperature: 0
             })
         });
 
