@@ -145,7 +145,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             alert('Cover updated!');
         } catch (err) {
             console.error('Error saving crop:', err);
-            alert('Failed to save cropped image: ' + err.message);
+            const errMsg = err.message || (typeof err === 'string' ? err : 'Unknown error (possibly CORS)');
+            alert('Failed to save cropped image: ' + errMsg);
         } finally {
             setUploadingImage(false);
         }
