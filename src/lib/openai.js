@@ -356,9 +356,11 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                                 type: "text", text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork, then use your internal database for details.'}
 Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
 **CRITICAL FOR ACCURACY:**
-- **VISUAL MATCHING:** Look at the back cover image. Read 2-3 unique track titles you see. Use these to find the **EXACT Edition** in your database that matches this specific tracklist.
-- If the image contains a tracklist, **TRUST THE IMAGE** over the standard album version.
-- If this is a Compilation, ensure the tracklist matches what is printed on the cover.
+**CRITICAL FOR ACCURACY:**
+- **VISUAL MATCHING:** The text on the back cover is the **GROUND TRUTH**.
+- **Rule 1:** If you see a tracklist on the image, you MUST output those exact tracks in that order.
+- **Rule 2:** Only use internal knowledge (Discogs) to fix typos or fill in blurry lines. **NEVER** output a tracklist that contradicts the visible text on the cover.
+- **Rule 3:** For "Dirotta su Cuba" or "Formula 3", checking the specific Italian edition is mandatory.
 
 Return JSON with these keys: 
 - artist
