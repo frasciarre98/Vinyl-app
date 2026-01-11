@@ -190,7 +190,13 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                     try {
                         if (apiKey) {
                             // 10s Timeout Race to prevent hanging
-                            const aiPromise = analyzeImage(optimizedFile);
+                            // Smart Hint: Use filename if it's not generic (IMG_XXXX)
+                            let hint = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                            if (/^(IMG|DSC|PXL|VIDEO|MOV|VID)[\d_-]/i.test(hint) || hint.length < 4) {
+                                hint = null; // Ignore generic camera filenames
+                            }
+
+                            const aiPromise = analyzeImage(optimizedFile, hint);
                             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Timeout (10s)")), 10000));
 
                             aiMetadata = await Promise.race([aiPromise, timeoutPromise]);

@@ -81,7 +81,7 @@ export async function testConnection(provider, apiKey) {
 // --- CORE ANALYSIS DISPATCHER ---
 
 // Wrapper for Files (Upload Modal)
-export async function analyzeImage(file) {
+export async function analyzeImage(file, hint = null) {
     const base64Data = await fileToBase64(file);
     const base64Content = base64Data.split(',')[1];
     const mimeType = file.type || 'image/jpeg';
@@ -94,8 +94,8 @@ export async function analyzeImage(file) {
     const provider = getProvider();
     const apiKey = getApiKey(provider);
 
-    if (provider === 'openai') return analyzeOpenAI(base64Content, apiKey);
-    return analyzeGemini(base64Content, mimeType, apiKey);
+    if (provider === 'openai') return analyzeOpenAI(base64Content, apiKey, hint);
+    return analyzeGemini(base64Content, mimeType, apiKey, hint);
 }
 
 // Wrapper for URLs (Batch Analysis)
