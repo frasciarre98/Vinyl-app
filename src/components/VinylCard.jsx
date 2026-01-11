@@ -45,12 +45,12 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 title: analysis.title,
                 genre: analysis.genre,
                 year: String(analysis.year || '').substring(0, 50),
-                notes: analysis.notes,
-                group_members: analysis.group_members,
+                notes: String(analysis.notes || '').substring(0, 999),
+                group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 // Sanitise cost to strict String(50)
                 avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-                tracks: analysis.tracks
+                tracks: String(analysis.tracks || '').substring(0, 4999)
             };
 
             // Try Full Update - If this fails, it means Schema is missing attributes in Appwrite.
