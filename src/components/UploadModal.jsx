@@ -207,15 +207,15 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                             image_url: publicUrl,
                             // Use AI metadata if available, otherwise defaults
                             // Use AI metadata if available, otherwise defaults to 'Pending AI' for retry later
-                            artist: aiMetadata.artist || (apiKey ? 'Pending AI' : 'Unknown Artist'),
-                            title: aiMetadata.title || file.name.replace(/\.[^/.]+$/, ""),
-                            genre: aiMetadata.genre || '',
+                            artist: String(aiMetadata.artist || (apiKey ? 'Pending AI' : 'Unknown Artist')).substring(0, 100),
+                            title: String(aiMetadata.title || file.name.replace(/\.[^/.]+$/, "")).substring(0, 100),
+                            genre: String(aiMetadata.genre || '').substring(0, 50),
                             // SAFE CAST for year to String(50) to prevent Appwrite errors
                             year: String(aiMetadata.year || '').substring(0, 50),
-                            notes: aiMetadata.notes || '',
-                            tracks: aiMetadata.tracks || '',
-                            group_members: aiMetadata.group_members || '',
-                            condition: aiMetadata.condition || '',
+                            notes: String(aiMetadata.notes || '').substring(0, 1000),
+                            tracks: String(aiMetadata.tracks || '').substring(0, 5000),
+                            group_members: String(aiMetadata.group_members || '').substring(0, 255),
+                            condition: String(aiMetadata.condition || '').substring(0, 50),
                             // Sanitise cost to strict String(50) for DB
                             avarege_cost: String(aiMetadata.average_cost || '').substring(0, 50),
                             original_filename: file.name,
