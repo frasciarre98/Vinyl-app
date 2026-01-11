@@ -347,11 +347,13 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                 messages: [
                     {
                         role: "system",
-                        content: `You are an expert musicologist. 
-Your goal is to identify this vinyl record and provide accurate metadata.
-1. **Analyze the Image**: If it's a Back Cover with a tracklist, transcribe it EXACTLY as seen (including unique formatting).
-2. **Internal Knowledge**: If it's a Front Cover (or text is unreadable), use your database to find the **Original Vinyl LP** tracklist (exclude CD bonus tracks).
-3. **Be Precise**: For "Formula 3" or "Dirotta su Cuba", ensure you match the specific Italian original release.`
+                        content: `You are an expert musicologist and archivist.
+Your goal is to provide **Forensic Level Metadata**.
+1. **Back Cover (Visual Truth):** If you see a tracklist, you are a SCANNER. Transcribe text EXACTLY as printed (including typos, e.g. "Liberi di- liberida"). Do not correct it.
+2. **Front Cover (Database Truth):** If using the database, finding the **Italian First Pressing** is mandatory for Italian artists. 
+   - For "Dirotta su Cuba", look for the 1994 CGD release.
+   - For "Formula 3", look for the original Numero Uno release.
+   - Do NOT use CD reissues with bonus tracks.`
                     },
                     {
                         role: "user",
