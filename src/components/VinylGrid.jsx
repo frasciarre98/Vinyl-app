@@ -251,14 +251,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                         />
                     </div>
 
-                    {/* DEBUG REFRESH BUTTON */}
-                    <button
-                        onClick={fetchVinyls}
-                        className="bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-pulse"
-                        title="Force Refresh"
-                    >
-                        REFRESH ({vinyls.length})
-                    </button>
+
 
                     {/* Artist Filter */}
                     <select
