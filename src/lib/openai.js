@@ -94,7 +94,7 @@ export async function analyzeImage(file, hint = null) {
     const provider = getProvider();
     const apiKey = getApiKey(provider);
 
-    if (provider === 'openai') return analyzeOpenAI(base64Content, apiKey, hint);
+    if (provider === 'openai') return analyzeOpenAI(base64Content, apiKey, hint, mimeType);
     return analyzeGemini(base64Content, mimeType, apiKey, hint);
 }
 
@@ -118,7 +118,7 @@ export async function analyzeImageUrl(publicUrl, apiKey, hint = null) {
         // If apiKey is passed, use it, otherwise fetch based on provider
         const keyToUse = apiKey || getApiKey(provider);
 
-        if (provider === 'openai') return analyzeOpenAI(base64Content, keyToUse, hint);
+        if (provider === 'openai') return analyzeOpenAI(base64Content, keyToUse, hint, 'image/jpeg');
         return analyzeGemini(base64Content, 'image/jpeg', keyToUse, hint);
 
     } catch (error) {
@@ -323,16 +323,20 @@ Raw JSON only.` },
     throw new Error(`All models failed. Last error: ${lastError?.message || 'Check API Key permissions'}`);
 }
 
-// 2. OpenAI (GPT-4o-mini - Fast & Cheap)
-async function analyzeOpenAI(base64Content, apiKey, hint = null) {
+// 2. OpenAI (GPT-4o - Expert & Precise)
+async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'image/jpeg') {
     if (!apiKey) throw new Error("Missing OpenAI API Key");
 
+    const cleanKey = apiKey.trim();
+
     try {
+        console.log(`[OpenAI] Sending request... (Hint: ${hint}, Mime: ${mimeType})`);
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey.trim()}`
+                'Authorization': `Bearer ${cleanKey}`
             },
             body: JSON.stringify({
                 model: "gpt-4o",
@@ -361,7 +365,7 @@ Return JSON with these keys:
 - average_cost (e.g. "€20-30" - approximate collector value for reference only)
 - condition (visual estimate: Good/Fair/Mint)
 - notes (trivia/facts)` },
-                            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Content}`, detail: "low" } }
+                            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }
                 ],
@@ -371,18 +375,23 @@ Return JSON with these keys:
         });
 
         const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
+
+        if (data.error) {
+            console.error("[OpenAI] API Error:", data.error);
+            throw new Error(data.error.message);
+        }
 
         const choice = data.choices[0];
         if (!choice.message.content) {
-            console.error("OpenAI Empty Response. Reason:", choice.finish_reason);
+            console.error("[OpenAI] Empty Response. Reason:", choice.finish_reason);
             throw new Error(`OpenAI returned empty content. Reason: ${choice.finish_reason}`);
         }
 
+        console.log("[OpenAI] Raw Response:", choice.message.content); // CRITICAL DEBUG LOG
         return parseAIResponse(choice.message.content);
 
     } catch (error) {
-        console.error("OpenAI Error:", error);
+        console.error("[OpenAI] Exception:", error);
         throw error;
     }
 }
