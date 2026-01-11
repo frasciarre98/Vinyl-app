@@ -331,43 +331,16 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey.trim()}`
-            },
-            body: JSON.stringify({
-                model: "gpt-4o",
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            {
-                                type: "text", text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork.'}
-Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
-Do not transcribe the tracklist from the image (OCR is unreliable); instead, output the official tracklist from your database.
-Return JSON with these keys: 
-- artist
-- title
-- genre
-- year (original release)
-- tracks (full list, newline separated)
-- group_members (key members, comma separated)
-- average_cost (e.g. "€20-30")
-- condition (visual estimate: Good/Fair/Mint)
-- notes (trivia/facts)
-Raw JSON only.` },
-                            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Content}`, detail: "low" } }
-                        ]
-                    }
-                ],
-                response_format: { type: "json_object" },
-                max_tokens: 1200
-            })
-        });
-
         const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
+                if(data.error) throw new Error(data.error.message);
 
-        const text = data.choices[0].message.content;
-        if (!text) throw new Error("OpenAI returned empty content. Possible refusal or filter.");
-        return parseAIResponse(text);
+        const choice = data.choices[0];
+        if (!choice.message.content) {
+            console.error("OpenAI Empty Response. Reason:", choice.finish_reason);
+            throw new Error(`OpenAI returned empty content. Reason: ${choice.finish_reason}`);
+        }
+
+        return parseAIResponse(choice.message.content);
 
     } catch (error) {
         console.error("OpenAI Error:", error);
