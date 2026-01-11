@@ -338,6 +338,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
         if (data.error) throw new Error(data.error.message);
 
         const text = data.choices[0].message.content;
+        if (!text) throw new Error("OpenAI returned empty content. Possible refusal or filter.");
         return parseAIResponse(text);
 
     } catch (error) {
