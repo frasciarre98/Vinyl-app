@@ -283,6 +283,16 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
                 {/* Selection Actions */}
                 <div className="flex items-center gap-2">
+                    {/* Manual Refresh Button */}
+                    <button
+                        onClick={fetchVinyls}
+                        disabled={loading}
+                        className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors"
+                        title="Force Refresh Library"
+                    >
+                        <LucideSparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+
                     {/* REPROCESS ERRORS BUTTON */}
                     {vinyls.some(v => v.artist === 'Error') && (
                         <button
