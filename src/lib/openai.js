@@ -347,7 +347,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                 messages: [
                     {
                         role: "system",
-                        content: "You are an expert musicologist specializing in Vinyl. Return ONLY valid JSON. Focus on historical accuracy. Do not offer financial advice. Pay attention to specific local editions (especially Italian presses)."
+                        content: "You are an expert musicologist specializing in Vinyl. Return ONLY valid JSON. Focus on historical accuracy. Do not offer financial advice. Pay attention to specific local editions (especially Italian presses). If you cannot identify the album, return JSON with 'artist': 'Unknown'. Do NOT return conversational text."
                     },
                     {
                         role: "user",
@@ -433,7 +433,7 @@ function parseAIResponse(jsonString) {
         }
     }
 
-    throw new Error("Invalid JSON from AI: No JSON object found in response.");
+    throw new Error(`Invalid JSON from AI: No JSON object found in response. Raw: "${content.substring(0, 100)}..."`);
 }
 
 function normalizeParsedData(parsed) {
