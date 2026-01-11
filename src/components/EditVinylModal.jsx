@@ -117,7 +117,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             setRotation(0);
         } catch (error) {
             console.error("Failed to load image for cropping:", error);
-            alert("Could not load image for editing. It might be blocked by browser security (CORS).");
+            alert("Browser Security (CORS) blocked editing this remote image.\n\nPlease select the original file from your device to crop it.");
+            // Automatically trigger file selection as fallback
+            fileInputRef.current?.click();
         } finally {
             setUploadingImage(false);
         }
