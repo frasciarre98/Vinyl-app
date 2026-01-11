@@ -156,8 +156,15 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             );
 
             console.log("Step 4: final update...");
-            // Get Public URL
-            const publicUrl = storage.getFileView(BUCKET_ID, fileUpload.$id).href;
+            // Get Public URL - Handle both URL object (newer SDK) and string (older SDK)
+            const viewResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
+            const publicUrl = viewResult.href ? viewResult.href : String(viewResult);
+
+            if (!publicUrl || publicUrl === 'undefined') {
+                throw new Error(`Failed to generate Public URL. Result was: ${JSON.stringify(viewResult)}`);
+            }
+
+            console.log("Updating with URL:", publicUrl);
 
             // Update Vinyl Record immediately
             await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { image_url: publicUrl });
