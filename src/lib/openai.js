@@ -248,7 +248,21 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
                 body: JSON.stringify({
                     contents: [{
                         parts: [
-                            { text: `Act as an expert musicologist. Identify this album from the cover art. Once identified, STOP looking at the image text. Retrieve the CANONICAL metadata (Tracklist, Group Members, Year) from Discogs/MusicBrainz. Do NOT guess from blurry text. Use the Official Listing. Return JSON: artist, title, genre, year, tracks (full correct list, newline separated), group_members (key members, comma separated), average_cost (e.g. "€20-30"), condition (visual est.), notes (trivia). Raw JSON only.${hint ? ` IDENTIFIED AS: '${hint}'. USE CANONICAL DATA FOR THIS ALBUM.` : ''}` },
+                            {
+                                text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork.'}
+Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
+Do not transcribe the tracklist from the image (OCR is unreliable); instead, output the official tracklist from your database.
+Return JSON with these keys: 
+- artist
+- title
+- genre
+- year (original release)
+- tracks (full list, newline separated)
+- group_members (key members, comma separated)
+- average_cost (e.g. "€20-30")
+- condition (visual estimate: Good/Fair/Mint)
+- notes (trivia/facts)
+Raw JSON only.` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
                     }],
@@ -324,7 +338,21 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: `Act as an expert musicologist. Identify this album from the cover art. Once identified, STOP looking at the image text. Retrieve the CANONICAL metadata (Tracklist, Group Members, Year) from Discogs/MusicBrainz. Do NOT guess from blurry text. Use the Official Listing. Return JSON: artist, title, genre, year, tracks (full correct list, newline separated), group_members (key members, comma separated), average_cost (e.g. "€20-30"), condition (visual est.), notes (trivia). Raw JSON only.${hint ? ` IDENTIFIED AS: '${hint}'. USE CANONICAL DATA FOR THIS ALBUM.` : ''}` },
+                            {
+                                type: "text", text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork.'}
+Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
+Do not transcribe the tracklist from the image (OCR is unreliable); instead, output the official tracklist from your database.
+Return JSON with these keys: 
+- artist
+- title
+- genre
+- year (original release)
+- tracks (full list, newline separated)
+- group_members (key members, comma separated)
+- average_cost (e.g. "€20-30")
+- condition (visual estimate: Good/Fair/Mint)
+- notes (trivia/facts)
+Raw JSON only.` },
                             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Content}`, detail: "low" } }
                         ]
                     }
