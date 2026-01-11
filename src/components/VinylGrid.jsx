@@ -32,25 +32,35 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const fetchVinyls = async () => {
         try {
             setLoading(true);
-            // Appwrite: listDocuments
-            const response = await databases.listDocuments(
-                DATABASE_ID,
-                'vinyls',
-                [
-                    Query.orderDesc('$createdAt'),
-                    Query.limit(100) // Appwrite creates pagination by default, limit 100 for now
-                ]
-            );
+            let allVinyls = [];
+            let offset = 0;
+            let total = 0;
 
-            // Appwrite returns { total, documents }. Map documents to match expected structure if needed
-            // Our vinyl structure maps 1:1 mostly, but id is $id
-            const mappedData = response.documents.map(doc => ({
-                ...doc,
-                id: doc.$id // Map $id to id for compatibility
-            }));
+            // Loop to fetch ALL records (Appwrite max limit per request is 100)
+            do {
+                const response = await databases.listDocuments(
+                    DATABASE_ID,
+                    'vinyls',
+                    [
+                        Query.orderDesc('$createdAt'),
+                        Query.limit(100),
+                        Query.offset(offset)
+                    ]
+                );
 
-            setVinyls(mappedData || []);
-            // Reset selection on refresh
+                // Map current chunk
+                const chunk = response.documents.map(doc => ({
+                    ...doc,
+                    id: doc.$id
+                }));
+
+                allVinyls = [...allVinyls, ...chunk];
+                total = response.total;
+                offset += 100;
+
+            } while (allVinyls.length < total);
+
+            setVinyls(allVinyls);
             setSelectedIds([]);
             setIsSelectionMode(false);
         } catch (err) {
