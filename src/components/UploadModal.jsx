@@ -136,11 +136,18 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
 
     const processUploads = async () => {
         setUploading(true);
+        abortRef.current = false; // Reset abort flag
         const apiKey = getApiKey();
         const uploadedRecords = [];
 
         try {
             for (let i = 0; i < files.length; i++) {
+                // Check Abort Flag
+                if (abortRef.current) {
+                    console.log("Upload aborted by user.");
+                    break;
+                }
+
                 const file = files[i];
 
                 // Skip if already done
@@ -258,7 +265,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                         <button onClick={() => setFormat('Vinyl')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${format === 'Vinyl' ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Vinyl</button>
                         <button onClick={() => setFormat('CD')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${format === 'CD' ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>CD</button>
                     </div>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors" disabled={uploading}>
+                    <button onClick={handleClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -303,17 +310,24 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                     <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
                 </div>
 
-                <div className="p-4 border-t border-border flex justify-between items-center gap-2">
-                    {files.length > 0 && (
-                        <button onClick={processUploads} disabled={uploading || files.every(f => progress[f.name]?.status === 'complete')} className="flex items-center gap-2 bg-white text-black px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                            {uploading ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Processing...
-                                </>
-                            ) : (
-                                'Start Upload'
-                            )}
+                <div className="p-4 border-t border-border flex justify-end gap-3 bg-surface rounded-b-xl">
+                    <button onClick={handleClose} className="px-4 py-2 text-secondary hover:text-white transition-colors" disabled={uploading && !abortRef.current}>
+                        Cancel
+                    </button>
+                    {uploading ? (
+                        <button
+                            onClick={() => abortRef.current = true}
+                            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-red-500/20 transition-all flex items-center gap-2"
+                        >
+                            <X className="w-4 h-4" /> Stop Upload
+                        </button>
+                    ) : (
+                        <button
+                            onClick={processUploads}
+                            disabled={files.length === 0}
+                            className="bg-primary hover:bg-primary/90 text-black px-6 py-2 rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                            {files.length > 0 ? `Upload ${files.length} Files` : 'Upload'}
                         </button>
                     )}
                 </div>
