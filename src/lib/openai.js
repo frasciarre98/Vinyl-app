@@ -171,15 +171,15 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
 
     // For Paid Users: Prioritize STABLE, HIGH-THROUGHPUT models
     const PAID_ORDER = [
-        'gemini-1.5-flash',
         'gemini-1.5-pro',
+        'gemini-1.5-flash',
         'gemini-2.0-flash-exp'
     ];
 
     const FREE_ORDER = [
-        'gemini-2.0-flash-exp', // Try latest first
+        'gemini-1.5-pro',
         'gemini-1.5-flash',
-        'gemini-1.5-pro'
+        'gemini-2.0-flash-exp'
     ];
 
     let PREFERRED_ORDER = isPaid ? PAID_ORDER : FREE_ORDER;
@@ -319,7 +319,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                 'Authorization': `Bearer ${apiKey.trim()}`
             },
             body: JSON.stringify({
-                model: "gpt-4o-mini",
+                model: "gpt-4o",
                 messages: [
                     {
                         role: "user",
