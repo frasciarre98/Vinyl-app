@@ -68,6 +68,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
     const [existingFilenames, setExistingFilenames] = useState(new Set());
     const [format, setFormat] = useState('Vinyl'); // Default format
     const formatRef = useRef('Vinyl');
+    const abortRef = useRef(false);
 
     // Keep ref in sync
     useEffect(() => {
