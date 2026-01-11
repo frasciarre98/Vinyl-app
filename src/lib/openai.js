@@ -251,7 +251,9 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
                             {
                                 text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork.'}
 Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
-Do not transcribe the tracklist from the image (OCR is unreliable); instead, output the official tracklist from your database.
+**CRITICAL FOR ACCURACY:**
+- If this is a **Compilation**, **Greatest Hits**, or **Live** album, you MUST list the tracks for **THAT SPECIFIC RELEASE**. Do NOT list the tracks from the original studio albums.
+- Use the **Standard Edition** tracklist unless a Deluxe/Extended edition is clearly visible or stated in the hint.
 Return JSON with these keys: 
 - artist
 - title
@@ -345,12 +347,15 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                             {
                                 type: "text", text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork, then use your internal database for details.'}
 Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
-Do not transcribe the tracklist from the image (OCR is unreliable); instead, output the official tracklist from your database.
+**CRITICAL FOR ACCURACY:**
+- If this is a **Compilation**, **Greatest Hits**, or **Live** album, you MUST list the tracks for **THAT SPECIFIC RELEASE**. Do NOT list the tracks from the original studio albums.
+- Use the **Standard Edition** tracklist unless a Deluxe/Extended edition is clearly visible or stated in the hint.
+
 Return JSON with these keys: 
 - artist
 - title
 - genre
-- year (original release)
+- year (original release of THIS specific album/compilation)
 - tracks (full list, newline separated)
 - group_members (key members, comma separated)
 - average_cost (e.g. "€20-30")
