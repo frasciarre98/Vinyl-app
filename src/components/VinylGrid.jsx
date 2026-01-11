@@ -33,24 +33,19 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         try {
             setLoading(true);
             let allVinyls = [];
-            // Loop to fetch ALL records using Cursor Pagination (Most Robust)
-            let lastId = null;
+            // Loop to fetch ALL records using Offset (Simpler & More Reliable for <5k items)
+            let offset = 0;
             let currentChunkSize = 0;
 
             do {
-                const queries = [
-                    Query.orderDesc('$createdAt'),
-                    Query.limit(100)
-                ];
-
-                if (lastId) {
-                    queries.push(Query.cursorAfter(lastId));
-                }
-
                 const response = await databases.listDocuments(
                     DATABASE_ID,
                     'vinyls',
-                    queries
+                    [
+                        Query.orderDesc('$createdAt'),
+                        Query.limit(100),
+                        Query.offset(offset)
+                    ]
                 );
 
                 const chunk = response.documents.map(doc => ({
@@ -58,14 +53,14 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     id: doc.$id
                 }));
 
-                console.log(`Fetch pass: Got ${chunk.length} items. Last ID: ${chunk.length > 0 ? chunk[chunk.length - 1].$id : 'none'}`);
+                console.log(`Fetch pass at offset ${offset}: Got ${chunk.length} items.`);
 
                 allVinyls = [...allVinyls, ...chunk];
                 currentChunkSize = chunk.length;
+                offset += 100;
 
-                if (chunk.length > 0) {
-                    lastId = chunk[chunk.length - 1].$id;
-                }
+                // Safety break for Appwrite offset limit
+                if (offset >= 5000) break;
 
             } while (currentChunkSize === 100);
 
