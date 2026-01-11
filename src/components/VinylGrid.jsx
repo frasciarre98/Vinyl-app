@@ -58,6 +58,8 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     id: doc.$id
                 }));
 
+                console.log(`Fetch pass: Got ${chunk.length} items. Last ID: ${chunk.length > 0 ? chunk[chunk.length - 1].$id : 'none'}`);
+
                 allVinyls = [...allVinyls, ...chunk];
                 currentChunkSize = chunk.length;
 
