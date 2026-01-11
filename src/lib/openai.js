@@ -410,17 +410,33 @@ Return JSON with these keys:
 // --- HELPERS ---
 
 function parseAIResponse(jsonString) {
-    let content = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-    let parsed;
+    let content = jsonString;
+
+    // 1. Try clean parse first
     try {
-        parsed = JSON.parse(content);
+        return normalizeParsedData(JSON.parse(content));
     } catch (e) {
-        // Simple repair attempt
-        const match = content.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-        else throw new Error("Invalid JSON from AI");
+        // Continue to extraction...
     }
 
+    // 2. Extract JSON object substring (Find first '{' and last '}')
+    const firstOpen = content.indexOf('{');
+    const lastClose = content.lastIndexOf('}');
+
+    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+        const jsonCandidate = content.substring(firstOpen, lastClose + 1);
+        try {
+            return normalizeParsedData(JSON.parse(jsonCandidate));
+        } catch (e2) {
+            console.error("[OpenAI] JSON Extraction Failed:", e2);
+            throw new Error(`Invalid JSON from AI: ${e2.message} -- Raw: ${content.substring(0, 100)}...`);
+        }
+    }
+
+    throw new Error("Invalid JSON from AI: No JSON object found in response.");
+}
+
+function normalizeParsedData(parsed) {
     return {
         artist: parsed.artist || "Unknown",
         title: parsed.title || "Unknown",
