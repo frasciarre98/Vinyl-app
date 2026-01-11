@@ -370,26 +370,7 @@ Return JSON keys: artist, title, genre, year, tracks, group_members, average_cos
                         ]
                     }
                 ],
-                4. ** FILL ** the JSON metadata.
 
-** OUTPUT FORMAT:**
-                    Return a single JSON object(no markdown, no conversation) with these keys:
-                    {
-                        "_visual_evidence": "List 3-4 tracks or text you actually SEE on the image here...",
-                        "artist": "Exact Artist Name",
-                        "title": "Exact Album Title",
-                        "genre": "Genre",
-                        "year": "Original Release Year (of this edition)",
-                        "tracks": "Full tracklist (newline separated). MUST MATCH THE BACK COVER.",
-                        "group_members": "Key members (comma separated)",
-                        "average_cost": "Collector Value (e.g. €20-30)",
-                        "condition": "Visual Grade (Mint/Good/Fair)",
-                        "notes": "Brief trivia"
-                    }` },
-                            { type: "image_url", image_url: { url: `data: ${ mimeType }; base64, ${ base64Content }`, detail: "high" } }
-                        ]
-                    }
-                ],
                 // response_format: { type: "json_object" }, // Removing strict mode to debug empty content
                 max_tokens: 1200,
                 temperature: 0.1
@@ -408,9 +389,9 @@ Return JSON keys: artist, title, genre, year, tracks, group_members, average_cos
             console.error("[OpenAI] Empty Response. Full Choice:", JSON.stringify(choice, null, 2));
             // Check for refusal specifically
             if (choice.message.refusal) {
-                throw new Error(`OpenAI Refusal: ${ choice.message.refusal }`);
+                throw new Error(`OpenAI Refusal: ${choice.message.refusal}`);
             }
-            throw new Error(`OpenAI returned empty content.Reason: ${ choice.finish_reason }`);
+            throw new Error(`OpenAI returned empty content.Reason: ${choice.finish_reason}`);
         }
 
         console.log("[OpenAI] Raw Response:", choice.message.content); // CRITICAL DEBUG LOG
@@ -445,7 +426,7 @@ function parseAIResponse(jsonString) {
             return normalizeParsedData(JSON.parse(jsonCandidate));
         } catch (e2) {
             console.error("[OpenAI] JSON Extraction Failed:", e2);
-            throw new Error(`Invalid JSON from AI: ${ e2.message } -- Raw: ${ content.substring(0, 100) }...`);
+            throw new Error(`Invalid JSON from AI: ${e2.message} -- Raw: ${content.substring(0, 100)}...`);
         }
     }
 
