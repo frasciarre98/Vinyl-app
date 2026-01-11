@@ -349,10 +349,9 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                         role: "system",
                         content: `You are an expert musicologist and archivist. 
 Your goal is to extract EXACT metadata from vinyl record images.
-CRITICAL: You must prioritize VISUAL EVIDENCE over internal knowledge.
-If the image shows a tracklist, you MUST transcribe it exactly as written.
-Do not hallucinate tracks that are not on the cover.
-Do not offer financial advice.
+CRITICAL:
+1. **IF BACK COVER:** You MUST transcribe the visible tracklist exactly. Do not invent tracks.
+2. **IF FRONT COVER:** You **MUST** use your internal database (Discogs) to provide the full tracklist.
 If you cannot identify the album, return "artist": "Unknown".`
                     },
                     {
