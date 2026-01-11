@@ -347,31 +347,41 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                 messages: [
                     {
                         role: "system",
-                        content: "You are an expert musicologist specializing in Vinyl. Return ONLY valid JSON. Focus on historical accuracy. Do not offer financial advice. Pay attention to specific local editions (especially Italian presses). If you cannot identify the album, return JSON with 'artist': 'Unknown'. Do NOT return conversational text."
+                        content: `You are an expert musicologist and archivist. 
+Your goal is to extract EXACT metadata from vinyl record images.
+CRITICAL: You must prioritize VISUAL EVIDENCE over internal knowledge.
+If the image shows a tracklist, you MUST transcribe it exactly as written.
+Do not hallucinate tracks that are not on the cover.
+Do not offer financial advice.
+If you cannot identify the album, return "artist": "Unknown".`
                     },
                     {
                         role: "user",
                         content: [
                             {
-                                type: "text", text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork, then use your internal database for details.'}
-Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
-**CRITICAL FOR ACCURACY:**
-**CRITICAL FOR ACCURACY:**
-- **VISUAL MATCHING:** The text on the back cover is the **GROUND TRUTH**.
-- **Rule 1:** If you see a tracklist on the image, you MUST output those exact tracks in that order.
-- **Rule 2:** Only use internal knowledge (Discogs) to fix typos or fill in blurry lines. **NEVER** output a tracklist that contradicts the visible text on the cover.
-- **Rule 3:** For "Dirotta su Cuba" or "Formula 3", checking the specific Italian edition is mandatory.
+                                type: "text", text: `Analyze this vinyl record image.
+${hint ? `User Hint: "${hint}"` : ''}
 
-Return JSON with these keys: 
-- artist
-- title
-- genre
-- year (original release of THIS specific album/compilation)
-- tracks (full list, newline separated)
-- group_members (key members, comma separated)
-- average_cost (e.g. "€20-30" - approximate collector value for reference only)
-- condition (visual estimate: Good/Fair/Mint)
-- notes (trivia/facts)` },
+**INSTRUCTIONS:**
+1. **LOOK** closely at the image (especially back cover text).
+2. **TRANSCRIBE** 3-4 visible track titles or the catalogue number into the "_visual_evidence" field.
+3. **IDENTIFY** the specific edition based on those transcribed details.
+4. **FILL** the JSON metadata.
+
+**OUTPUT FORMAT:**
+Return a single JSON object (no markdown, no conversation) with these keys:
+{
+  "_visual_evidence": "List 3-4 tracks or text you actually SEE on the image here...",
+  "artist": "Exact Artist Name",
+  "title": "Exact Album Title",
+  "genre": "Genre",
+  "year": "Original Release Year (of this edition)",
+  "tracks": "Full tracklist (newline separated). MUST MATCH THE BACK COVER.",
+  "group_members": "Key members (comma separated)",
+  "average_cost": "Collector Value (e.g. €20-30)",
+  "condition": "Visual Grade (Mint/Good/Fair)",
+  "notes": "Brief trivia"
+}` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }
@@ -462,8 +472,8 @@ export function resizeImage(fileOrBlob) {
         img.crossOrigin = 'Anonymous'; // Check for CORS
         img.onload = () => {
             try {
-                const maxWidth = 800;
-                const maxHeight = 800;
+                const maxWidth = 2048;
+                const maxHeight = 2048;
                 let width = img.width;
                 let height = img.height;
 
