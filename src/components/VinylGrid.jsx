@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Search, Loader2, Trash2, CheckSquare, Square, Sparkles } from 'lucide-react';
 import { databases, DATABASE_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
 import { VinylCard } from './VinylCard';
@@ -290,7 +290,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                         className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors"
                         title="Force Refresh Library"
                     >
-                        <LucideSparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        <Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
 
                     {/* REPROCESS ERRORS BUTTON */}
