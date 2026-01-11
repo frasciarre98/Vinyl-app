@@ -103,10 +103,24 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
 
     const handleEditExisting = async () => {
         if (!vinyl.image_url) return;
-        setCropImageSrc(vinyl.image_url);
-        setIsCropping(true);
-        setZoom(1);
-        setRotation(0);
+        setUploadingImage(true);
+        try {
+            // Fetch as blob to avoid CORS issues with Canvas
+            const response = await fetch(vinyl.image_url, { mode: 'cors' });
+            if (!response.ok) throw new Error("Network response was not ok");
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+
+            setCropImageSrc(objectUrl);
+            setIsCropping(true);
+            setZoom(1);
+            setRotation(0);
+        } catch (error) {
+            console.error("Failed to load image for cropping:", error);
+            alert("Could not load image for editing. It might be blocked by browser security (CORS).");
+        } finally {
+            setUploadingImage(false);
+        }
     };
 
     const onCropComplete = (croppedArea, croppedAreaPixels) => {
