@@ -330,7 +330,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                     }
                 ],
                 response_format: { type: "json_object" },
-                max_tokens: 300
+                max_tokens: 1200
             })
         });
 
