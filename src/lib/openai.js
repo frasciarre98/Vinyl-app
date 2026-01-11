@@ -374,9 +374,9 @@ Return JSON with these keys:
                         ]
                     }
                 ],
-                response_format: { type: "json_object" },
+                // response_format: { type: "json_object" }, // Removing strict mode to debug empty content
                 max_tokens: 1200,
-                temperature: 0
+                temperature: 0.1
             })
         });
 
@@ -389,7 +389,11 @@ Return JSON with these keys:
 
         const choice = data.choices[0];
         if (!choice.message.content) {
-            console.error("[OpenAI] Empty Response. Reason:", choice.finish_reason);
+            console.error("[OpenAI] Empty Response. Full Choice:", JSON.stringify(choice, null, 2));
+            // Check for refusal specifically
+            if (choice.message.refusal) {
+                throw new Error(`OpenAI Refusal: ${choice.message.refusal}`);
+            }
             throw new Error(`OpenAI returned empty content. Reason: ${choice.finish_reason}`);
         }
 
