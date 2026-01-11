@@ -132,13 +132,19 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
     const handleSaveCrop = async () => {
         setUploadingImage(true);
         try {
-            const croppedBlob = await getCroppedImg(cropImageSrc, croppedAreaPixels, rotation);
+            console.log("Step 1: generating crop...");
+            if (!croppedAreaPixels) throw new Error("No crop area defined");
 
+            const croppedBlob = await getCroppedImg(cropImageSrc, croppedAreaPixels, rotation);
+            if (!croppedBlob) throw new Error("Crop generation returned null");
+
+            console.log("Step 2: compressing...");
             // Compress resulted crop
             const file = new File([croppedBlob], "cropped.jpg", { type: "image/jpeg" });
             const compressedDataUrl = await resizeImage(file);
             const compressedBlob = await (await fetch(compressedDataUrl)).blob();
 
+            console.log("Step 3: uploading...");
             // Reconstruct File for Appwrite
             const uploadFile = new File([compressedBlob], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
 
@@ -149,6 +155,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                 uploadFile
             );
 
+            console.log("Step 4: final update...");
             // Get Public URL
             const publicUrl = storage.getFileView(BUCKET_ID, fileUpload.$id).href;
 
@@ -158,7 +165,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             onUpdate();
             setIsCropping(false);
             setCropImageSrc(null);
-            alert('Cover updated!');
+            alert('Cover updated successfully!');
         } catch (err) {
             console.error('Error saving crop:', err);
             const errMsg = err.message || (typeof err === 'string' ? err : 'Unknown error (possibly CORS)');
