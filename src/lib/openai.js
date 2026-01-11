@@ -248,7 +248,7 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
                 body: JSON.stringify({
                     contents: [{
                         parts: [
-                            { text: `Act as an expert musicologist and vinyl appraiser. Identify this album cover. Use your internal knowledge (Discogs, MusicBrainz, Wikipedia) to provide precise metadata. Return JSON with keys: artist, title, genre, year (original release), tracks (full list, newline separated), group_members (comma separated list of key members), average_cost (realistic market value estimate in EUR based on median resale prices, e.g. "€20-30"), condition (visual estimate: Good/Fair/Mint), notes (interesting trivia/facts, max 500 chars). Do NOT use Markdown. Raw JSON only.${hint ? ` IMPORTANT: The user explicitly identifies this album as '${hint}'. TRUST THIS IDENTIFICATION. Use your internal knowledge to fetch details for '${hint}'.` : ''}` },
+                            { text: `Act as an expert musicologist. Identify this album from the cover art. Once identified, STOP looking at the image text. Retrieve the CANONICAL metadata (Tracklist, Group Members, Year) from Discogs/MusicBrainz. Do NOT guess from blurry text. Use the Official Listing. Return JSON: artist, title, genre, year, tracks (full correct list, newline separated), group_members (key members, comma separated), average_cost (e.g. "€20-30"), condition (visual est.), notes (trivia). Raw JSON only.${hint ? ` IDENTIFIED AS: '${hint}'. USE CANONICAL DATA FOR THIS ALBUM.` : ''}` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
                     }],
@@ -324,7 +324,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: `Act as an expert musicologist and vinyl appraiser. Identify this album cover. Use your internal knowledge (Discogs, MusicBrainz, Wikipedia) to provide precise metadata. Return JSON with keys: artist, title, genre, year (original release), tracks (full list, newline separated), group_members (comma separated list of key members), average_cost (realistic market value estimate in EUR based on median resale prices, e.g. "€20-30"), condition (visual estimate: Good/Fair/Mint), notes (interesting trivia/facts, max 500 chars). Do NOT use Markdown. Raw JSON only.${hint ? ` IMPORTANT: The user explicitly identifies this album as '${hint}'. TRUST THIS IDENTIFICATION. Use your internal knowledge to fetch details for '${hint}'.` : ''}` },
+                            { type: "text", text: `Act as an expert musicologist. Identify this album from the cover art. Once identified, STOP looking at the image text. Retrieve the CANONICAL metadata (Tracklist, Group Members, Year) from Discogs/MusicBrainz. Do NOT guess from blurry text. Use the Official Listing. Return JSON: artist, title, genre, year, tracks (full correct list, newline separated), group_members (key members, comma separated), average_cost (e.g. "€20-30"), condition (visual est.), notes (trivia). Raw JSON only.${hint ? ` IDENTIFIED AS: '${hint}'. USE CANONICAL DATA FOR THIS ALBUM.` : ''}` },
                             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Content}`, detail: "low" } }
                         ]
                     }
