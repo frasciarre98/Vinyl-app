@@ -33,21 +33,24 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         try {
             setLoading(true);
             let allVinyls = [];
-            let offset = 0;
-            let total = 0;
-
-            // Loop to fetch ALL records (Appwrite max limit per request is 100)
-            // Loop to fetch ALL records
+            // Loop to fetch ALL records using Cursor Pagination (Most Robust)
+            let lastId = null;
             let currentChunkSize = 0;
+
             do {
+                const queries = [
+                    Query.orderDesc('$createdAt'),
+                    Query.limit(100)
+                ];
+
+                if (lastId) {
+                    queries.push(Query.cursorAfter(lastId));
+                }
+
                 const response = await databases.listDocuments(
                     DATABASE_ID,
                     'vinyls',
-                    [
-                        Query.orderDesc('$createdAt'),
-                        Query.limit(100),
-                        Query.offset(offset)
-                    ]
+                    queries
                 );
 
                 const chunk = response.documents.map(doc => ({
@@ -56,10 +59,13 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                 }));
 
                 allVinyls = [...allVinyls, ...chunk];
-                offset += 100;
                 currentChunkSize = chunk.length;
 
-            } while (currentChunkSize === 100); // Continue only if we got a full page
+                if (chunk.length > 0) {
+                    lastId = chunk[chunk.length - 1].$id;
+                }
+
+            } while (currentChunkSize === 100);
 
             setVinyls(allVinyls);
             setSelectedIds([]);
