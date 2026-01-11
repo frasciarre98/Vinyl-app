@@ -339,7 +339,7 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null) {
                 messages: [
                     {
                         role: "system",
-                        content: "You are an expert musicologist. Return ONLY valid JSON. Do not output markdown code blocks."
+                        content: "You are an expert musicologist. Return ONLY valid JSON. Focus on historical and cataloging metadata. Do not offer financial advice."
                     },
                     {
                         role: "user",
@@ -358,7 +358,7 @@ Return JSON with these keys:
 - year (original release of THIS specific album/compilation)
 - tracks (full list, newline separated)
 - group_members (key members, comma separated)
-- average_cost (e.g. "€20-30")
+- average_cost (e.g. "€20-30" - approximate collector value for reference only)
 - condition (visual estimate: Good/Fair/Mint)
 - notes (trivia/facts)` },
                             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Content}`, detail: "low" } }
