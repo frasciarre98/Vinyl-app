@@ -37,6 +37,8 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
             let total = 0;
 
             // Loop to fetch ALL records (Appwrite max limit per request is 100)
+            // Loop to fetch ALL records
+            let currentChunkSize = 0;
             do {
                 const response = await databases.listDocuments(
                     DATABASE_ID,
@@ -48,17 +50,16 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     ]
                 );
 
-                // Map current chunk
                 const chunk = response.documents.map(doc => ({
                     ...doc,
                     id: doc.$id
                 }));
 
                 allVinyls = [...allVinyls, ...chunk];
-                total = response.total;
                 offset += 100;
+                currentChunkSize = chunk.length;
 
-            } while (allVinyls.length < total);
+            } while (currentChunkSize === 100); // Continue only if we got a full page
 
             setVinyls(allVinyls);
             setSelectedIds([]);
