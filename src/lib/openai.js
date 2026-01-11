@@ -363,9 +363,9 @@ If you cannot identify the album, return "artist": "Unknown".`
 ${hint ? `User Hint: "${hint}"` : ''}
 
 **INSTRUCTIONS:**
-1. **LOOK** closely at the image (especially back cover text).
-2. **TRANSCRIBE** 3-4 visible track titles or the catalogue number into the "_visual_evidence" field.
-3. **IDENTIFY** the specific edition based on those transcribed details.
+1. **LOOK** closely at the image. Determine if it is the FRONT or BACK cover.
+2. **IF BACK COVER:** You MUST transcribe the tracklist EXATCLY as printed (e.g. if it says "2 Liberi di- liberida", write EXACTLY that). Do NOT correct typos or "fix" the text. Visual text is the only truth.
+3. **IF FRONT COVER:** Identify the album, then search your internal database for the *specific* edition that matches the artwork style/logos.
 4. **FILL** the JSON metadata.
 
 **OUTPUT FORMAT:**
