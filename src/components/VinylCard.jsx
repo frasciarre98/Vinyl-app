@@ -3,7 +3,7 @@ import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles
 import { databases, DATABASE_ID } from '../lib/appwrite';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
-export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip }) {
+export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip, onViewDetail }) {
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState(null);
     // Local state to show updates immediately without full grid refresh
@@ -53,6 +53,12 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 tracks: String(analysis.tracks || '').substring(0, 4999)
             };
 
+            // CRITICAL: Respect User Validation
+            if (localVinyl.is_tracks_validated) {
+                console.log("Preserving validated tracks for:", localVinyl.title);
+                delete fullUpdate.tracks;
+            }
+
             // Try Full Update - If this fails, it means Schema is missing attributes in Appwrite.
             // We want to know WHICH one failed validation.
             try {
@@ -76,7 +82,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
         } catch (err) {
             console.error("Analysis failed:", err);
             // Explicitly alert the user to the failure reason (e.g. API Key missing or Quota)
-            alert(`Analysis Failed: ${err.message}`);
+            alert(`Analysis Failed: ${err.message} `);
 
             const msg = err.message.toLowerCase();
             if (msg.includes("quota") || msg.includes("limit") || msg.includes("429")) {
@@ -94,23 +100,27 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
     return (
         <div
             className={`
-                group relative h-[320px] perspective-1000
-                ${selectionMode ? 'cursor-pointer' : ''}
+                group relative w-full h-0 pb-[100%] md:h-[320px] md:pb-0 perspective-1000
+                ${selectionMode ? 'cursor-pointer' : 'cursor-zoom-in'}
                 ${isFlipped ? 'z-50' : 'z-0'}
-            `}
+`}
             onClick={() => {
                 if (selectionMode) onToggleSelect(vinyl.id);
-                else onFlip(); // Use parent handler
+                else {
+                    // Mobile Overhaul: Prefer detail view modal over flip
+                    if (onViewDetail) onViewDetail();
+                    else onFlip();
+                }
             }}
         >
             {/* ... JSX ... */}
             {selectionMode && (
-                <div className={`absolute top-3 left-3 z-30 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'bg-black/50 border-white/50'}`}>
+                <div className={`absolute top - 3 left - 3 z - 30 w - 6 h - 6 rounded - full border - 2 flex items - center justify - center transition - colors ${isSelected ? 'bg-primary border-primary' : 'bg-black/50 border-white/50'} `}>
                     {isSelected && <CheckCircle className="w-4 h-4 text-black" />}
                 </div>
             )}
 
-            <div className={`relative w-full h-full transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+            <div className={`absolute inset-0 md:relative md:inset-auto md:w-full md:h-full transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
 
                 {/* FRONT FACE - FULL COVER ART */}
                 <div className="absolute inset-0 backface-hidden bg-black border border-white/10 rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300">
@@ -120,12 +130,12 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                         <div className="w-full h-full relative">
                             <img
                                 src={localVinyl.image_url}
-                                alt={`${localVinyl.artist} - ${localVinyl.title}`}
+                                alt={`${localVinyl.artist} - ${localVinyl.title} `}
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                 loading="lazy"
                             />
                             {/* Gradient Overlay for Text */}
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/60 to-transparent p-4 flex flex-col justify-end min-h-[40%] translate-y-2 group-hover:translate-y-0 transition-transform">
+                            <div className="hidden md:flex absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/60 to-transparent p-4 flex-col justify-end min-h-[40%] translate-y-2 group-hover:translate-y-0 transition-transform">
                                 <h3 className="font-bold text-white truncate text-lg leading-tight dropshadow-md">{localVinyl.title || 'Unknown Album'}</h3>
                                 <p className="text-gray-300 truncate text-sm font-medium flex items-center gap-2">
                                     {localVinyl.artist === 'Pending AI' ? <><Loader2 className="w-3 h-3 animate-spin" /> Analyzing...</> : (localVinyl.artist || 'Unknown Artist')}
@@ -135,7 +145,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900 relative">
                             <Disc className="w-20 h-20 text-white/10 mb-4" />
-                            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black to-transparent">
+                            <div className="hidden md:block absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black to-transparent">
                                 <h3 className="font-bold text-gray-400 truncate text-center">{localVinyl.title || 'Unknown'}</h3>
                                 <p className="text-gray-600 truncate text-center text-sm">{localVinyl.artist}</p>
                             </div>
@@ -144,7 +154,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
                     {/* Overlay Controls (Top Right) */}
                     {!selectionMode && (
-                        <div className="absolute top-2 right-2 flex gap-2 z-50 transform-gpu">
+                        <div className="hidden md:flex absolute top-2 right-2 gap-2 z-50 transform-gpu">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onEdit(vinyl); }}
                                 className="p-3 bg-black/60 hover:bg-black/90 active:scale-95 active:bg-black text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
@@ -154,7 +164,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                             </button>
                             <button
                                 onClick={handleAnalyze}
-                                className={`p-3 rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all active:scale-95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'}`}
+                                className={`p - 3 rounded - full backdrop - blur - md shadow - lg border border - white / 10 transition - all active: scale - 95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'} `}
                                 title="Magic Analyze"
                                 disabled={analyzing}
                             >
@@ -169,7 +179,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 title="Play on Spotify"
                             >
                                 <PlayCircle className="w-5 h-5 fill-current" />
-                            </a>
+                            </a >
                             <a
                                 href={`https://www.youtube.com/results?search_query=${encodeURIComponent((localVinyl.artist === 'Pending AI' ? '' : localVinyl.artist || '') + ' ' + (localVinyl.title || ''))}`}
                                 target="_blank"
@@ -180,23 +190,25 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                             >
                                 <Youtube className="w-5 h-5" />
                             </a>
-                        </div>
+                        </div >
                     )}
 
 
 
-                </div>
+                </div >
 
                 {/* BACK FACE (DETAILS) */}
-                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-black border border-white/10 rounded-xl overflow-hidden shadow-xl flex flex-col relative z-0">
+                < div className="absolute inset-0 backface-hidden rotate-y-180 bg-black border border-white/10 rounded-xl overflow-hidden shadow-xl flex flex-col relative z-0" >
 
                     {/* 1. Background Image - More visible now */}
-                    {localVinyl.image_url && (
-                        <div
-                            className="absolute inset-0 z-0 bg-cover bg-center opacity-40 blur-md scale-110 saturate-50"
-                            style={{ backgroundImage: `url(${localVinyl.image_url})` }}
-                        />
-                    )}
+                    {
+                        localVinyl.image_url && (
+                            <div
+                                className="absolute inset-0 z-0 bg-cover bg-center opacity-40 blur-md scale-110 saturate-50"
+                                style={{ backgroundImage: `url(${localVinyl.image_url})` }}
+                            />
+                        )
+                    }
 
                     {/* 2. Gradient Overlay for text readability */}
                     <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/70 to-black/90" />
@@ -312,9 +324,9 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                             )}
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 }, (prev, next) => {
     // Custom comparison to ignore function prop changes (which can be unstable)

@@ -107,6 +107,12 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     tracks: analysis.tracks
                 };
 
+                // CRITICAL: Respect User Validation
+                if (item.is_tracks_validated) {
+                    addLog(`Created by User: Tracks are locked. Validated by User. Preserving...`, "info");
+                    delete fullUpdate.tracks;
+                }
+
                 // Appwrite Update
                 try {
                     await databases.updateDocument(

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw } from 'lucide-react';
+import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle } from 'lucide-react';
 import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import { resizeImage } from '../lib/openai';
@@ -13,11 +13,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         year: '',
         genre: '',
         format: 'Vinyl',
-        condition: '', // Typo fix if it was missing
+        condition: '',
         average_cost: '',
         notes: '',
         tracks: '',
-        group_members: '' // Added missing fields
+        group_members: '',
+        is_tracks_validated: false
     });
     const [saving, setSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -41,9 +42,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                 format: vinyl.format || 'Vinyl',
                 group_members: vinyl.group_members || '',
                 condition: vinyl.condition || '',
-                average_cost: vinyl.avarege_cost || vinyl.average_cost || '', // Map from DB typo
+                average_cost: vinyl.avarege_cost || vinyl.average_cost || '',
                 notes: vinyl.notes || '',
-                tracks: vinyl.tracks || ''
+                tracks: vinyl.tracks || '',
+                is_tracks_validated: vinyl.is_tracks_validated || false
             });
         }
     }, [vinyl]);
@@ -64,6 +66,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             onClose();
         } catch (err) {
             console.error('Error updating vinyl:', err);
+            alert(`Errore nel salvataggio: ${err.message}\n\nProbabilmente manca l'attributo 'is_tracks_validated' (boolean) nel database Appwrite.`);
         } finally {
             setSaving(false);
         }
@@ -182,7 +185,14 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         }
     };
 
-
+    // Auto-lock validation when user types in tracks
+    const handleTracksChange = (newTracks) => {
+        setFormData(prev => ({
+            ...prev,
+            tracks: newTracks,
+            is_tracks_validated: true // Auto-check validation on manual edit
+        }));
+    };
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -257,6 +267,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="p-6 space-y-4">
+
                         {/* Cover Image Replacement Section */}
                         <div className="flex items-center gap-4 bg-background border border-border p-3 rounded-lg">
                             <div className="w-16 h-16 bg-black/40 rounded overflow-hidden flex-shrink-0 flex items-center justify-center border border-white/10">
@@ -385,13 +396,27 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                 />
                             </div>
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-secondary mb-1">Tracks (One per line)</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Tracks (One per line)</label>
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs select-none bg-white/5 px-2 py-1 rounded border border-white/10 hover:bg-white/10 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_tracks_validated}
+                                            onChange={e => setFormData({ ...formData, is_tracks_validated: e.target.checked })}
+                                            className="w-4 h-4 rounded accent-green-500 cursor-pointer"
+                                        />
+                                        <span className={`flex items-center gap-1 font-bold ${formData.is_tracks_validated ? 'text-green-400' : 'text-gray-400'}`}>
+                                            {formData.is_tracks_validated ? <CheckCircle className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                                            {formData.is_tracks_validated ? 'LOCKED (AI Proof)' : 'Unlocked'}
+                                        </span>
+                                    </label>
+                                </div>
                                 <textarea
                                     value={formData.tracks || ''}
-                                    onChange={e => setFormData({ ...formData, tracks: e.target.value })}
+                                    onChange={e => handleTracksChange(e.target.value)}
                                     rows={5}
                                     placeholder="1. Song A&#10;2. Song B"
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-vertical font-mono"
+                                    className={`w-full bg-background border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-vertical font-mono ${formData.is_tracks_validated ? 'border-green-500/30 ring-1 ring-green-500/10' : 'border-border'}`}
                                 />
                             </div>
                             <div className="col-span-2">
@@ -437,4 +462,5 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         </div>
     );
 }
+
 
