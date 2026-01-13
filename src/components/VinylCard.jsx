@@ -115,7 +115,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
         >
             {/* ... JSX ... */}
             {selectionMode && (
-                <div className={`absolute top - 3 left - 3 z - 30 w - 6 h - 6 rounded - full border - 2 flex items - center justify - center transition - colors ${isSelected ? 'bg-primary border-primary' : 'bg-black/50 border-white/50'} `}>
+                <div className={`absolute top-3 left-3 z-30 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'bg-black/50 border-white/50'}`}>
                     {isSelected && <CheckCircle className="w-4 h-4 text-black" />}
                 </div>
             )}
@@ -164,7 +164,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                             </button>
                             <button
                                 onClick={handleAnalyze}
-                                className={`p - 3 rounded - full backdrop - blur - md shadow - lg border border - white / 10 transition - all active: scale - 95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'} `}
+                                className={`p-3 rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all active:scale-95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'}`}
                                 title="Magic Analyze"
                                 disabled={analyzing}
                             >
