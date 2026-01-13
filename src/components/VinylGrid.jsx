@@ -13,6 +13,8 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const [search, setSearch] = useState('');
     const [selectedArtist, setSelectedArtist] = useState('');
     const [selectedGenre, setSelectedGenre] = useState('');
+    // Sort Order: 'newest' (default) | 'artist_asc'
+    const [sortOrder, setSortOrder] = useState('newest');
 
     // Selection Mode State
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -121,6 +123,11 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         const matchesArtist = selectedArtist ? v.artist === selectedArtist : true;
         const matchesGenre = selectedGenre ? v.genre?.includes(selectedGenre) : true;
         return matchesSearch && matchesArtist && matchesGenre;
+    }).sort((a, b) => {
+        if (sortOrder === 'artist_asc') {
+            return (a.artist || '').localeCompare(b.artist || '');
+        }
+        return 0; // Default is 'newest' which corresponds to the API order (desc createdAt) preserved by filter
     });
 
     return (
@@ -133,6 +140,14 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     <span className="text-primary font-bold">{vinyls.length}</span> RECORDS
                 </div>
                 <div className="flex gap-2">
+                    {/* Mobile Sort Toggle */}
+                    <button
+                        onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')}
+                        className={`p-2 rounded-full border transition-colors ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white'}`}
+                        title={sortOrder === 'newest' ? "Sort by Artist (A-Z)" : "Sort by Newest"}
+                    >
+                        {sortOrder === 'artist_asc' ? "A-Z" : "New"}
+                    </button>
                     <button
                         onClick={() => setIsFiltersOpen(!isFiltersOpen)}
                         className={`p-2 rounded-full border transition-colors ${isFiltersOpen ? 'bg-primary text-black border-primary' : 'bg-white/5 border-white/10 text-white'}`}
@@ -183,6 +198,15 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm">
                         <span className="font-bold text-primary mr-1">{vinyls.length}</span> records
                     </div>
+
+                    {/* Desktop Sort Toggle */}
+                    <button
+                        onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')}
+                        className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                    >
+                        {sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}
+                    </button>
+
                     <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white">
                         <Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
