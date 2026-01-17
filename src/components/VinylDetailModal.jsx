@@ -1,9 +1,19 @@
-import React, { useEffect } from 'react';
-import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, DollarSign, PlayCircle, Youtube } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, DollarSign, PlayCircle, Youtube, Wand2, Loader2 } from 'lucide-react';
+import { analyzeImageUrl, getApiKey } from '../lib/openai';
+import { databases, DATABASE_ID } from '../lib/appwrite';
 
 const icons = { PlayCircle, Youtube }; // Quick fix for previous replacement using icons.Namespace
 
-export function VinylDetailModal({ vinyl, isOpen, onClose, onEdit, onDelete }) {
+export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit, onDelete }) {
+    // Local state to handle updates immediately
+    const [vinyl, setVinyl] = useState(initialVinyl);
+    const [analyzing, setAnalyzing] = useState(false);
+
+    useEffect(() => {
+        setVinyl(initialVinyl);
+    }, [initialVinyl]);
+
     // Lock body scroll when modal is open
     useEffect(() => {
         if (isOpen) {
@@ -16,6 +26,62 @@ export function VinylDetailModal({ vinyl, isOpen, onClose, onEdit, onDelete }) {
 
     if (!isOpen || !vinyl) return null;
 
+    const handleAnalyze = async () => {
+        // Guided AI: Ask for hint
+        let hint = null;
+        if (vinyl.title || vinyl.artist) {
+            const userInput = prompt("Guided Analysis: Help the AI by entering the Artist and Album Name.\n\nLeave empty to run standard analysis.");
+            if (userInput === null) return; // Cancelled
+            if (userInput.trim()) hint = userInput.trim();
+        }
+
+        setAnalyzing(true);
+        try {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert("Please set your Gemini API Key in settings first.");
+                return;
+            }
+
+            const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
+
+            // Appwrite Update
+            const fullUpdate = {
+                artist: analysis.artist,
+                title: analysis.title,
+                genre: analysis.genre,
+                year: String(analysis.year || '').substring(0, 50),
+                notes: String(analysis.notes || '').substring(0, 999),
+                group_members: String(analysis.group_members || '').substring(0, 999),
+                condition: analysis.condition,
+                avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+                tracks: String(analysis.tracks || '').substring(0, 4999)
+            };
+
+            // Respect User Validation
+            if (vinyl.is_tracks_validated) {
+                delete fullUpdate.tracks;
+            }
+
+            await databases.updateDocument(
+                DATABASE_ID,
+                'vinyls',
+                vinyl.id,
+                fullUpdate
+            );
+
+            // Update local view
+            setVinyl(prev => ({ ...prev, ...analysis }));
+            alert("Analysis Complete!");
+
+        } catch (err) {
+            console.error("Analysis failed:", err);
+            alert(`Analysis Failed: ${err.message}`);
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] flex flex-col bg-background/95 backdrop-blur-3xl animate-in slide-in-from-bottom duration-300">
             {/* Header / Actions */}
@@ -27,6 +93,13 @@ export function VinylDetailModal({ vinyl, isOpen, onClose, onEdit, onDelete }) {
                     <X className="w-8 h-8" />
                 </button>
                 <div className="flex gap-2">
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={analyzing}
+                        className={`p-2 rounded-full transition-all ${analyzing ? 'bg-yellow-500/20 text-yellow-400' : 'text-purple-400 hover:text-purple-300 bg-purple-500/10'}`}
+                    >
+                        {analyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wand2 className="w-6 h-6" />}
+                    </button>
                     <button
                         onClick={() => onEdit(vinyl)}
                         className="p-2 text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-full"
@@ -96,15 +169,15 @@ export function VinylDetailModal({ vinyl, isOpen, onClose, onEdit, onDelete }) {
                         <div className="flex flex-wrap gap-4 text-sm">
                             <div className="bg-white/5 px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 text-gray-300">
                                 <Calendar className="w-4 h-4 text-secondary" />
-                                {vinyl.year || 'N/A'}
+                                <span className="text-white">{vinyl.year || 'N/A'}</span>
                             </div>
                             <div className="bg-white/5 px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 text-gray-300">
                                 <Music2 className="w-4 h-4 text-secondary" />
-                                {vinyl.genre || 'N/A'}
+                                <span className="text-white">{vinyl.genre || 'N/A'}</span>
                             </div>
                             <div className="bg-white/5 px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 text-gray-300">
                                 <Disc className="w-4 h-4 text-secondary" />
-                                {vinyl.format || 'Vinyl'}
+                                <span className="text-white">{vinyl.format || 'Vinyl'}</span>
                             </div>
                             {(vinyl.avarege_cost || vinyl.average_cost) && (
                                 <div className="bg-green-900/20 px-4 py-2 rounded-full border border-green-500/20 flex items-center gap-2 text-green-400">

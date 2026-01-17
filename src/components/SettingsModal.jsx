@@ -13,9 +13,18 @@ export function SettingsModal({ onClose, onSave }) {
     const [cleaning, setCleaning] = useState(false);
 
     useEffect(() => {
-        setApiKey(localStorage.getItem('gemini_api_key') || '');
-        setOpenaiKey(localStorage.getItem('openai_api_key') || '');
-        setProvider(localStorage.getItem('ai_provider') || 'gemini');
+        setApiKey(localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '');
+        setOpenaiKey(localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY || '');
+
+        const storedProvider = localStorage.getItem('ai_provider');
+        if (storedProvider) {
+            setProvider(storedProvider);
+        } else if (import.meta.env.VITE_OPENAI_API_KEY) {
+            setProvider('openai');
+        } else {
+            setProvider('gemini');
+        }
+
         setGeminiTierState(localStorage.getItem('gemini_tier') || 'free');
         setGeminiModel(localStorage.getItem('gemini_model') || 'auto');
     }, []);

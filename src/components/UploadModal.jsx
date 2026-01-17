@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock } from 'lucide-react';
+import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera } from 'lucide-react';
 import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
 import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
@@ -65,6 +65,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState({});
     const fileInputRef = useRef(null);
+    const cameraInputRef = useRef(null);
     const [existingFilenames, setExistingFilenames] = useState(new Set());
     const [format, setFormat] = useState('Vinyl'); // Default format
     const formatRef = useRef('Vinyl');
@@ -291,10 +292,22 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
 
                 <div className="p-6 flex-1 overflow-y-auto">
                     {files.length === 0 ? (
-                        <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-colors group">
-                            <div className="bg-primary/10 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform"><UploadIcon className="w-8 h-8 text-primary" /></div>
-                            <p className="text-lg font-medium">Click to upload or drag and drop</p>
-                            <p className="text-secondary text-sm mt-2">Support for JPG, PNG</p>
+                        <div className="flex flex-col gap-4">
+                            {/* Standard Drop/Click Area */}
+                            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-colors group">
+                                <div className="bg-primary/10 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform"><UploadIcon className="w-8 h-8 text-primary" /></div>
+                                <p className="text-lg font-medium">Click to upload or drag and drop</p>
+                                <p className="text-secondary text-sm mt-2">Support for JPG, PNG</p>
+                            </div>
+
+                            {/* Camera Button */}
+                            <button
+                                onClick={() => cameraInputRef.current?.click()}
+                                className="w-full flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-xl transition-all active:scale-[0.98]"
+                            >
+                                <Camera className="w-6 h-6 text-accent" />
+                                <span className="font-medium">Take Photo with Camera</span>
+                            </button>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -323,10 +336,15 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                                     </div>
                                 );
                             })}
-                            <button onClick={() => fileInputRef.current?.click()} className="text-sm text-primary hover:underline mt-2" disabled={uploading}>+ Add more files</button>
+                            <div className="flex gap-2 mt-2">
+                                <button onClick={() => fileInputRef.current?.click()} className="text-sm text-primary hover:underline" disabled={uploading}>+ Add more files</button>
+                                <span className="text-white/20">|</span>
+                                <button onClick={() => cameraInputRef.current?.click()} className="text-sm text-accent hover:underline flex items-center gap-1" disabled={uploading}><Camera className="w-3 h-3" /> Take Photo</button>
+                            </div>
                         </div>
                     )}
                     <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
+                    <input type="file" ref={cameraInputRef} onChange={handleFileSelect} accept="image/*" capture="environment" className="hidden" />
                 </div>
 
                 <div className="p-4 border-t border-border flex justify-end gap-3 bg-surface rounded-b-xl">

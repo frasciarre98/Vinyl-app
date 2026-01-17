@@ -9,7 +9,12 @@ const MODEL_COOLDOWNS = new Map();
 // --- CONFIGURATION MANAGEMENT ---
 
 export function getProvider() {
-    return localStorage.getItem('ai_provider') || DEFAULT_PROVIDER;
+    const stored = localStorage.getItem('ai_provider');
+    if (stored) return stored;
+
+    // Fallback to Env Vars
+    if (import.meta.env.VITE_OPENAI_API_KEY) return 'openai';
+    return DEFAULT_PROVIDER;
 }
 
 export function setProvider(provider) {
@@ -18,8 +23,10 @@ export function setProvider(provider) {
 
 export function getApiKey(provider = null) {
     const current = provider || getProvider();
-    if (current === 'openai') return localStorage.getItem('openai_api_key');
-    return localStorage.getItem('gemini_api_key');
+    if (current === 'openai') {
+        return localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY;
+    }
+    return localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
 }
 
 export function saveApiKey(key, provider = 'gemini') {

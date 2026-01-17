@@ -110,8 +110,19 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
+            // Use proxy to bypass CORS on mobile LAN (192.168.x.x)
+            // If the URL matches our Appwrite Endpoint, route it through Vite proxy
+            const PROXY_PREFIX = '/appwrite-proxy';
+            const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
+
+            let fetchUrl = vinyl.image_url;
+            if (window.location.hostname !== 'localhost' && vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
+                fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
+                console.log("Using Proxy URL for CORS:", fetchUrl);
+            }
+
             // Fetch as blob to avoid CORS issues with Canvas
-            const response = await fetch(vinyl.image_url, { mode: 'cors' });
+            const response = await fetch(fetchUrl);
             if (!response.ok) throw new Error("Network response was not ok");
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
