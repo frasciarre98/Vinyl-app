@@ -175,20 +175,20 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="hidden md:flex p-3 bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 text-black rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                className="flex p-2 md:p-3 bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 text-black rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Play on Spotify"
                             >
-                                <PlayCircle className="w-5 h-5 fill-current" />
+                                <PlayCircle className="w-4 h-4 md:w-5 md:h-5 fill-current" />
                             </a >
                             <a
                                 href={`https://www.youtube.com/results?search_query=${encodeURIComponent((localVinyl.artist === 'Pending AI' ? '' : localVinyl.artist || '') + ' ' + (localVinyl.title || ''))}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="hidden md:flex p-3 bg-[#FF0000] hover:bg-[#cc0000] active:scale-95 text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                className="flex p-2 md:p-3 bg-[#FF0000] hover:bg-[#cc0000] active:scale-95 text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Search on YouTube"
                             >
-                                <Youtube className="w-5 h-5" />
+                                <Youtube className="w-4 h-4 md:w-5 md:h-5" />
                             </a>
                         </div >
                     )}
