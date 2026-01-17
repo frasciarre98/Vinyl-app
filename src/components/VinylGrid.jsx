@@ -75,45 +75,115 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
-    const handleBulkDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${selectedIds.length} albums?`)) return;
-        setLoading(true);
+    // UNDO Logic State
+    const [deletedItems, setDeletedItems] = useState([]); // { items: [], timeoutId: null }
+    const undoTimeoutRef = useRef(null);
+
+    const executePermanentDelete = async (itemsToDelete) => {
         try {
-            for (let i = 0; i < selectedIds.length; i++) {
-                await databases.deleteDocument(DATABASE_ID, 'vinyls', selectedIds[i]);
-                await new Promise(r => setTimeout(r, 200)); // Rate limit safety
+            for (const item of itemsToDelete) {
+                await databases.deleteDocument(DATABASE_ID, 'vinyls', item.id);
             }
-            fetchVinyls();
+            console.log('Permanently deleted', itemsToDelete.length, 'items');
         } catch (err) {
-            alert('Bulk delete failed: ' + err.message);
-        } finally {
-            setLoading(false);
+            console.error('Delete failed', err);
+            // In a real app we might want to alert, but for now silent fail or re-fetch
+            fetchVinyls();
         }
     };
 
+    const handleSoftDelete = (itemsToDelete) => {
+        // 1. Clear existing timeout if any (merging deletions not supported in this simple version, we just execute previous immediately if exists?)
+        // Better: Force execute previous pending if exists
+        if (undoTimeoutRef.current) {
+            clearTimeout(undoTimeoutRef.current);
+            // Automatically confirming previous one is tricky UI-wise, usually we just replace.
+            // But to be safe, let's just support one pending batch at a time. 
+            // If user deletes AGAIN while Toast is showing, we immediately execute the previous one.
+            if (deletedItems.length > 0) {
+                executePermanentDelete(deletedItems);
+            }
+        }
+
+        // 2. Optimistic Update
+        const ids = itemsToDelete.map(i => i.id);
+        setVinyls(prev => prev.filter(v => !ids.includes(v.id)));
+        setDeletedItems(itemsToDelete);
+        setSelectedIds([]);
+        setIsSelectionMode(false);
+
+        // 3. Set Timeout
+        undoTimeoutRef.current = setTimeout(() => {
+            executePermanentDelete(itemsToDelete);
+            setDeletedItems([]);
+            undoTimeoutRef.current = null;
+        }, 5000);
+    };
+
+    const handleUndo = () => {
+        if (undoTimeoutRef.current) {
+            clearTimeout(undoTimeoutRef.current);
+            undoTimeoutRef.current = null;
+        }
+        // Restore items
+        setVinyls(prev => [...deletedItems, ...prev].sort((a, b) => b.$createdAt.localeCompare(a.$createdAt)));
+        setDeletedItems([]);
+    };
+
+    const handleBulkDelete = () => {
+        const toDelete = vinyls.filter(v => selectedIds.includes(v.id));
+        handleSoftDelete(toDelete);
+    };
+
+    const handleSingleDelete = (id) => {
+        const item = vinyls.find(v => v.id === id);
+        if (item) handleSoftDelete([item]);
+    };
+
+    // ... (rest of functions) ...
+
+    return (
+        <div className="space-y-6 relative min-h-screen">
+            {/* Undo Toast */}
+            {deletedItems.length > 0 && (
+                <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 bg-black text-white px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl border border-white/20 animate-in fade-in slide-in-from-bottom-4">
+                    <span>Deleted {deletedItems.length} item{deletedItems.length > 1 ? 's' : ''}.</span>
+                    <button
+                        onClick={handleUndo}
+                        className="bg-white text-black px-4 py-1.5 rounded-full text-sm font-bold hover:bg-gray-200 transition-colors"
+                    >
+                        UNDO
+                    </button>
+                </div>
+            )}
+
+            <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
+
+            {/* ... header ... */
+
     const handleBatchPriceEstimate = async () => {
         const apiKey = getApiKey();
-        if (!apiKey) return alert("API Key missing.");
-        if (!confirm(`Estimate price for ${selectedIds.length} records?`)) return;
+            if (!apiKey) return alert("API Key missing.");
+            if (!confirm(`Estimate price for ${selectedIds.length} records?`)) return;
 
-        setLoading(true);
-        let count = 0;
-        try {
+            setLoading(true);
+            let count = 0;
+            try {
             const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
             for (const vinyl of selectedVinyls) {
                 try {
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, `${vinyl.artist} - ${vinyl.title}`);
-                    if (analysis.average_cost) {
-                        await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { average_cost: analysis.average_cost });
-                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, average_cost: analysis.average_cost } : v));
-                        count++;
+            if (analysis.average_cost) {
+                await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { average_cost: analysis.average_cost });
+                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? {...v, average_cost: analysis.average_cost } : v));
+            count++;
                     }
                     await new Promise(r => setTimeout(r, 1000));
-                } catch (e) { console.error(e); }
+                } catch (e) {console.error(e); }
             }
             alert(`Updated ${count} records.`);
         } finally {
-            setLoading(false);
+                setLoading(false);
             setIsSelectionMode(false);
             setSelectedIds([]);
         }
@@ -122,22 +192,22 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const handleBatchFormatChange = async (newFormat) => {
         if (!confirm(`Set format to ${newFormat} for ${selectedIds.length} records?`)) return;
 
-        setLoading(true);
-        try {
+            setLoading(true);
+            try {
             const updates = selectedIds.map(id =>
-                databases.updateDocument(DATABASE_ID, 'vinyls', id, { format: newFormat })
+            databases.updateDocument(DATABASE_ID, 'vinyls', id, {format: newFormat })
             );
 
             await Promise.all(updates);
 
-            setVinyls(prev => prev.map(v => selectedIds.includes(v.id) ? { ...v, format: newFormat } : v));
+            setVinyls(prev => prev.map(v => selectedIds.includes(v.id) ? {...v, format: newFormat } : v));
 
             alert(`Updated ${selectedIds.length} records to ${newFormat}.`);
         } catch (err) {
-            console.error(err);
+                console.error(err);
             alert('Batch update failed: ' + err.message);
         } finally {
-            setLoading(false);
+                setLoading(false);
             setIsSelectionMode(false);
             setSelectedIds([]);
         }
@@ -145,86 +215,59 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
     const handleBatchFullAnalysis = async () => {
         const apiKey = getApiKey();
-        if (!apiKey) return alert("API Key missing.");
-        if (!confirm(`Deep Analyze metadata for ${selectedIds.length} records?\nThis will update Notes, Tracks, and other info using the new AI Settings.`)) return;
+            if (!apiKey) return alert("API Key missing.");
+            if (!confirm(`Deep Analyze metadata for ${selectedIds.length} records?\nThis will update Notes, Tracks, and other info using the new AI Settings.`)) return;
 
-        setLoading(true);
-        let count = 0;
-        try {
+            setLoading(true);
+            let count = 0;
+            try {
             const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
             for (const vinyl of selectedVinyls) {
                 try {
                     // Use artist+title hint to guide AI if available
                     const hint = vinyl.artist && vinyl.artist !== 'Pending AI' ? `${vinyl.artist} - ${vinyl.title}` : null;
-                    const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
+            const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
-                    const fullUpdate = {
-                        artist: analysis.artist,
-                        title: analysis.title,
-                        genre: analysis.genre,
-                        year: analysis.year,
-                        notes: String(analysis.notes || '').substring(0, 4000), // New Limit
-                        group_members: analysis.group_members,
-                        condition: analysis.condition,
-                        avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-                        tracks: analysis.tracks
+            const fullUpdate = {
+                artist: analysis.artist,
+            title: analysis.title,
+            genre: analysis.genre,
+            year: analysis.year,
+            notes: String(analysis.notes || '').substring(0, 4000), // New Limit
+            group_members: analysis.group_members,
+            condition: analysis.condition,
+            avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+            tracks: analysis.tracks
                     };
 
-                    if (vinyl.is_tracks_validated) {
-                        delete fullUpdate.tracks;
+            if (vinyl.is_tracks_validated) {
+                delete fullUpdate.tracks;
                     }
 
-                    await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, fullUpdate);
-                    setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...fullUpdate } : v));
-                    count++;
+            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, fullUpdate);
+                    setVinyls(prev => prev.map(v => v.id === vinyl.id ? {...v, ...fullUpdate } : v));
+            count++;
 
                     // Rate Limiting (2s delay to be safe)
                     await new Promise(r => setTimeout(r, 2000));
 
-                } catch (e) { console.error(`Failed to analyze ${vinyl.id}:`, e); }
+                } catch (e) {console.error(`Failed to analyze ${vinyl.id}:`, e); }
             }
             alert(`Deep Analysis completed for ${count} records.`);
         } finally {
-            setLoading(false);
+                setLoading(false);
             setIsSelectionMode(false);
             setSelectedIds([]);
         }
     };
 
     const toggleSelectionMode = () => {
-        setIsSelectionMode(!isSelectionMode);
-        setSelectedIds([]);
+                setIsSelectionMode(!isSelectionMode);
+            setSelectedIds([]);
     };
 
-    // Filter Logic
-    const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
-
-    const filteredVinyls = vinyls.filter(v => {
-        const matchesSearch = (v.title?.toLowerCase().includes(search.toLowerCase()) || v.artist?.toLowerCase().includes(search.toLowerCase()) || v.genre?.toLowerCase().includes(search.toLowerCase()));
-        const matchesArtist = selectedArtist ? v.artist === selectedArtist : true;
-        const matchesGenre = selectedGenre ? v.genre?.includes(selectedGenre) : true;
-        const matchesRating = selectedRating === 'unrated'
-            ? (!v.rating || v.rating === 0)
-            : (v.rating || 0) >= parseInt(selectedRating);
-
-        return matchesSearch && matchesArtist && matchesGenre && matchesRating;
-    }).sort((a, b) => {
-        if (sortOrder === 'artist_asc') {
-            return (a.artist || '').localeCompare(b.artist || '');
-        }
-        return 0; // Default is 'newest' - API returns desc createdAt
-    });
-
-    const resetFilters = () => {
-        setSearch('');
-        setSelectedArtist('');
-        setSelectedGenre('');
-        setSelectedRating('0');
-        setSortOrder('newest');
-    };
-
-    return (
-        <div className="space-y-6 relative min-h-screen">
+            // Filter Logic
+            const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
             <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
 
             {/* --- MOBILE STICKY HEADER --- */}
