@@ -13,6 +13,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const [search, setSearch] = useState('');
     const [selectedArtist, setSelectedArtist] = useState('');
     const [selectedGenre, setSelectedGenre] = useState('');
+    const [selectedRating, setSelectedRating] = useState('0');
     // Sort Order: 'newest' (default) | 'artist_asc'
     const [sortOrder, setSortOrder] = useState('newest');
 
@@ -32,6 +33,10 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     // Compute Filter Options
     const uniqueArtists = [...new Set(vinyls.map(v => v.artist).filter(Boolean).sort())];
     const uniqueGenres = [...new Set(vinyls.map(v => v.genre).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
+
+    // Compute Format Counts
+    const vinylCount = vinyls.filter(v => !v.format || v.format === 'Vinyl').length;
+    const cdCount = vinyls.filter(v => v.format === 'CD').length;
 
     const fetchVinyls = async () => {
         try {
@@ -113,6 +118,32 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         }
     };
 
+    const handleBatchFormatChange = async (newFormat) => {
+        if (!confirm(`Set format to ${newFormat} for ${selectedIds.length} records?`)) return;
+
+        setLoading(true);
+        try {
+            // Parallel execution for speed (Appwrite handles concurrency well enough for small batches, or we can chunk if needed)
+            const updates = selectedIds.map(id =>
+                databases.updateDocument(DATABASE_ID, 'vinyls', id, { format: newFormat })
+            );
+
+            await Promise.all(updates);
+
+            // Update local state
+            setVinyls(prev => prev.map(v => selectedIds.includes(v.id) ? { ...v, format: newFormat } : v));
+
+            alert(`Updated ${selectedIds.length} records to ${newFormat}.`);
+        } catch (err) {
+            console.error(err);
+            alert('Batch update failed: ' + err.message);
+        } finally {
+            setLoading(false);
+            setIsSelectionMode(false);
+            setSelectedIds([]);
+        }
+    };
+
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
         setSelectedIds([]);
@@ -122,7 +153,11 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         const matchesSearch = (v.title?.toLowerCase().includes(search.toLowerCase()) || v.artist?.toLowerCase().includes(search.toLowerCase()) || v.genre?.toLowerCase().includes(search.toLowerCase()));
         const matchesArtist = selectedArtist ? v.artist === selectedArtist : true;
         const matchesGenre = selectedGenre ? v.genre?.includes(selectedGenre) : true;
-        return matchesSearch && matchesArtist && matchesGenre;
+        const matchesRating = selectedRating === 'unrated'
+            ? (!v.rating || v.rating === 0)
+            : (v.rating || 0) >= parseInt(selectedRating);
+
+        return matchesSearch && matchesArtist && matchesGenre && matchesRating;
     }).sort((a, b) => {
         if (sortOrder === 'artist_asc') {
             return (a.artist || '').localeCompare(b.artist || '');
@@ -136,8 +171,9 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
             {/* Mobile Filter Toggle & Count */}
             <div className="flex md:hidden items-center justify-between sticky top-16 z-30 bg-background/95 backdrop-blur shadow-sm p-4 -mx-4 mb-4 border-b border-white/10">
-                <div className="font-mono text-xs text-secondary">
-                    <span className="text-primary font-bold">{vinyls.length}</span> RECORDS
+                <div className="font-mono text-xs text-secondary flex flex-col leading-tight">
+                    <div><span className="text-primary font-bold">{vinyls.length}</span> RECORDS</div>
+                    <div className="text-[10px] opacity-70">{vinylCount} LP / {cdCount} CD</div>
                 </div>
                 <div className="flex gap-2">
                     {/* Mobile Sort Toggle */}
@@ -191,12 +227,25 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                         <option value="">All Genres</option>
                         {uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}
                     </select>
+                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 md:max-w-[200px]">
+                        <option value="0">All Ratings</option>
+                        <option value="5">5 Stars Only</option>
+                        <option value="4">4+ Stars</option>
+                        <option value="3">3+ Stars</option>
+                        <option value="2">2+ Stars</option>
+                        <option value="1">1+ Star</option>
+                        <option value="unrated">Unrated</option>
+                    </select>
                 </div>
 
                 {/* Desktop Buttons */}
                 <div className="hidden md:flex items-center gap-2">
-                    <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm">
-                        <span className="font-bold text-primary mr-1">{vinyls.length}</span> records
+                    <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm flex items-center gap-2">
+                        <span className="font-bold text-primary">{vinyls.length}</span>
+                        <span className="text-secondary/50">records</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">
+                            {vinylCount} LP / {cdCount} CD
+                        </span>
                     </div>
 
                     {/* Desktop Sort Toggle */}
@@ -218,6 +267,14 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                             >
                                 {selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}
                             </button>
+
+                            {/* Format Buttons */}
+                            <div className="flex bg-white/5 rounded-full border border-white/10 p-1">
+                                <button onClick={() => handleBatchFormatChange('Vinyl')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors">to Vinyl</button>
+                                <div className="w-px bg-white/10 my-1"></div>
+                                <button onClick={() => handleBatchFormatChange('CD')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors">to CD</button>
+                            </div>
+
                             <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm">
                                 <CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})
                             </button>
@@ -235,12 +292,18 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
                 {/* Mobile Selection Action Bar (Only visible when selecting on mobile) */}
                 {isSelectionMode && (
-                    <div className="md:hidden mt-4 pt-4 border-t border-white/10 flex gap-2 overflow-x-auto pb-2">
-                        <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap">
-                            <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
+                    <div className="md:hidden mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-2">
+                        <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-white/5 border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium">
+                            Set to Vinyl
                         </button>
-                        <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap">
+                        <button onClick={() => handleBatchFormatChange('CD')} className="bg-white/5 border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium">
+                            Set to CD
+                        </button>
+                        <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-bold">
                             <CheckSquare className="w-4 h-4" /> Price
+                        </button>
+                        <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-3 rounded-xl text-sm font-bold">
+                            <Trash2 className="w-4 h-4" /> Delete
                         </button>
                     </div>
                 )}
