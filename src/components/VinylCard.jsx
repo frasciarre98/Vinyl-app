@@ -154,28 +154,28 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
                     {/* Overlay Controls (Top Right) */}
                     {!selectionMode && (
-                        <div className="hidden md:flex absolute top-2 right-2 gap-2 z-50 transform-gpu">
+                        <div className="flex absolute top-2 right-2 gap-2 z-50 transform-gpu">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onEdit(vinyl); }}
-                                className="p-3 bg-black/60 hover:bg-black/90 active:scale-95 active:bg-black text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                className="p-2 md:p-3 bg-black/60 hover:bg-black/90 active:scale-95 active:bg-black text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Edit"
                             >
-                                <Edit2 className="w-5 h-5" />
+                                <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
                             </button>
                             <button
                                 onClick={handleAnalyze}
-                                className={`p-3 rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all active:scale-95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'}`}
+                                className={`p-2 md:p-3 rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all active:scale-95 ${isPending ? 'bg-yellow-500 text-black animate-pulse' : 'bg-black/60 hover:bg-black/90 active:bg-black text-white'}`}
                                 title="Magic Analyze"
                                 disabled={analyzing}
                             >
-                                {analyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
+                                {analyzing ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <Wand2 className="w-4 h-4 md:w-5 md:h-5" />}
                             </button>
                             <a
                                 href={`https://open.spotify.com/search/${encodeURIComponent((localVinyl.artist === 'Pending AI' ? '' : localVinyl.artist || '') + ' ' + (localVinyl.title || ''))}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-3 bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 text-black rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                className="hidden md:flex p-3 bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 text-black rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Play on Spotify"
                             >
                                 <PlayCircle className="w-5 h-5 fill-current" />
@@ -185,7 +185,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-3 bg-[#FF0000] hover:bg-[#cc0000] active:scale-95 text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                className="hidden md:flex p-3 bg-[#FF0000] hover:bg-[#cc0000] active:scale-95 text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
                                 title="Search on YouTube"
                             >
                                 <Youtube className="w-5 h-5" />
