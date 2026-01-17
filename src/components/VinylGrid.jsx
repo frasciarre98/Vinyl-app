@@ -143,6 +143,54 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
         }
     };
 
+    const handleBatchFullAnalysis = async () => {
+        const apiKey = getApiKey();
+        if (!apiKey) return alert("API Key missing.");
+        if (!confirm(`Deep Analyze metadata for ${selectedIds.length} records?\nThis will update Notes, Tracks, and other info using the new AI Settings.`)) return;
+
+        setLoading(true);
+        let count = 0;
+        try {
+            const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
+            for (const vinyl of selectedVinyls) {
+                try {
+                    // Use artist+title hint to guide AI if available
+                    const hint = vinyl.artist && vinyl.artist !== 'Pending AI' ? `${vinyl.artist} - ${vinyl.title}` : null;
+                    const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
+
+                    const fullUpdate = {
+                        artist: analysis.artist,
+                        title: analysis.title,
+                        genre: analysis.genre,
+                        year: analysis.year,
+                        notes: String(analysis.notes || '').substring(0, 4000), // New Limit
+                        group_members: analysis.group_members,
+                        condition: analysis.condition,
+                        avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+                        tracks: analysis.tracks
+                    };
+
+                    if (vinyl.is_tracks_validated) {
+                        delete fullUpdate.tracks;
+                    }
+
+                    await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, fullUpdate);
+                    setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...fullUpdate } : v));
+                    count++;
+
+                    // Rate Limiting (2s delay to be safe)
+                    await new Promise(r => setTimeout(r, 2000));
+
+                } catch (e) { console.error(`Failed to analyze ${vinyl.id}:`, e); }
+            }
+            alert(`Deep Analysis completed for ${count} records.`);
+        } finally {
+            setLoading(false);
+            setIsSelectionMode(false);
+            setSelectedIds([]);
+        }
+    };
+
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
         setSelectedIds([]);
@@ -402,6 +450,9 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                             <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm">
                                 <CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})
                             </button>
+                            <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors">
+                                <Sparkles className="w-4 h-4" /> Magic Refresh ({selectedIds.length})
+                            </button>
                             <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm">
                                 <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
                             </button>
@@ -450,9 +501,13 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
                         Set to CD
                     </button>
-                    <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                        <CheckSquare className="w-4 h-4" /> Estimate
+                    <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
+                        <Sparkles className="w-4 h-4" /> Magic Refresh Metadata
                     </button>
+                    <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
+                        <CheckSquare className="w-4 h-4" /> Estimate Price
+                    </button>
+
                     <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
                         <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
                     </button>
@@ -472,6 +527,6 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
                     }
                 }}
             />
-        </div>
+        </div >
     );
 }
