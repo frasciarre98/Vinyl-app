@@ -117,7 +117,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
             executePermanentDelete(itemsToDelete);
             setDeletedItems([]);
             undoTimeoutRef.current = null;
-        }, 5000);
+        }, 600000);
     };
 
     const handleUndo = () => {
