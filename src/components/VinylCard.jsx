@@ -154,7 +154,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
                     {/* Overlay Controls (Top Right) */}
                     {!selectionMode && (
-                        <div className="flex absolute top-2 right-2 gap-2 z-50 transform-gpu">
+                        <div className="hidden md:flex absolute top-2 right-2 gap-2 z-50 transform-gpu">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onEdit(vinyl); }}
                                 className="p-2 md:p-3 bg-black/60 hover:bg-black/90 active:scale-95 active:bg-black text-white rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
