@@ -51,7 +51,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                 title: analysis.title,
                 genre: analysis.genre,
                 year: String(analysis.year || '').substring(0, 50),
-                notes: String(analysis.notes || '').substring(0, 999),
+                notes: String(analysis.notes || '').substring(0, 4000),
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 avarege_cost: String(analysis.average_cost || '').substring(0, 50),
@@ -227,7 +227,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                             </div>
                             <div>
                                 <h4 className="text-xs uppercase text-secondary mb-2">Notes</h4>
-                                <p className="text-gray-400 font-light italic leading-relaxed border-l-2 border-white/10 pl-4">
+                                <p className="text-gray-400 font-light italic leading-relaxed border-l-2 border-white/10 pl-4 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20">
                                     {vinyl.notes || '—'}
                                 </p>
                             </div>

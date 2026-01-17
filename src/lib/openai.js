@@ -271,7 +271,7 @@ Return JSON with these keys:
 - group_members (key members, comma separated)
 - average_cost (e.g. "€20-30")
 - condition (visual estimate: Good/Fair/Mint)
-- notes (trivia/facts)
+- notes (Detailed description including: history of the album/artist, interesting anecdotes, trivia, recording context, and musical influence. Make it engaging and comprehensive approx 300-500 words)
 Raw JSON only.` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
@@ -374,7 +374,7 @@ Your goal is to provide **Forensic Level Metadata**.
 - **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
 - **year**: Original release year.
 
-Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, notes.` },
+Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, notes (Detailed history, anecdotes, trivia, approx 300-500 words).` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }

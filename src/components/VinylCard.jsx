@@ -45,7 +45,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 title: analysis.title,
                 genre: analysis.genre,
                 year: String(analysis.year || '').substring(0, 50),
-                notes: String(analysis.notes || '').substring(0, 999),
+                notes: String(analysis.notes || '').substring(0, 4000),
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 // Sanitise cost to strict String(50)
