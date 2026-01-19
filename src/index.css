@@ -7,7 +7,33 @@
 }
 
 body {
-  @apply bg-background text-primary antialiased;
+  @apply text-slate-900 antialiased;
+  background-color: #cbd5e1;
+  /* Slate 300 - Distinctly darker than white */
+  background-image:
+    radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
+    radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),
+    radial-gradient(at 50% 50%, hsla(220, 60%, 92%, 1) 0, transparent 60%),
+    radial-gradient(at 20% 80%, hsla(200, 50%, 85%, 1) 0, transparent 50%),
+    radial-gradient(at 80% 90%, hsla(240, 40%, 88%, 1) 0, transparent 50%);
+  background-attachment: fixed;
+  background-size: cover;
+  min-height: 100vh;
+}
+
+/* Glassmorphism Utilities */
+@layer components {
+  .glass-panel {
+    @apply bg-white/40 backdrop-blur-xl border border-white/60 shadow-xl;
+  }
+
+  .glass-card {
+    @apply bg-white/30 backdrop-blur-md border border-white/50 shadow-lg hover:bg-white/50 transition-all duration-300;
+  }
+
+  .glass-heavy {
+    @apply bg-white/60 backdrop-blur-2xl border border-white/60;
+  }
 }
 
 /* Custom scrollbar for Webkit browsers */
@@ -16,11 +42,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-background;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full hover:bg-secondary transition-colors;
+  @apply bg-slate-400/50 rounded-full hover:bg-slate-500/50 transition-colors;
 }
 
 /* 3D Flip Utilities */

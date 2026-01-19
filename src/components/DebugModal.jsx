@@ -100,8 +100,8 @@ export function DebugModal({ isOpen, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-surface border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh]">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="glass-heavy rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh]">
                 <div className="flex items-center justify-between p-4 border-b border-border">
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-red-500">
                         <Bug className="w-5 h-5" /> Debug Tools
@@ -113,7 +113,7 @@ export function DebugModal({ isOpen, onClose }) {
 
                 <div className="p-6 overflow-y-auto space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-background p-4 rounded-lg border border-border">
+                        <div className="bg-black/10 p-4 rounded-lg border border-white/10">
                             <h3 className="font-medium mb-2 flex items-center gap-2">
                                 <Wrench className="w-4 h-4 text-primary" /> Database Consistency
                             </h3>
@@ -129,7 +129,7 @@ export function DebugModal({ isOpen, onClose }) {
                             </button>
                         </div>
 
-                        <div className="bg-background p-4 rounded-lg border border-border">
+                        <div className="bg-black/10 p-4 rounded-lg border border-white/10">
                             <h3 className="font-medium mb-2 flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4 text-primary" /> Image Diagnostics
                             </h3>
@@ -146,7 +146,7 @@ export function DebugModal({ isOpen, onClose }) {
                         </div>
                     </div>
 
-                    <div className="bg-black/40 rounded-lg p-4 font-mono text-xs border border-white/5 h-64 overflow-y-auto">
+                    <div className="bg-black/10 rounded-lg p-4 font-mono text-xs border border-white/5 h-64 overflow-y-auto">
                         {logs.length === 0 ? (
                             <div className="text-secondary italic text-center mt-20">Logs will appear here...</div>
                         ) : (

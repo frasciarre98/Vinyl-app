@@ -11,6 +11,12 @@ export default defineConfig({
         target: 'https://cloud.appwrite.io/v1',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/appwrite-proxy/, ''),
+        configure: (proxy, options) => {
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+            proxyRes.headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
+          });
+        }
       },
     }
   }

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle } from 'lucide-react';
+import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera } from 'lucide-react';
 import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import { resizeImage } from '../lib/openai';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../lib/imageUtils';
+import { PerspectiveCropper } from './PerspectiveCropper';
 
-export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
+export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
     const [formData, setFormData] = useState({
         title: '',
         artist: '',
@@ -24,9 +25,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
     const [saving, setSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef(null);
+    const cameraInputRef = useRef(null);
 
     // Crop State
     const [isCropping, setIsCropping] = useState(false);
+    const [perspectiveMode, setPerspectiveMode] = useState(false);
     const [cropImageSrc, setCropImageSrc] = useState(null);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
@@ -75,16 +78,22 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
     };
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this record?')) return;
-        setSaving(true);
-        try {
-            await databases.deleteDocument(DATABASE_ID, 'vinyls', vinyl.id);
-            onUpdate();
+        if (onDelete) {
+            onDelete(vinyl.id);
             onClose();
-        } catch (err) {
-            console.error('Error deleting vinyl:', err);
-        } finally {
-            setSaving(false);
+        } else {
+            // Fallback (should not be used ideally if we want Undo)
+            if (!confirm('Are you sure you want to delete this record?')) return;
+            setSaving(true);
+            try {
+                await databases.deleteDocument(DATABASE_ID, 'vinyls', vinyl.id);
+                onUpdate();
+                onClose();
+            } catch (err) {
+                console.error('Error deleting vinyl:', err);
+            } finally {
+                setSaving(false);
+            }
         }
     };
 
@@ -115,8 +124,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             const PROXY_PREFIX = '/appwrite-proxy';
             const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 
+            // Start with original URL
             let fetchUrl = vinyl.image_url;
-            if (window.location.hostname !== 'localhost' && vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
+
+            // Use proxy if valid Appwrite URL (ALWAYS, even on localhost to fix CORS)
+            if (vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
                 fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
                 console.log("Using Proxy URL for CORS:", fetchUrl);
             }
@@ -136,6 +148,75 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
             alert("Browser Security (CORS) blocked editing this remote image.\n\nPlease select the original file from your device to crop it.");
             // Automatically trigger file selection as fallback
             fileInputRef.current?.click();
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const handleStartPerspective = async () => {
+        if (!vinyl.image_url) return;
+        setUploadingImage(true);
+        try {
+            // Use proxy to bypass CORS on mobile LAN (192.168.x.x)
+            // If the URL matches our Appwrite Endpoint, route it through Vite proxy
+            const PROXY_PREFIX = '/appwrite-proxy';
+            const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
+
+            let fetchUrl = vinyl.image_url;
+            if (vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
+                fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
+            }
+
+            const response = await fetch(fetchUrl);
+            if (!response.ok) throw new Error("Network response was not ok");
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+
+            setCropImageSrc(objectUrl);
+            setIsCropping(true);
+            setPerspectiveMode(true);
+        } catch (error) {
+            console.error(error);
+            alert("Error loading image for perspective: " + error.message);
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const handleSavePerspective = async (blob) => {
+        if (!blob || blob.size < 1000) {
+            alert("Error: Generated image is too small or empty. Please try again.");
+            return;
+        }
+
+        setUploadingImage(true);
+        try {
+            console.log("Uploading warped image...");
+            // Blob is already optimized by perspective.js (max 1200px, jpeg 0.9)
+            // No need to resizeImage again.
+            const uploadFile = new File([blob], `warped-${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+            const fileUpload = await storage.createFile(
+                BUCKET_ID,
+                ID.unique(),
+                uploadFile
+            );
+
+            const viewResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
+            const publicUrl = viewResult.href ? viewResult.href : String(viewResult);
+
+            console.log("New Perspective URL:", publicUrl);
+
+            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { image_url: publicUrl });
+
+            onUpdate();
+            setIsCropping(false);
+            setPerspectiveMode(false);
+            setCropImageSrc(null);
+            alert('Perspective correction applied successfully!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save warped image: ' + err.message);
         } finally {
             setUploadingImage(false);
         }
@@ -208,81 +289,93 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-surface border border-border rounded-xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface z-10">
-                    <h2 className="text-lg font-semibold">{isCropping ? 'Crop & Rotate' : 'Edit Album'}</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="glass-heavy rounded-xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 glass-panel z-10">
+                    <h2 className="text-lg font-semibold">
+                        {isCropping ? (perspectiveMode ? 'Perspective Fix' : 'Crop & Rotate') : 'Edit Album'}
+                    </h2>
                     <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {isCropping ? (
-                    <div className="p-4 h-[500px] flex flex-col">
-                        <div className="relative flex-1 bg-black rounded-lg overflow-hidden border border-white/10 mb-4">
-                            <Cropper
-                                image={cropImageSrc}
-                                crop={crop}
-                                zoom={zoom}
-                                rotation={rotation}
-                                aspect={1}
-                                onCropChange={setCrop}
-                                onCropComplete={onCropComplete}
-                                onZoomChange={setZoom}
-                                onRotationChange={setRotation}
+                    perspectiveMode ? (
+                        <div className="h-[65vh] min-h-[400px] flex flex-col">
+                            <PerspectiveCropper
+                                imageSrc={cropImageSrc}
+                                onComplete={handleSavePerspective}
+                                onCancel={() => { setIsCropping(false); setPerspectiveMode(false); setCropImageSrc(null); }}
                             />
                         </div>
-
-                        <div className="space-y-4 px-2">
-                            <div className="flex items-center gap-4">
-                                <span className="text-xs text-secondary w-12">Zoom</span>
-                                <input
-                                    type="range"
-                                    value={zoom}
-                                    min={1}
-                                    max={3}
-                                    step={0.1}
-                                    aria-labelledby="Zoom"
-                                    onChange={(e) => setZoom(e.target.value)}
-                                    className="flex-1 accent-primary h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                />
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <span className="text-xs text-secondary w-12">Rotate</span>
-                                <input
-                                    type="range"
-                                    value={rotation}
-                                    min={0}
-                                    max={360}
-                                    step={1}
-                                    aria-labelledby="Rotation"
-                                    onChange={(e) => setRotation(e.target.value)}
-                                    className="flex-1 accent-primary h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                    ) : (
+                        <div className="p-4 h-[500px] flex flex-col">
+                            <div className="relative flex-1 bg-black rounded-lg overflow-hidden border border-white/10 mb-4">
+                                <Cropper
+                                    image={cropImageSrc}
+                                    crop={crop}
+                                    zoom={zoom}
+                                    rotation={rotation}
+                                    aspect={1}
+                                    onCropChange={setCrop}
+                                    onCropComplete={onCropComplete}
+                                    onZoomChange={setZoom}
+                                    onRotationChange={setRotation}
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button
-                                    onClick={() => { setIsCropping(false); setCropImageSrc(null); }}
-                                    className="px-4 py-2 text-sm text-secondary hover:text-primary"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSaveCrop}
-                                    disabled={uploadingImage}
-                                    className="px-4 py-2 bg-primary text-black rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50"
-                                >
-                                    {uploadingImage ? 'Saving...' : 'Save Image'}
-                                </button>
+                            <div className="space-y-4 px-2">
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs text-secondary w-12">Zoom</span>
+                                    <input
+                                        type="range"
+                                        value={zoom}
+                                        min={1}
+                                        max={3}
+                                        step={0.1}
+                                        aria-labelledby="Zoom"
+                                        onChange={(e) => setZoom(e.target.value)}
+                                        className="flex-1 accent-primary h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs text-secondary w-12">Rotate</span>
+                                    <input
+                                        type="range"
+                                        value={rotation}
+                                        min={0}
+                                        max={360}
+                                        step={1}
+                                        aria-labelledby="Rotation"
+                                        onChange={(e) => setRotation(e.target.value)}
+                                        className="flex-1 accent-primary h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <button
+                                        onClick={() => { setIsCropping(false); setCropImageSrc(null); }}
+                                        className="px-4 py-2 text-sm text-secondary hover:text-primary"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveCrop}
+                                        disabled={uploadingImage}
+                                        className="px-4 py-2 bg-primary text-black rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50"
+                                    >
+                                        {uploadingImage ? 'Saving...' : 'Save Image'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )
                 ) : (
                     <form onSubmit={handleSubmit} className="p-6 space-y-4">
 
                         {/* Cover Image Replacement Section */}
-                        <div className="flex items-center gap-4 bg-background border border-border p-3 rounded-lg">
+                        <div className="flex items-center gap-4 bg-black/40 border border-white/10 p-3 rounded-lg">
                             <div className="w-16 h-16 bg-black/40 rounded overflow-hidden flex-shrink-0 flex items-center justify-center border border-white/10">
                                 {vinyl.image_url ? (
                                     <img src={vinyl.image_url} alt="Current Cover" className="w-full h-full object-cover" />
@@ -302,14 +395,32 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                         <Upload className="w-3 h-3" /> Replace
                                     </button>
 
+                                    <button
+                                        type="button"
+                                        onClick={() => cameraInputRef.current?.click()}
+                                        disabled={uploadingImage}
+                                        className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
+                                    >
+                                        <Camera className="w-3 h-3" /> Photo
+                                    </button>
+
                                     {vinyl.image_url && (
-                                        <button
-                                            type="button"
-                                            onClick={handleEditExisting}
-                                            className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
-                                        >
-                                            <Crop className="w-3 h-3" /> Crop / Rotate {rotation > 0 && `(${rotation}°)`}
-                                        </button>
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={handleEditExisting}
+                                                className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
+                                            >
+                                                <Crop className="w-3 h-3" /> Crop / Rotate {rotation > 0 && `(${rotation}°)`}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleStartPerspective}
+                                                className="text-xs bg-white/10 hover:bg-white/20 text-green-300 px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
+                                            >
+                                                <Move className="w-3 h-3" /> Perspective
+                                            </button>
+                                        </>
                                     )}
 
                                     <input
@@ -317,6 +428,14 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                         ref={fileInputRef}
                                         onChange={handleFileSelect}
                                         accept="image/*"
+                                        className="hidden"
+                                    />
+                                    <input
+                                        type="file"
+                                        ref={cameraInputRef}
+                                        onChange={handleFileSelect}
+                                        accept="image/*"
+                                        capture="environment"
                                         className="hidden"
                                     />
                                 </div>
@@ -333,7 +452,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     type="text"
                                     value={formData.title}
                                     onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                             </div>
                             <div className="col-span-2">
@@ -342,7 +461,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     type="text"
                                     value={formData.artist}
                                     onChange={e => setFormData({ ...formData, artist: e.target.value })}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                             </div>
                             <div>
@@ -351,7 +470,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     type="text"
                                     value={formData.year}
                                     onChange={e => setFormData({ ...formData, year: e.target.value })}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                             </div>
                             <div>
@@ -360,7 +479,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     type="text"
                                     value={formData.genre}
                                     onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                             </div>
                             <div className="col-span-2">
@@ -370,7 +489,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     value={formData.group_members || ''}
                                     onChange={e => setFormData({ ...formData, group_members: e.target.value })}
                                     placeholder="e.g. John Lennon, Paul McCartney..."
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                             </div>
                             <div>
@@ -378,7 +497,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                 <select
                                     value={formData.format}
                                     onChange={e => setFormData({ ...formData, format: e.target.value })}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900"
                                 >
                                     <option value="Vinyl">Vinyl</option>
                                     <option value="CD">CD</option>
@@ -389,7 +508,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                 <select
                                     value={formData.condition}
                                     onChange={e => setFormData({ ...formData, condition: e.target.value })}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900"
                                 >
                                     <option value="Mint">Mint</option>
                                     <option value="Near Mint">Near Mint</option>
@@ -405,7 +524,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     value={formData.average_cost || ''}
                                     onChange={e => setFormData({ ...formData, average_cost: e.target.value })}
                                     placeholder="e.g. €20-30"
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                             </div>
                             <div className="col-span-2">
@@ -429,7 +548,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     onChange={e => handleTracksChange(e.target.value)}
                                     rows={5}
                                     placeholder="1. Song A&#10;2. Song B"
-                                    className={`w-full bg-background border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-vertical font-mono ${formData.is_tracks_validated ? 'border-green-500/30 ring-1 ring-green-500/10' : 'border-border'}`}
+                                    className={`w-full bg-white/50 border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-vertical font-mono text-slate-900 placeholder-slate-400 ${formData.is_tracks_validated ? 'border-green-500/30 ring-1 ring-green-500/10' : 'border-slate-200'}`}
                                 />
                             </div>
                             <div className="col-span-2">
@@ -438,7 +557,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate }) {
                                     value={formData.notes}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
                                     rows={3}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-none"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-none text-slate-900 placeholder-slate-400"
                                 />
                             </div>
 

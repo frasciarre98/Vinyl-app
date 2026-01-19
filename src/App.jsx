@@ -3,14 +3,12 @@ import { Layout } from './components/Layout';
 import { SettingsModal } from './components/SettingsModal';
 import { UploadModal } from './components/UploadModal';
 import { VinylGrid } from './components/VinylGrid';
-import { EditVinylModal } from './components/EditVinylModal';
 import { DebugModal } from './components/DebugModal';
 
 function App() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDebugOpen, setIsDebugOpen] = useState(false);
-    const [editingVinyl, setEditingVinyl] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const handleRefresh = () => {
@@ -25,7 +23,6 @@ function App() {
         >
             <VinylGrid
                 refreshTrigger={refreshTrigger}
-                onEdit={(vinyl) => setEditingVinyl(vinyl)}
             />
 
             {isSettingsOpen && (
@@ -39,18 +36,12 @@ function App() {
                 isOpen={isUploadOpen}
                 onClose={() => setIsUploadOpen(false)}
                 onUploadComplete={handleRefresh}
+                onOpenDebug={() => setIsDebugOpen(true)}
             />
 
             <DebugModal
                 isOpen={isDebugOpen}
                 onClose={() => setIsDebugOpen(false)}
-            />
-
-            <EditVinylModal
-                isOpen={!!editingVinyl}
-                vinyl={editingVinyl}
-                onClose={() => setEditingVinyl(null)}
-                onUpdate={handleRefresh}
             />
         </Layout>
     );

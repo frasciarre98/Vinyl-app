@@ -83,7 +83,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-background/95 backdrop-blur-3xl animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/30 backdrop-blur-3xl animate-in slide-in-from-bottom duration-300">
             {/* Header / Actions */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-black/50 sticky top-0 z-10 shrink-0">
                 <button
@@ -124,7 +124,15 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                         <icons.Youtube className="w-6 h-6" />
                     </a>
                     <button
-                        onClick={() => onDelete(vinyl.id)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (typeof onDelete !== 'function') {
+                                alert("Error: Delete function is missing. Please reload.");
+                                console.error("onDelete prop is missing in VinylDetailModal");
+                                return;
+                            }
+                            onDelete(vinyl.id);
+                        }}
                         className="p-2 text-red-500 hover:text-red-400 bg-red-500/10 rounded-full"
                     >
                         <Trash2 className="w-6 h-6" />

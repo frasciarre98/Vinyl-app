@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Disc, Settings, Plus, Download, Loader2, Bug } from 'lucide-react';
+import { Settings, Plus, Download, Loader2, Bug } from 'lucide-react';
+import { VinylLogo } from './VinylLogo';
 import { databases, DATABASE_ID, isAppwriteConfigured } from '../lib/appwrite';
 import { Query } from 'appwrite';
 
@@ -73,23 +74,17 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     ⚠️ Errore Configurazione: PROJECT_ID mancante in src/lib/appwrite.js
                 </div>
             )}
-            <header className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-50">
+            <header className="glass-panel sticky top-0 z-50 border-b-0">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-primary/10 p-2 rounded-full">
-                            <Disc className="w-6 h-6 text-primary animate-spin-slow" style={{ animationDuration: '10s' }} />
-                        </div>
-                        <h1 className="text-xl font-bold tracking-tight text-primary">Vinyl<span className="text-secondary font-light">Catalog</span></h1>
+                    <div className="flex items-center gap-3">
+                        <VinylLogo className="w-14 h-14 drop-shadow-lg" />
+                        <h1 className="text-2xl font-black tracking-wider text-slate-900 uppercase italic">
+                            Vinyl <span className="text-slate-600 font-bold">Catalog</span>
+                        </h1>
                     </div>
 
                     <nav className="flex items-center gap-4">
-                        <button
-                            onClick={onOpenDebug}
-                            className="p-2 text-red-500 hover:text-red-400 transition-colors hover:bg-white/5 rounded-full"
-                            title="Debug Tools"
-                        >
-                            <Bug className="w-5 h-5" />
-                        </button>
+
                         <button
                             onClick={handleExport}
                             disabled={isExporting}

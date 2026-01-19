@@ -123,7 +123,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
             <div className={`absolute inset-0 md:relative md:inset-auto md:w-full md:h-full transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
 
                 {/* FRONT FACE - FULL COVER ART */}
-                <div className="absolute inset-0 backface-hidden bg-black border border-white/10 rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300">
+                <div className="absolute inset-0 backface-hidden glass-card rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300">
 
                     {/* Full Image */}
                     {localVinyl.image_url ? (
@@ -198,7 +198,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 </div >
 
                 {/* BACK FACE (DETAILS) */}
-                < div className="absolute inset-0 backface-hidden rotate-y-180 bg-black border border-white/10 rounded-xl overflow-hidden shadow-xl flex flex-col relative z-0" >
+                <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card rounded-xl overflow-hidden shadow-xl flex flex-col relative z-0">
 
                     {/* 1. Background Image - More visible now */}
                     {

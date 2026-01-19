@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown, RotateCcw } from 'lucide-react';
 import { databases, DATABASE_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
 import { VinylCard } from './VinylCard';
 import { BatchAnalysisBanner } from './BatchAnalysisBanner';
 import { VinylDetailModal } from './VinylDetailModal';
+import { EditVinylModal } from './EditVinylModal';
+import { UndoToast } from './UndoToast';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
-export function VinylGrid({ refreshTrigger, onEdit }) {
+export function VinylGrid({ refreshTrigger }) {
     const [vinyls, setVinyls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -15,7 +17,11 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const [selectedGenre, setSelectedGenre] = useState('');
     const [selectedRating, setSelectedRating] = useState('0');
     // Sort Order: 'newest' (default) | 'artist_asc'
-    const [sortOrder, setSortOrder] = useState('newest');
+    const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('vinyl_sort_order') || 'newest');
+
+    useEffect(() => {
+        localStorage.setItem('vinyl_sort_order', sortOrder);
+    }, [sortOrder]);
 
     // Selection Mode State
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -25,6 +31,7 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const [flippedCardId, setFlippedCardId] = useState(null);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Controls Bottom Sheet on Mobile
     const [selectedDetailVinyl, setSelectedDetailVinyl] = useState(null);
+    const [editingVinyl, setEditingVinyl] = useState(null); // Local state for Edit Modal
     const [isSearchExpanded, setIsSearchExpanded] = useState(false); // For mobile compacted search
 
     useEffect(() => {
@@ -142,48 +149,31 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
     // ... (rest of functions) ...
 
-    return (
-        <div className="space-y-6 relative min-h-screen">
-            {/* Undo Toast */}
-            {deletedItems.length > 0 && (
-                <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 bg-black text-white px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl border border-white/20 animate-in fade-in slide-in-from-bottom-4">
-                    <span>Deleted {deletedItems.length} item{deletedItems.length > 1 ? 's' : ''}.</span>
-                    <button
-                        onClick={handleUndo}
-                        className="bg-white text-black px-4 py-1.5 rounded-full text-sm font-bold hover:bg-gray-200 transition-colors"
-                    >
-                        UNDO
-                    </button>
-                </div>
-            )}
 
-            <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
-
-            {/* ... header ... */
 
     const handleBatchPriceEstimate = async () => {
         const apiKey = getApiKey();
-            if (!apiKey) return alert("API Key missing.");
-            if (!confirm(`Estimate price for ${selectedIds.length} records?`)) return;
+        if (!apiKey) return alert("API Key missing.");
+        if (!confirm(`Estimate price for ${selectedIds.length} records?`)) return;
 
-            setLoading(true);
-            let count = 0;
-            try {
+        setLoading(true);
+        let count = 0;
+        try {
             const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
             for (const vinyl of selectedVinyls) {
                 try {
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, `${vinyl.artist} - ${vinyl.title}`);
-            if (analysis.average_cost) {
-                await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { average_cost: analysis.average_cost });
-                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? {...v, average_cost: analysis.average_cost } : v));
-            count++;
+                    if (analysis.average_cost) {
+                        await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { average_cost: analysis.average_cost });
+                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, average_cost: analysis.average_cost } : v));
+                        count++;
                     }
                     await new Promise(r => setTimeout(r, 1000));
-                } catch (e) {console.error(e); }
+                } catch (e) { console.error(e); }
             }
             alert(`Updated ${count} records.`);
         } finally {
-                setLoading(false);
+            setLoading(false);
             setIsSelectionMode(false);
             setSelectedIds([]);
         }
@@ -192,22 +182,22 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
     const handleBatchFormatChange = async (newFormat) => {
         if (!confirm(`Set format to ${newFormat} for ${selectedIds.length} records?`)) return;
 
-            setLoading(true);
-            try {
+        setLoading(true);
+        try {
             const updates = selectedIds.map(id =>
-            databases.updateDocument(DATABASE_ID, 'vinyls', id, {format: newFormat })
+                databases.updateDocument(DATABASE_ID, 'vinyls', id, { format: newFormat })
             );
 
             await Promise.all(updates);
 
-            setVinyls(prev => prev.map(v => selectedIds.includes(v.id) ? {...v, format: newFormat } : v));
+            setVinyls(prev => prev.map(v => selectedIds.includes(v.id) ? { ...v, format: newFormat } : v));
 
             alert(`Updated ${selectedIds.length} records to ${newFormat}.`);
         } catch (err) {
-                console.error(err);
+            console.error(err);
             alert('Batch update failed: ' + err.message);
         } finally {
-                setLoading(false);
+            setLoading(false);
             setIsSelectionMode(false);
             setSelectedIds([]);
         }
@@ -215,59 +205,110 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
     const handleBatchFullAnalysis = async () => {
         const apiKey = getApiKey();
-            if (!apiKey) return alert("API Key missing.");
-            if (!confirm(`Deep Analyze metadata for ${selectedIds.length} records?\nThis will update Notes, Tracks, and other info using the new AI Settings.`)) return;
+        if (!apiKey) return alert("API Key missing.");
+        if (!confirm(`Deep Analyze metadata for ${selectedIds.length} records?\nThis will update Notes, Tracks, and other info using the new AI Settings.`)) return;
 
-            setLoading(true);
-            let count = 0;
-            try {
+        setLoading(true);
+        let count = 0;
+        try {
             const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
             for (const vinyl of selectedVinyls) {
                 try {
                     // Use artist+title hint to guide AI if available
                     const hint = vinyl.artist && vinyl.artist !== 'Pending AI' ? `${vinyl.artist} - ${vinyl.title}` : null;
-            const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
+                    const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
-            const fullUpdate = {
-                artist: analysis.artist,
-            title: analysis.title,
-            genre: analysis.genre,
-            year: analysis.year,
-            notes: String(analysis.notes || '').substring(0, 4000), // New Limit
-            group_members: analysis.group_members,
-            condition: analysis.condition,
-            avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-            tracks: analysis.tracks
+                    const fullUpdate = {
+                        artist: analysis.artist,
+                        title: analysis.title,
+                        genre: analysis.genre,
+                        year: analysis.year,
+                        notes: String(analysis.notes || '').substring(0, 4000), // New Limit
+                        group_members: analysis.group_members,
+                        condition: analysis.condition,
+                        avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+                        tracks: analysis.tracks
                     };
 
-            if (vinyl.is_tracks_validated) {
-                delete fullUpdate.tracks;
+                    if (vinyl.is_tracks_validated) {
+                        delete fullUpdate.tracks;
                     }
 
-            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, fullUpdate);
-                    setVinyls(prev => prev.map(v => v.id === vinyl.id ? {...v, ...fullUpdate } : v));
-            count++;
+                    await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, fullUpdate);
+                    setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...fullUpdate } : v));
+                    count++;
 
                     // Rate Limiting (2s delay to be safe)
                     await new Promise(r => setTimeout(r, 2000));
 
-                } catch (e) {console.error(`Failed to analyze ${vinyl.id}:`, e); }
+                } catch (e) { console.error(`Failed to analyze ${vinyl.id}:`, e); }
             }
             alert(`Deep Analysis completed for ${count} records.`);
         } finally {
-                setLoading(false);
+            setLoading(false);
             setIsSelectionMode(false);
             setSelectedIds([]);
         }
     };
 
     const toggleSelectionMode = () => {
-                setIsSelectionMode(!isSelectionMode);
-            setSelectedIds([]);
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedIds([]);
     };
 
-            // Filter Logic
-            const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
+    const resetFilters = () => {
+        setSearch('');
+        setSelectedArtist('');
+        setSelectedGenre('');
+        setSelectedRating('0');
+        setIsFiltersOpen(false);
+    };
+
+    // Filter Logic
+    const filteredVinyls = vinyls.filter(vinyl => {
+        const matchesSearch = search === '' ||
+            (vinyl.title?.toLowerCase() || '').includes(search.toLowerCase()) ||
+            (vinyl.artist?.toLowerCase() || '').includes(search.toLowerCase());
+
+        const matchesArtist = !selectedArtist || vinyl.artist === selectedArtist;
+        const matchesGenre = !selectedGenre || (vinyl.genre && vinyl.genre.includes(selectedGenre));
+
+        let matchesRating = true;
+        if (selectedRating === 'unrated') {
+            matchesRating = !vinyl.rating || vinyl.rating === 0;
+        } else if (selectedRating !== '0') {
+            matchesRating = (vinyl.rating || 0) >= parseInt(selectedRating);
+        }
+
+        return matchesSearch && matchesArtist && matchesGenre && matchesRating;
+    }).sort((a, b) => {
+        if (sortOrder === 'artist_asc') {
+            return (a.artist || '').localeCompare(b.artist || '');
+        }
+        return new Date(b.$createdAt) - new Date(a.$createdAt);
+    });
+
+    const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
+    return (
+        <div className="space-y-6 relative min-h-screen">
+            {/* --- UNDO TOAST (Fixed Top for Visibility) --- */}
+            {deletedItems.length > 0 && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 border border-white/20 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 backdrop-blur-md">
+                    <span className="font-medium">
+                        Deleted <span className="text-red-400 font-bold">{deletedItems.length}</span> record{deletedItems.length > 1 ? 's' : ''}.
+                    </span>
+                    <button
+                        onClick={handleUndo}
+                        className="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:bg-gray-200 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        UNDO
+                    </button>
+                    {/* Fallback closer */}
+                    <button onClick={() => executePermanentDelete(deletedItems)} className="ml-2 text-white/20 hover:text-white transition-colors">✕</button>
+                </div>
+            )}
+
             <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
 
             {/* --- MOBILE STICKY HEADER --- */}
@@ -340,12 +381,14 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
 
             {/* --- MOBILE BOTTOM SHEET FILTERS --- */}
             {/* Backdrop */}
-            {isFiltersOpen && (
-                <div
-                    className="fixed inset-0 bg-black/60 z-50 md:hidden backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => setIsFiltersOpen(false)}
-                />
-            )}
+            {
+                isFiltersOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/60 z-50 md:hidden backdrop-blur-sm animate-in fade-in duration-200"
+                        onClick={() => setIsFiltersOpen(false)}
+                    />
+                )
+            }
             {/* Sheet */}
             <div className={`
                 fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-white/10 rounded-t-3xl p-6 md:hidden
@@ -510,64 +553,83 @@ export function VinylGrid({ refreshTrigger, onEdit }) {
             </div>
 
             {/* Grid */}
-            {loading ? (
-                <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
-            ) : filteredVinyls.length === 0 ? (
-                <div className="text-center py-20 text-secondary"><p className="text-xl font-light">No records found.</p></div>
-            ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6 pb-20">
-                    {filteredVinyls.map(vinyl => (
-                        <VinylCard
-                            key={vinyl.id}
-                            vinyl={vinyl}
-                            onEdit={onEdit}
-                            onDelete={(id) => {
-                                if (confirm('Delete this record?')) databases.deleteDocument(DATABASE_ID, 'vinyls', id).then(() => setVinyls(p => p.filter(v => v.id !== id)));
-                            }}
-                            selectionMode={isSelectionMode}
-                            isSelected={selectedIds.includes(vinyl.id)}
-                            onToggleSelect={handleToggleSelect}
-                            isFlipped={flippedCardId === vinyl.id}
-                            onFlip={() => setFlippedCardId(flippedCardId === vinyl.id ? null : vinyl.id)}
-                            onViewDetail={() => setSelectedDetailVinyl(vinyl)}
-                        />
-                    ))}
-                </div>
-            )}
+            <div className="relative min-h-[50vh]">
+                {loading && (
+                    <div className="absolute inset-0 z-10 flex items-start justify-center pt-40 bg-background/50 backdrop-blur-[1px]">
+                        <Loader2 className="w-10 h-10 animate-spin text-primary sticky top-40" />
+                    </div>
+                )}
+
+                {filteredVinyls.length === 0 && !loading ? (
+                    <div className="text-center py-20 text-secondary"><p className="text-xl font-light">No records found.</p></div>
+                ) : (
+                    <div className={`grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6 pb-20 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                        {filteredVinyls.map(vinyl => (
+                            <VinylCard
+                                key={vinyl.id}
+                                vinyl={vinyl}
+                                onEdit={setEditingVinyl}
+                                onDelete={handleSingleDelete}
+                                selectionMode={isSelectionMode}
+                                isSelected={selectedIds.includes(vinyl.id)}
+                                onToggleSelect={handleToggleSelect}
+                                isFlipped={flippedCardId === vinyl.id}
+                                onFlip={() => setFlippedCardId(flippedCardId === vinyl.id ? null : vinyl.id)}
+                                onViewDetail={() => setSelectedDetailVinyl(vinyl)}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {/* Mobile Selection Action Bar (Floating at bottom) */}
-            {isSelectionMode && (
-                <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden grid grid-cols-2 gap-2 shadow-2xl animate-in slide-in-from-bottom-5">
-                    <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
-                        Set to Vinyl
-                    </button>
-                    <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
-                        Set to CD
-                    </button>
-                    <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                        <Sparkles className="w-4 h-4" /> Magic Refresh Metadata
-                    </button>
-                    <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                        <CheckSquare className="w-4 h-4" /> Estimate Price
-                    </button>
+            {
+                isSelectionMode && (
+                    <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden grid grid-cols-2 gap-2 shadow-2xl animate-in slide-in-from-bottom-5">
+                        <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
+                            Set to Vinyl
+                        </button>
+                        <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
+                            Set to CD
+                        </button>
+                        <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
+                            <Sparkles className="w-4 h-4" /> Magic Refresh Metadata
+                        </button>
+                        <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
+                            <CheckSquare className="w-4 h-4" /> Estimate Price
+                        </button>
 
-                    <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                        <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
-                    </button>
-                </div>
-            )}
+                        <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
+                            <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
+                        </button>
+                    </div>
+                )
+            }
 
             <VinylDetailModal
                 vinyl={selectedDetailVinyl}
                 isOpen={!!selectedDetailVinyl}
                 onClose={() => setSelectedDetailVinyl(null)}
-                onEdit={(v) => { setSelectedDetailVinyl(null); onEdit(v); }}
-                onDelete={async (id) => {
-                    if (confirm('Delete this record?')) {
-                        await databases.deleteDocument(DATABASE_ID, 'vinyls', id);
-                        setVinyls(p => p.filter(v => v.id !== id));
-                        setSelectedDetailVinyl(null);
-                    }
+                onEdit={(v) => { setSelectedDetailVinyl(null); setEditingVinyl(v); }}
+                onDelete={(id) => {
+                    // Close modal FIRST to avoid render conflicts
+                    setSelectedDetailVinyl(null);
+                    // Delete AFTER small delay to allow unmount
+                    setTimeout(() => {
+                        handleSingleDelete(id);
+                    }, 50);
+                }}
+            />
+
+            {/* Internal Edit Modal - Wired to Undo System */}
+            <EditVinylModal
+                vinyl={editingVinyl}
+                isOpen={!!editingVinyl}
+                onClose={() => setEditingVinyl(null)}
+                onUpdate={fetchVinyls}
+                onDelete={(id) => {
+                    handleSingleDelete(id);
+                    setEditingVinyl(null);
                 }}
             />
         </div >

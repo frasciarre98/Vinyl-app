@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera } from 'lucide-react';
+import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug } from 'lucide-react';
 import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
 import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
@@ -46,7 +46,7 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-export function UploadModal({ isOpen, onClose, onUploadComplete }) {
+export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug }) {
     if (!isOpen) return null;
 
     return (
@@ -55,12 +55,13 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }) {
                 isOpen={isOpen}
                 onClose={onClose}
                 onUploadComplete={onUploadComplete}
+                onOpenDebug={onOpenDebug}
             />
         </ErrorBoundary>
     );
 }
 
-function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
+function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) {
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState({});
@@ -108,13 +109,9 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
         let dupCount = 0;
 
         selectedFiles.forEach(f => {
-            const isDup = existingFilenames.has(f.name) || files.some(existing => existing.name === f.name);
-
-            if (isDup) {
-                dupCount++;
-                // Strict Blocking: Do not add to files list
-                return;
-            }
+            // REMOVED: Strict duplicate checking on filename.
+            // It caused issues with generic camera filenames (IMG_XXXX) or re-uploads.
+            // const isDup = existingFilenames.has(f.name) || files.some(existing => existing.name === f.name);
 
             newFiles.push(f);
             newProgress[f.name] = {
@@ -124,9 +121,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
             };
         });
 
-        if (dupCount > 0) {
-            alert(`Skipped ${dupCount} duplicate file(s) that are already in your library.`);
-        }
+        // if (dupCount > 0) { ... }
 
         if (newFiles.length > 0) {
             setFiles(prev => [...prev, ...newFiles]);
@@ -275,8 +270,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-surface border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh]">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="glass-heavy rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh]">
                 <div className="flex items-center justify-between p-4 border-b border-border">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                         <UploadIcon className="w-5 h-5 text-primary" /> Upload {format}s
@@ -285,9 +280,16 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                         <button onClick={() => setFormat('Vinyl')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${format === 'Vinyl' ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Vinyl</button>
                         <button onClick={() => setFormat('CD')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${format === 'CD' ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>CD</button>
                     </div>
-                    <button onClick={handleClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {onOpenDebug && (
+                            <button onClick={onOpenDebug} className="p-2 text-danger/50 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-colors" title="Debug Tools">
+                                <Bug className="w-4 h-4" />
+                            </button>
+                        )}
+                        <button onClick={handleClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-6 flex-1 overflow-y-auto">
@@ -314,10 +316,10 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                             {files.map(file => {
                                 const status = progress[file.name] || { status: 'pending', progress: 0 };
                                 return (
-                                    <div key={file.name} className="flex items-center gap-4 bg-background p-3 rounded-lg border border-border">
-                                        <div className="w-10 h-10 bg-white/5 rounded flex items-center justify-center flex-shrink-0"><ImageIcon className="w-5 h-5 text-secondary" /></div>
+                                    <div key={file.name} className="flex items-center gap-4 bg-white/50 p-3 rounded-lg border border-slate-200">
+                                        <div className="w-10 h-10 bg-white/50 rounded flex items-center justify-center flex-shrink-0"><ImageIcon className="w-5 h-5 text-secondary" /></div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{file.name}</p>
+                                            <p className="text-sm font-medium truncate text-slate-900">{file.name}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
                                                     <div className={`h-full transition-all duration-300 ${status.status === 'error' ? 'bg-red-500' : status.status === 'retrying' || status.status === 'queued' ? 'bg-yellow-500' : 'bg-primary'}`} style={{ width: `${status.progress}%` }} />
@@ -347,7 +349,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete }) {
                     <input type="file" ref={cameraInputRef} onChange={handleFileSelect} accept="image/*" capture="environment" className="hidden" />
                 </div>
 
-                <div className="p-4 border-t border-border flex justify-end gap-3 bg-surface rounded-b-xl">
+                <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 rounded-b-xl">
                     <button onClick={handleClose} className="px-4 py-2 text-secondary hover:text-white transition-colors" disabled={uploading && !abortRef.current}>
                         Cancel
                     </button>
