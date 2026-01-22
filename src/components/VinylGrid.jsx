@@ -294,7 +294,7 @@ export function VinylGrid({ refreshTrigger }) {
 
     const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
     return (
-        <div className="space-y-6 relative min-h-screen">
+        <div className="space-y-6 relative">
             {/* --- UNDO TOAST --- */}
             {deletedItems.length > 0 && (
                 <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 border border-white/20 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 backdrop-blur-md">
@@ -396,7 +396,7 @@ export function VinylGrid({ refreshTrigger }) {
             </div>
 
             {/* Grid */}
-            <div className="relative min-h-[50vh]">
+            <div className="relative">
                 {loading && (
                     <div className="absolute inset-0 z-10 flex items-start justify-center pt-40 bg-background/50 backdrop-blur-[1px]">
                         <Loader2 className="w-10 h-10 animate-spin text-primary sticky top-40" />
@@ -429,7 +429,7 @@ export function VinylGrid({ refreshTrigger }) {
 
                 {/* Load More Button */}
                 {visibleCount < filteredVinyls.length && (
-                    <div className="flex justify-center py-8">
+                    <div className="flex justify-center py-4">
                         <button onClick={handleLoadMore} className="px-8 py-3 bg-white/5 hover:bg-white/10 text-secondary hover:text-white rounded-full transition-colors border border-white/10 text-sm font-medium shadow-lg hover:shadow-xl active:scale-95">
                             Load More ({filteredVinyls.length - visibleCount} remaining)
                         </button>

@@ -116,7 +116,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 {children}
             </main>
 
-            <footer className="border-t border-border py-6 mt-12">
+            <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-secondary text-sm">
                     <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade.</p>
                 </div>
