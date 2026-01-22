@@ -294,7 +294,7 @@ export function VinylGrid({ refreshTrigger }) {
 
     const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
     return (
-        <div className="space-y-6 relative pb-20 md:pb-0">
+        <div className="space-y-6 relative pb-4 md:pb-0">
             {/* --- UNDO TOAST --- */}
             {deletedItems.length > 0 && (
                 <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 border border-white/20 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 backdrop-blur-md">
