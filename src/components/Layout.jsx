@@ -78,11 +78,11 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             {/* Fixed Background for Mobile Stability */}
             <div className="fixed inset-0 -z-50 bg-[#0f172a]" style={{
                 backgroundImage: `
-                    radial-gradient(at 10% 20%, hsla(210, 60%, 15%, 0.4) 0, transparent 50%),
-                    radial-gradient(at 90% 10%, hsla(270, 40%, 15%, 0.4) 0, transparent 40%),
-                    radial-gradient(at 50% 50%, hsla(220, 60%, 12%, 0.4) 0, transparent 60%),
-                    radial-gradient(at 20% 80%, hsla(200, 50%, 15%, 0.4) 0, transparent 50%),
-                    radial-gradient(at 80% 90%, hsla(240, 40%, 15%, 0.4) 0, transparent 50%)
+                    radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
+                    radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),
+                    radial-gradient(at 50% 50%, hsla(220, 60%, 92%, 1) 0, transparent 60%),
+                    radial-gradient(at 20% 80%, hsla(200, 50%, 85%, 1) 0, transparent 50%),
+                    radial-gradient(at 80% 90%, hsla(240, 40%, 88%, 1) 0, transparent 50%)
                 `
             }} />
 
@@ -130,7 +130,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-white/40 text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v2.1</span></p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v2.2</span></p>
                 </div>
             </footer>
 
