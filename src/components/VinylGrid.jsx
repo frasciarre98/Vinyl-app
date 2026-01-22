@@ -409,7 +409,7 @@ export function VinylGrid({ refreshTrigger }) {
                         <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>
                     </div>
                 ) : (
-                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-8 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-4 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                         {visibleVinyls.map(vinyl => (
                             <VinylCard
                                 key={vinyl.id}

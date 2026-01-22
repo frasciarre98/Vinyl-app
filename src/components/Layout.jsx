@@ -124,7 +124,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 </div>
             </header>
 
-            <main className="flex-1 container mx-auto px-4 py-8">
+            <main className="flex-1 container mx-auto px-4 py-1 md:py-8">
                 {children}
             </main>
 
