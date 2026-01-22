@@ -409,7 +409,7 @@ export function VinylGrid({ refreshTrigger }) {
                         <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>
                     </div>
                 ) : (
-                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-20 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-8 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                         {visibleVinyls.map(vinyl => (
                             <VinylCard
                                 key={vinyl.id}
@@ -429,7 +429,7 @@ export function VinylGrid({ refreshTrigger }) {
 
                 {/* Load More Button */}
                 {visibleCount < filteredVinyls.length && (
-                    <div className="flex justify-center pt-8 pb-12">
+                    <div className="flex justify-center py-8">
                         <button onClick={handleLoadMore} className="px-8 py-3 bg-white/5 hover:bg-white/10 text-secondary hover:text-white rounded-full transition-colors border border-white/10 text-sm font-medium shadow-lg hover:shadow-xl active:scale-95">
                             Load More ({filteredVinyls.length - visibleCount} remaining)
                         </button>
@@ -438,15 +438,17 @@ export function VinylGrid({ refreshTrigger }) {
             </div>
 
             {/* Mobile Selection Action Bar (Floating at bottom) */}
-            {isSelectionMode && (
-                <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden grid grid-cols-2 gap-2 shadow-2xl animate-in slide-in-from-bottom-5">
-                    <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">Set to Vinyl</button>
-                    <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">Set to CD</button>
-                    <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><Sparkles className="w-4 h-4" /> Magic Refresh Metadata</button>
-                    <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><CheckSquare className="w-4 h-4" /> Estimate Price</button>
-                    <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
-                </div>
-            )}
+            {
+                isSelectionMode && (
+                    <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden grid grid-cols-2 gap-2 shadow-2xl animate-in slide-in-from-bottom-5">
+                        <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">Set to Vinyl</button>
+                        <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">Set to CD</button>
+                        <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><Sparkles className="w-4 h-4" /> Magic Refresh Metadata</button>
+                        <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><CheckSquare className="w-4 h-4" /> Estimate Price</button>
+                        <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
+                    </div>
+                )
+            }
 
             <VinylDetailModal
                 vinyl={selectedDetailVinyl}
@@ -463,6 +465,6 @@ export function VinylGrid({ refreshTrigger }) {
                 onUpdate={fetchVinyls}
                 onDelete={(id) => { handleSingleDelete(id); setEditingVinyl(null); }}
             />
-        </div>
+        </div >
     );
 }
