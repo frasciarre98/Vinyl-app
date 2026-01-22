@@ -76,7 +76,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             )}
 
             {/* Fixed Background for Mobile Stability */}
-            <div className="fixed inset-0 -z-50 bg-[#cbd5e1]" style={{
+            <div className="fixed inset-0 -z-50 bg-[#0f172a]" style={{
                 backgroundImage: `
                     radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
                     radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),
@@ -130,7 +130,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-secondary text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade.</p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-50 text-xs">v2.0</span></p>
                 </div>
             </footer>
 
