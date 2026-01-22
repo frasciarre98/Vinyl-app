@@ -68,7 +68,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
     };
 
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-[100dvh] flex flex-col w-full overflow-x-hidden relative">
             {!isConfigured && (
                 <div className="bg-red-600 text-white text-center py-2 px-4 font-bold animate-pulse">
                     ⚠️ Errore Configurazione: PROJECT_ID mancante in src/lib/appwrite.js
@@ -76,7 +76,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             )}
 
             {/* Fixed Background for Mobile Stability */}
-            <div className="fixed inset-0 -z-50 bg-[#cbd5e1]" style={{
+            <div className="fixed inset-0 h-[100dvh] -z-50 bg-[#cbd5e1]" style={{
                 backgroundImage: `
                     radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
                     radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),

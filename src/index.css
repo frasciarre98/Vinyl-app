@@ -9,15 +9,15 @@
 body {
   @apply text-slate-900 antialiased;
   min-height: 100vh;
+  /* Prevent rubber band effect showing gray background */
   overscroll-behavior-y: none;
-  /* Prevent rubber band effect */
-  background-color: #cbd5e1;
-  /* Fallback */
+  background-color: #000000;
 }
 
 html {
   height: 100%;
   overscroll-behavior-y: none;
+  background-color: #000000;
 }
 
 /* Glassmorphism Utilities */
