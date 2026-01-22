@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown, RotateCcw } from 'lucide-react';
 import { databases, DATABASE_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
@@ -22,6 +22,9 @@ export function VinylGrid({ refreshTrigger }) {
     useEffect(() => {
         localStorage.setItem('vinyl_sort_order', sortOrder);
     }, [sortOrder]);
+
+    // Pagination State (Local Performance Optimization)
+    const [visibleCount, setVisibleCount] = useState(24);
 
     // Selection Mode State
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -53,6 +56,7 @@ export function VinylGrid({ refreshTrigger }) {
             let offset = 0;
             let currentChunkSize = 0;
 
+            // Loop to fetch all records (bypass 100 limit if needed)
             do {
                 const response = await databases.listDocuments(
                     DATABASE_ID,
@@ -63,6 +67,7 @@ export function VinylGrid({ refreshTrigger }) {
                 allVinyls = [...allVinyls, ...chunk];
                 currentChunkSize = chunk.length;
                 offset += 100;
+                // Safety break
                 if (offset >= 5000) break;
             } while (currentChunkSize === 100);
 
@@ -94,32 +99,24 @@ export function VinylGrid({ refreshTrigger }) {
             console.log('Permanently deleted', itemsToDelete.length, 'items');
         } catch (err) {
             console.error('Delete failed', err);
-            // In a real app we might want to alert, but for now silent fail or re-fetch
             fetchVinyls();
         }
     };
 
     const handleSoftDelete = (itemsToDelete) => {
-        // 1. Clear existing timeout if any (merging deletions not supported in this simple version, we just execute previous immediately if exists?)
-        // Better: Force execute previous pending if exists
         if (undoTimeoutRef.current) {
             clearTimeout(undoTimeoutRef.current);
-            // Automatically confirming previous one is tricky UI-wise, usually we just replace.
-            // But to be safe, let's just support one pending batch at a time. 
-            // If user deletes AGAIN while Toast is showing, we immediately execute the previous one.
             if (deletedItems.length > 0) {
                 executePermanentDelete(deletedItems);
             }
         }
 
-        // 2. Optimistic Update
         const ids = itemsToDelete.map(i => i.id);
         setVinyls(prev => prev.filter(v => !ids.includes(v.id)));
         setDeletedItems(itemsToDelete);
         setSelectedIds([]);
         setIsSelectionMode(false);
 
-        // 3. Set Timeout
         undoTimeoutRef.current = setTimeout(() => {
             executePermanentDelete(itemsToDelete);
             setDeletedItems([]);
@@ -132,7 +129,6 @@ export function VinylGrid({ refreshTrigger }) {
             clearTimeout(undoTimeoutRef.current);
             undoTimeoutRef.current = null;
         }
-        // Restore items
         setVinyls(prev => [...deletedItems, ...prev].sort((a, b) => b.$createdAt.localeCompare(a.$createdAt)));
         setDeletedItems([]);
     };
@@ -146,10 +142,6 @@ export function VinylGrid({ refreshTrigger }) {
         const item = vinyls.find(v => v.id === id);
         if (item) handleSoftDelete([item]);
     };
-
-    // ... (rest of functions) ...
-
-
 
     const handleBatchPriceEstimate = async () => {
         const apiKey = getApiKey();
@@ -214,7 +206,6 @@ export function VinylGrid({ refreshTrigger }) {
             const selectedVinyls = vinyls.filter(v => selectedIds.includes(v.id));
             for (const vinyl of selectedVinyls) {
                 try {
-                    // Use artist+title hint to guide AI if available
                     const hint = vinyl.artist && vinyl.artist !== 'Pending AI' ? `${vinyl.artist} - ${vinyl.title}` : null;
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
@@ -223,7 +214,7 @@ export function VinylGrid({ refreshTrigger }) {
                         title: analysis.title,
                         genre: analysis.genre,
                         year: analysis.year,
-                        notes: String(analysis.notes || '').substring(0, 4000), // New Limit
+                        notes: String(analysis.notes || '').substring(0, 4000),
                         group_members: analysis.group_members,
                         condition: analysis.condition,
                         avarege_cost: String(analysis.average_cost || '').substring(0, 50),
@@ -238,7 +229,6 @@ export function VinylGrid({ refreshTrigger }) {
                     setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...fullUpdate } : v));
                     count++;
 
-                    // Rate Limiting (2s delay to be safe)
                     await new Promise(r => setTimeout(r, 2000));
 
                 } catch (e) { console.error(`Failed to analyze ${vinyl.id}:`, e); }
@@ -264,47 +254,56 @@ export function VinylGrid({ refreshTrigger }) {
         setIsFiltersOpen(false);
     };
 
-    // Filter Logic
-    const filteredVinyls = vinyls.filter(vinyl => {
-        const matchesSearch = search === '' ||
-            (vinyl.title?.toLowerCase() || '').includes(search.toLowerCase()) ||
-            (vinyl.artist?.toLowerCase() || '').includes(search.toLowerCase());
+    // Filter Logic (Memoized)
+    const filteredVinyls = useMemo(() => {
+        let result = vinyls.filter(vinyl => {
+            const matchesSearch = search === '' ||
+                (vinyl.title?.toLowerCase() || '').includes(search.toLowerCase()) ||
+                (vinyl.artist?.toLowerCase() || '').includes(search.toLowerCase()) ||
+                (vinyl.tracks?.toLowerCase() || '').includes(search.toLowerCase());
 
-        const matchesArtist = !selectedArtist || vinyl.artist === selectedArtist;
-        const matchesGenre = !selectedGenre || (vinyl.genre && vinyl.genre.includes(selectedGenre));
+            const matchesArtist = !selectedArtist || vinyl.artist === selectedArtist;
+            const matchesGenre = !selectedGenre || (vinyl.genre && vinyl.genre.includes(selectedGenre));
 
-        let matchesRating = true;
-        if (selectedRating === 'unrated') {
-            matchesRating = !vinyl.rating || vinyl.rating === 0;
-        } else if (selectedRating !== '0') {
-            matchesRating = (vinyl.rating || 0) >= parseInt(selectedRating);
-        }
+            let matchesRating = true;
+            if (selectedRating === 'unrated') {
+                matchesRating = !vinyl.rating || vinyl.rating === 0;
+            } else if (selectedRating !== '0') {
+                matchesRating = (vinyl.rating || 0) >= parseInt(selectedRating);
+            }
 
-        return matchesSearch && matchesArtist && matchesGenre && matchesRating;
-    }).sort((a, b) => {
-        if (sortOrder === 'artist_asc') {
-            return (a.artist || '').localeCompare(b.artist || '');
-        }
-        return new Date(b.$createdAt) - new Date(a.$createdAt);
-    });
+            return matchesSearch && matchesArtist && matchesGenre && matchesRating;
+        });
+
+        // Sort
+        result.sort((a, b) => {
+            if (sortOrder === 'artist_asc') {
+                return (a.artist || '').localeCompare(b.artist || '');
+            }
+            return new Date(b.$createdAt) - new Date(a.$createdAt);
+        });
+
+        return result;
+    }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder]);
+
+    const visibleVinyls = filteredVinyls.slice(0, visibleCount);
+
+    const handleLoadMore = () => {
+        setVisibleCount(prev => prev + 24);
+    };
 
     const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
     return (
         <div className="space-y-6 relative min-h-screen">
-            {/* --- UNDO TOAST (Fixed Top for Visibility) --- */}
+            {/* --- UNDO TOAST --- */}
             {deletedItems.length > 0 && (
                 <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 border border-white/20 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 backdrop-blur-md">
                     <span className="font-medium">
                         Deleted <span className="text-red-400 font-bold">{deletedItems.length}</span> record{deletedItems.length > 1 ? 's' : ''}.
                     </span>
-                    <button
-                        onClick={handleUndo}
-                        className="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:bg-gray-200 active:scale-95 transition-all flex items-center gap-2"
-                    >
-                        <RotateCcw className="w-4 h-4" />
-                        UNDO
+                    <button onClick={handleUndo} className="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:bg-gray-200 active:scale-95 transition-all flex items-center gap-2">
+                        <RotateCcw className="w-4 h-4" /> UNDO
                     </button>
-                    {/* Fallback closer */}
                     <button onClick={() => executePermanentDelete(deletedItems)} className="ml-2 text-white/20 hover:text-white transition-colors">✕</button>
                 </div>
             )}
@@ -317,22 +316,11 @@ export function VinylGrid({ refreshTrigger }) {
                 bg-background/80 backdrop-blur-md border-b border-white/5 
                 flex items-center justify-between transition-all duration-300
             `}>
-                {/* Left: Title or Search Input */}
                 <div className="flex-1 flex items-center">
                     {isSearchExpanded ? (
                         <div className="flex items-center w-full animate-in fade-in slide-in-from-left-5">
-                            <input
-                                autoFocus
-                                type="text"
-                                placeholder="Search records..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                onBlur={() => !search && setIsSearchExpanded(false)}
-                                className="w-full bg-transparent text-lg placeholder-white/30 outline-none text-white"
-                            />
-                            <button onClick={() => { setSearch(''); setIsSearchExpanded(false); }} className="p-2 text-white/50">
-                                <X className="w-5 h-5" />
-                            </button>
+                            <input autoFocus type="text" placeholder="Search records..." value={search} onChange={(e) => setSearch(e.target.value)} onBlur={() => !search && setIsSearchExpanded(false)} className="w-full bg-transparent text-lg placeholder-white/30 outline-none text-white" />
+                            <button onClick={() => { setSearch(''); setIsSearchExpanded(false); }} className="p-2 text-white/50"><X className="w-5 h-5" /></button>
                         </div>
                     ) : (
                         <div className="flex flex-col">
@@ -345,209 +333,64 @@ export function VinylGrid({ refreshTrigger }) {
                     )}
                 </div>
 
-                {/* Right: Actions */}
                 {!isSearchExpanded && (
                     <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setIsSearchExpanded(true)}
-                            className="p-2 rounded-full text-white/70 hover:bg-white/10 active:scale-95 transition-all"
-                        >
-                            <Search className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')}
-                            className={`p-2 rounded-full transition-all active:scale-95 ${sortOrder === 'artist_asc' ? 'text-accent' : 'text-white/70 hover:bg-white/10'}`}
-                        >
-                            <ArrowUpDown className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => setIsFiltersOpen(true)}
-                            className={`p-2 rounded-full transition-all active:scale-95 relative ${activeFiltersCount > 0 ? 'text-primary' : 'text-white/70 hover:bg-white/10'}`}
-                        >
-                            <Filter className="w-5 h-5" />
-                            {activeFiltersCount > 0 && (
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-black" />
-                            )}
-                        </button>
-                        <button
-                            onClick={toggleSelectionMode}
-                            className={`p-2 rounded-full transition-all active:scale-95 ${isSelectionMode ? 'bg-white text-black' : 'text-white/70 hover:bg-white/10'}`}
-                        >
-                            <CheckSquare className="w-5 h-5" />
-                        </button>
+                        <button onClick={() => setIsSearchExpanded(true)} className="p-2 rounded-full text-white/70 hover:bg-white/10 active:scale-95 transition-all"><Search className="w-5 h-5" /></button>
+                        <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`p-2 rounded-full transition-all active:scale-95 ${sortOrder === 'artist_asc' ? 'text-accent' : 'text-white/70 hover:bg-white/10'}`}><ArrowUpDown className="w-5 h-5" /></button>
+                        <button onClick={() => setIsFiltersOpen(true)} className={`p-2 rounded-full transition-all active:scale-95 relative ${activeFiltersCount > 0 ? 'text-primary' : 'text-white/70 hover:bg-white/10'}`}><Filter className="w-5 h-5" />{activeFiltersCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-black" />}</button>
+                        <button onClick={toggleSelectionMode} className={`p-2 rounded-full transition-all active:scale-95 ${isSelectionMode ? 'bg-white text-black' : 'text-white/70 hover:bg-white/10'}`}><CheckSquare className="w-5 h-5" /></button>
                     </div>
                 )}
             </div>
 
             {/* --- MOBILE BOTTOM SHEET FILTERS --- */}
-            {/* Backdrop */}
-            {
-                isFiltersOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/60 z-50 md:hidden backdrop-blur-sm animate-in fade-in duration-200"
-                        onClick={() => setIsFiltersOpen(false)}
-                    />
-                )
-            }
-            {/* Sheet */}
-            <div className={`
-                fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-white/10 rounded-t-3xl p-6 md:hidden
-                transition-transform duration-300 ease-out shadow-2xl
-                ${isFiltersOpen ? 'translate-y-0' : 'translate-y-full'}
-            `}>
-                <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" /> {/* Pull Handle */}
-
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold">Filters</h3>
-                    {activeFiltersCount > 0 && (
-                        <button onClick={resetFilters} className="text-sm text-red-400 font-medium">Reset All</button>
-                    )}
-                </div>
-
+            {isFiltersOpen && <div className="fixed inset-0 bg-black/60 z-50 md:hidden backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsFiltersOpen(false)} />}
+            <div className={`fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-white/10 rounded-t-3xl p-6 md:hidden transition-transform duration-300 ease-out shadow-2xl ${isFiltersOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+                <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
+                <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Filters</h3>{activeFiltersCount > 0 && <button onClick={resetFilters} className="text-sm text-red-400 font-medium">Reset All</button>}</div>
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto pb-8">
-                    <div className="space-y-2">
-                        <label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Artist</label>
-                        <div className="relative">
-                            <select
-                                value={selectedArtist}
-                                onChange={(e) => setSelectedArtist(e.target.value)}
-                                className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                            >
-                                <option value="">All Artists</option>
-                                {uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Genre</label>
-                        <div className="relative">
-                            <select
-                                value={selectedGenre}
-                                onChange={(e) => setSelectedGenre(e.target.value)}
-                                className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                            >
-                                <option value="">All Genres</option>
-                                {uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Rating</label>
-                        <div className="relative">
-                            <select
-                                value={selectedRating}
-                                onChange={(e) => setSelectedRating(e.target.value)}
-                                className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                            >
-                                <option value="0">Any Rating</option>
-                                <option value="5">Excellent (5 Stars)</option>
-                                <option value="4">Great (4+ Stars)</option>
-                                <option value="3">Good (3+ Stars)</option>
-                                <option value="unrated">Unrated</option>
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
-                        </div>
-                    </div>
+                    <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Artist</label><div className="relative"><select value={selectedArtist} onChange={(e) => setSelectedArtist(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="">All Artists</option>{uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
+                    <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Genre</label><div className="relative"><select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
+                    <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Rating</label><div className="relative"><select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="0">Any Rating</option><option value="5">Excellent (5 Stars)</option><option value="4">Great (4+ Stars)</option><option value="3">Good (3+ Stars)</option><option value="unrated">Unrated</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
                 </div>
-
-                <div className="pt-4 border-t border-white/10 mt-4">
-                    <button
-                        onClick={() => setIsFiltersOpen(false)}
-                        className="w-full bg-primary text-black font-bold py-4 rounded-xl active:scale-[0.98] transition-transform"
-                    >
-                        Show {filteredVinyls.length} Records
-                    </button>
-                </div>
+                <div className="pt-4 border-t border-white/10 mt-4"><button onClick={() => setIsFiltersOpen(false)} className="w-full bg-primary text-black font-bold py-4 rounded-xl active:scale-[0.98] transition-transform">Show {filteredVinyls.length} Records</button></div>
             </div>
 
-            {/* --- DESKTOP FILTERS (unchanged mostly, but simplified class toggling) --- */}
+            {/* --- DESKTOP FILTERS --- */}
             <div className="hidden md:flex sticky top-20 z-20 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 flex-row gap-4 justify-between items-center shadow-lg">
                 <div className="relative flex-1 w-full gap-4 flex flex-row">
                     <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-secondary" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Search..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm"
-                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-secondary" /></div>
+                        <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm" />
                     </div>
-                    <select value={selectedArtist} onChange={(e) => setSelectedArtist(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]">
-                        <option value="">All Artists</option>
-                        {uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}
-                    </select>
-                    <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]">
-                        <option value="">All Genres</option>
-                        {uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}
-                    </select>
-                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]">
-                        <option value="0">All Ratings</option>
-                        <option value="5">5 Stars Only</option>
-                        <option value="4">4+ Stars</option>
-                        <option value="3">3+ Stars</option>
-                        <option value="2">2+ Stars</option>
-                        <option value="1">1+ Star</option>
-                        <option value="unrated">Unrated</option>
-                    </select>
+                    <select value={selectedArtist} onChange={(e) => setSelectedArtist(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="">All Artists</option>{uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}</select>
+                    <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select>
+                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="0">All Ratings</option><option value="5">5 Stars Only</option><option value="4">4+ Stars</option><option value="3">3+ Stars</option><option value="2">2+ Stars</option><option value="1">1+ Star</option><option value="unrated">Unrated</option></select>
                 </div>
 
-                {/* Desktop Buttons */}
                 <div className="flex items-center gap-2">
                     <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm flex items-center gap-2">
                         <span className="font-bold text-primary">{vinyls.length}</span>
                         <span className="text-secondary/50">records</span>
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">
-                            {vinylCount} LP / {cdCount} CD
-                        </span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">{vinylCount} LP / {cdCount} CD</span>
                     </div>
-
-                    <button
-                        onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')}
-                        className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
-                    >
-                        {sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}
-                    </button>
-
-                    <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white">
-                        <Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>{sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}</button>
+                    <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white"><Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
                     {isSelectionMode ? (
                         <>
-                            <button
-                                onClick={() => setSelectedIds(selectedIds.length === filteredVinyls.length ? [] : filteredVinyls.map(v => v.id))}
-                                className="px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-full"
-                            >
-                                {selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}
-                            </button>
-
+                            <button onClick={() => setSelectedIds(selectedIds.length === filteredVinyls.length ? [] : filteredVinyls.map(v => v.id))} className="px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-full">{selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}</button>
                             <div className="flex bg-white/5 rounded-full border border-white/10 p-1">
                                 <button onClick={() => handleBatchFormatChange('Vinyl')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors">to Vinyl</button>
                                 <div className="w-px bg-white/10 my-1"></div>
                                 <button onClick={() => handleBatchFormatChange('CD')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors">to CD</button>
                             </div>
-
-                            <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm">
-                                <CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})
-                            </button>
-                            <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors">
-                                <Sparkles className="w-4 h-4" /> Magic Refresh ({selectedIds.length})
-                            </button>
-                            <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm">
-                                <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
-                            </button>
+                            <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm"><CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})</button>
+                            <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors"><Sparkles className="w-4 h-4" /> Magic Refresh ({selectedIds.length})</button>
+                            <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
                             <button onClick={toggleSelectionMode} className="px-4 py-2 text-sm text-secondary hover:text-primary">Cancel</button>
                         </>
                     ) : (
-                        <button onClick={toggleSelectionMode} className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 border border-border text-sm">
-                            <CheckSquare className="w-4 h-4" /> Select
-                        </button>
+                        <button onClick={toggleSelectionMode} className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 border border-border text-sm"><CheckSquare className="w-4 h-4" /> Select</button>
                     )}
                 </div>
             </div>
@@ -561,10 +404,13 @@ export function VinylGrid({ refreshTrigger }) {
                 )}
 
                 {filteredVinyls.length === 0 && !loading ? (
-                    <div className="text-center py-20 text-secondary"><p className="text-xl font-light">No records found.</p></div>
+                    <div className="text-center py-20 text-secondary">
+                        <p className="text-xl font-light">No records found.</p>
+                        <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>
+                    </div>
                 ) : (
-                    <div className={`grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6 pb-20 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                        {filteredVinyls.map(vinyl => (
+                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-20 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                        {visibleVinyls.map(vinyl => (
                             <VinylCard
                                 key={vinyl.id}
                                 vinyl={vinyl}
@@ -580,58 +426,43 @@ export function VinylGrid({ refreshTrigger }) {
                         ))}
                     </div>
                 )}
+
+                {/* Load More Button */}
+                {visibleCount < filteredVinyls.length && (
+                    <div className="flex justify-center pt-8 pb-12">
+                        <button onClick={handleLoadMore} className="px-8 py-3 bg-white/5 hover:bg-white/10 text-secondary hover:text-white rounded-full transition-colors border border-white/10 text-sm font-medium shadow-lg hover:shadow-xl active:scale-95">
+                            Load More ({filteredVinyls.length - visibleCount} remaining)
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Mobile Selection Action Bar (Floating at bottom) */}
-            {
-                isSelectionMode && (
-                    <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden grid grid-cols-2 gap-2 shadow-2xl animate-in slide-in-from-bottom-5">
-                        <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
-                            Set to Vinyl
-                        </button>
-                        <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">
-                            Set to CD
-                        </button>
-                        <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                            <Sparkles className="w-4 h-4" /> Magic Refresh Metadata
-                        </button>
-                        <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                            <CheckSquare className="w-4 h-4" /> Estimate Price
-                        </button>
-
-                        <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg">
-                            <Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})
-                        </button>
-                    </div>
-                )
-            }
+            {isSelectionMode && (
+                <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden grid grid-cols-2 gap-2 shadow-2xl animate-in slide-in-from-bottom-5">
+                    <button onClick={() => handleBatchFormatChange('Vinyl')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">Set to Vinyl</button>
+                    <button onClick={() => handleBatchFormatChange('CD')} className="bg-surface/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-medium shadow-lg">Set to CD</button>
+                    <button onClick={handleBatchFullAnalysis} className="col-span-2 flex items-center justify-center gap-2 bg-purple-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><Sparkles className="w-4 h-4" /> Magic Refresh Metadata</button>
+                    <button onClick={handleBatchPriceEstimate} className="flex items-center justify-center gap-2 bg-green-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><CheckSquare className="w-4 h-4" /> Estimate Price</button>
+                    <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center justify-center gap-2 bg-red-600/90 backdrop-blur text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
+                </div>
+            )}
 
             <VinylDetailModal
                 vinyl={selectedDetailVinyl}
                 isOpen={!!selectedDetailVinyl}
                 onClose={() => setSelectedDetailVinyl(null)}
                 onEdit={(v) => { setSelectedDetailVinyl(null); setEditingVinyl(v); }}
-                onDelete={(id) => {
-                    // Close modal FIRST to avoid render conflicts
-                    setSelectedDetailVinyl(null);
-                    // Delete AFTER small delay to allow unmount
-                    setTimeout(() => {
-                        handleSingleDelete(id);
-                    }, 50);
-                }}
+                onDelete={(id) => { setSelectedDetailVinyl(null); setTimeout(() => { handleSingleDelete(id); }, 50); }}
             />
 
-            {/* Internal Edit Modal - Wired to Undo System */}
             <EditVinylModal
                 vinyl={editingVinyl}
                 isOpen={!!editingVinyl}
                 onClose={() => setEditingVinyl(null)}
                 onUpdate={fetchVinyls}
-                onDelete={(id) => {
-                    handleSingleDelete(id);
-                    setEditingVinyl(null);
-                }}
+                onDelete={(id) => { handleSingleDelete(id); setEditingVinyl(null); }}
             />
-        </div >
+        </div>
     );
 }
