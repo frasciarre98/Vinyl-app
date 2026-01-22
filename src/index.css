@@ -8,17 +8,16 @@
 
 body {
   @apply text-slate-900 antialiased;
-  background-color: #cbd5e1;
-  /* Slate 300 - Distinctly darker than white */
-  background-image:
-    radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
-    radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),
-    radial-gradient(at 50% 50%, hsla(220, 60%, 92%, 1) 0, transparent 60%),
-    radial-gradient(at 20% 80%, hsla(200, 50%, 85%, 1) 0, transparent 50%),
-    radial-gradient(at 80% 90%, hsla(240, 40%, 88%, 1) 0, transparent 50%);
-  background-attachment: fixed;
-  background-size: cover;
   min-height: 100vh;
+  overscroll-behavior-y: none;
+  /* Prevent rubber band effect */
+  background-color: #cbd5e1;
+  /* Fallback */
+}
+
+html {
+  height: 100%;
+  overscroll-behavior-y: none;
 }
 
 /* Glassmorphism Utilities */
