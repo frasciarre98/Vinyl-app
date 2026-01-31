@@ -165,8 +165,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             setRotation(0);
         } catch (error) {
             console.error("Failed to load image for cropping:", error);
-            // DEBUG: Show exact URL and error
-            alert(`DEBUG ERROR:\nURL: ${fetchUrl}\nERR: ${error.message}\n\nPlease screenshot this.`);
+
+            if (error.message.includes("401")) {
+                alert("🔒 ACCESS DENIED (401)\n\nYour Appwrite Storage Bucket is set to 'Private'.\n\nPlease go to Appwrite Console > Storage > Settings > Permissions > Add Role 'Any' > Select 'Read'.\n\nThis allows the app to load images for editing.");
+            } else {
+                alert(`DEBUG ERROR:\nURL: ${fetchUrl}\nERR: ${error.message}`);
+            }
 
             // Fallback
             fileInputRef.current?.click();
@@ -206,8 +210,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             setPerspectiveMode(true);
         } catch (error) {
             console.error("Failed to load image for perspective:", error);
-            // DEBUG: Show exact URL and error
-            alert(`DEBUG ERROR (Perspective):\nURL: ${fetchUrl}\nERR: ${error.message}\n\nPlease screenshot this.`);
+
+            if (error.message.includes("401")) {
+                alert("🔒 ACCESS DENIED (401)\n\nYour Appwrite Storage Bucket is set to 'Private'.\n\nPlease go to Appwrite Console > Storage > Settings > Permissions > Add Role 'Any' > Select 'Read'.");
+            } else {
+                alert(`DEBUG ERROR (Perspective):\nURL: ${fetchUrl}\nERR: ${error.message}`);
+            }
         } finally {
             setUploadingImage(false);
         }
