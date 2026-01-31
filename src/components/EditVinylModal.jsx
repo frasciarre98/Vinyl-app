@@ -21,7 +21,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         group_members: '',
         is_tracks_validated: false,
         is_price_locked: false,
-        rating: 0
+        rating: 0,
+        label: '',
+        catalog_number: '',
+        edition: '',
+        purchase_price: '',
+        purchase_year: ''
     });
     const [saving, setSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -52,7 +57,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 tracks: vinyl.tracks || '',
                 is_tracks_validated: vinyl.is_tracks_validated || false,
                 is_price_locked: vinyl.is_price_locked || false,
-                rating: vinyl.rating || 0
+                rating: vinyl.rating || 0,
+                label: vinyl.label || '',
+                catalog_number: vinyl.catalog_number || '',
+                edition: vinyl.edition || '',
+                purchase_price: vinyl.purchase_price || '',
+                purchase_year: vinyl.purchase_year || ''
             });
         }
     }, [vinyl]);
@@ -530,6 +540,84 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                     placeholder="e.g. €20-30"
                                     className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
+                                <div className="mt-1 flex justify-end">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs select-none text-secondary hover:text-primary transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_price_locked}
+                                            onChange={e => setFormData({ ...formData, is_price_locked: e.target.checked })}
+                                            className="w-3.5 h-3.5 rounded accent-blue-500 cursor-pointer"
+                                        />
+                                        <span className="flex items-center gap-1">
+                                            {formData.is_price_locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                                            {formData.is_price_locked ? 'Price Locked' : 'Auto-Estimate'}
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* --- COLLECTOR INFO SECTION --- */}
+                            <div className="col-span-2 pt-2 border-t border-white/5 mt-2">
+                                <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">Collector Details</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-secondary mb-1">Label</label>
+                                        <input
+                                            type="text"
+                                            value={formData.label}
+                                            onChange={e => setFormData({ ...formData, label: e.target.value })}
+                                            placeholder="e.g. Blue Note"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-secondary mb-1">Catalog No.</label>
+                                        <input
+                                            type="text"
+                                            value={formData.catalog_number}
+                                            onChange={e => setFormData({ ...formData, catalog_number: e.target.value })}
+                                            placeholder="e.g. PCS 7027"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-sm font-medium text-secondary mb-1">Edition / Variant</label>
+                                        <input
+                                            type="text"
+                                            value={formData.edition}
+                                            onChange={e => setFormData({ ...formData, edition: e.target.value })}
+                                            placeholder="e.g. 1st Press, Red Vinyl, Japanese Import"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* --- HISTORY SECTION --- */}
+                            <div className="col-span-2 pt-2 border-t border-white/5">
+                                <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">My History</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-secondary mb-1">Purchase Price</label>
+                                        <input
+                                            type="text"
+                                            value={formData.purchase_price}
+                                            onChange={e => setFormData({ ...formData, purchase_price: e.target.value })}
+                                            placeholder="e.g. 25.00"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-secondary mb-1">Year Bought</label>
+                                        <input
+                                            type="text"
+                                            value={formData.purchase_year}
+                                            onChange={e => setFormData({ ...formData, purchase_year: e.target.value })}
+                                            placeholder="e.g. 2023"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                             <div className="col-span-2">
                                 <div className="flex items-center justify-between mb-1">

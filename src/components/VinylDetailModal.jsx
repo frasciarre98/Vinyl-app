@@ -55,7 +55,11 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-                tracks: String(analysis.tracks || '').substring(0, 4999)
+                avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+                tracks: String(analysis.tracks || '').substring(0, 4999),
+                label: analysis.label || vinyl.label || '', // Preserve existing if not returned
+                catalog_number: analysis.catalog_number || vinyl.catalog_number || '',
+                edition: analysis.edition || vinyl.edition || ''
             };
 
             // Respect User Validation
@@ -244,6 +248,58 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                                 <span className="uppercase">Condition:</span>
                                 <span className="text-white">{vinyl.condition || 'N/A'}</span>
                             </div>
+
+                            {/* --- COLLECTOR DETAILS --- */}
+                            {(vinyl.label || vinyl.catalog_number || vinyl.edition) && (
+                                <div className="p-4 bg-white/5 rounded-xl border border-white/10 space-y-3">
+                                    <h4 className="text-xs uppercase text-secondary font-bold flex items-center gap-2">
+                                        <Disc className="w-4 h-4" /> Collector Info
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        {vinyl.label && (
+                                            <div>
+                                                <span className="block text-xs text-white/40">Label</span>
+                                                <span className="text-white font-medium">{vinyl.label}</span>
+                                            </div>
+                                        )}
+                                        {vinyl.catalog_number && (
+                                            <div>
+                                                <span className="block text-xs text-white/40">Catalog No.</span>
+                                                <span className="font-mono text-accent/80">{vinyl.catalog_number}</span>
+                                            </div>
+                                        )}
+                                        {vinyl.edition && (
+                                            <div className="col-span-2">
+                                                <span className="block text-xs text-white/40">Edition / Variant</span>
+                                                <span className="text-white/80">{vinyl.edition}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* --- ACQUISITION --- */}
+                            {(vinyl.purchase_price || vinyl.purchase_year) && (
+                                <div className="p-4 bg-emerald-900/10 rounded-xl border border-emerald-500/20 space-y-3">
+                                    <h4 className="text-xs uppercase text-emerald-400 font-bold flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4" /> Acquisition
+                                    </h4>
+                                    <div className="flex gap-8 text-sm">
+                                        {vinyl.purchase_price && (
+                                            <div>
+                                                <span className="block text-xs text-emerald-400/50">Paid</span>
+                                                <span className="text-emerald-100 font-medium">€ {vinyl.purchase_price}</span>
+                                            </div>
+                                        )}
+                                        {vinyl.purchase_year && (
+                                            <div>
+                                                <span className="block text-xs text-emerald-400/50">Year</span>
+                                                <span className="text-emerald-100 font-medium">{vinyl.purchase_year}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                     </div>

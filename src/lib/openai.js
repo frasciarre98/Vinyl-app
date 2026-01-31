@@ -271,6 +271,9 @@ Return JSON with these keys:
 - group_members (key members, comma separated)
 - average_cost (e.g. "€20-30")
 - condition (visual estimate: Good/Fair/Mint)
+- label (Record Label, e.g. "Blue Note", "Columbia")
+- catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
+- edition (e.g. "1st Press", "Reissue", "Red Vinyl", "Japanese Import")
 - notes (Detailed description including: history of the album/artist, interesting anecdotes, trivia, recording context, and musical influence. Make it engaging and comprehensive approx 300-500 words)
 Raw JSON only.` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
@@ -374,7 +377,7 @@ Your goal is to provide **Forensic Level Metadata**.
 - **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
 - **year**: Original release year.
 
-Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, notes (Detailed history, anecdotes, trivia, approx 300-500 words).` },
+Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes (Detailed history, anecdotes, trivia, approx 300-500 words).` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }
@@ -452,6 +455,9 @@ function normalizeParsedData(parsed) {
         tracks: Array.isArray(parsed.tracks) ? parsed.tracks.join('\n') : (parsed.tracks || ""),
         condition: parsed.condition || "Good",
         average_cost: parsed.average_cost || "",
+        label: parsed.label || "",
+        catalog_number: parsed.catalog_number || "",
+        edition: parsed.edition || "",
         notes: parsed.notes || parsed.note || "Analyzed by AI"
     };
 }
