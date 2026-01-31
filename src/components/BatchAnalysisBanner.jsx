@@ -8,6 +8,15 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
         vinyls.filter(v => v.artist === 'Pending AI' || v.artist === 'Error'),
         [vinyls]
     );
+
+    const incompleteItems = useMemo(() =>
+        vinyls.filter(v =>
+            v.artist !== 'Pending AI' &&
+            v.artist !== 'Error' &&
+            (!v.label || !v.catalog_number || !v.edition || !v.average_cost)
+        ),
+        [vinyls]
+    );
     const [isExpanded, setIsExpanded] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [logs, setLogs] = useState([]);
@@ -104,7 +113,10 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     condition: analysis.condition,
                     // Sanitise cost to strict String(50)
                     avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-                    tracks: analysis.tracks
+                    tracks: analysis.tracks,
+                    label: String(analysis.label || '').substring(0, 100),
+                    catalog_number: String(analysis.catalog_number || '').substring(0, 50),
+                    edition: String(analysis.edition || '').substring(0, 100)
                 };
 
                 // CRITICAL: Respect User Validation
@@ -255,7 +267,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
 
 
     // VISIBILITY LOGIC:
-    if (pendingItems.length === 0 && !isProcessing && !isExpanded) return null;
+    if (pendingItems.length === 0 && incompleteItems.length === 0 && !isProcessing && !isExpanded) return null;
 
     if (!isExpanded) {
         return (
@@ -264,15 +276,29 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     {isProcessing ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <AlertTriangle className="w-5 h-5 text-yellow-500" />}
                     <div>
                         <p className="text-sm font-medium text-white">
-                            {isProcessing ? `Analyzing records... ${progress}% ` : `${pendingItems.length} new records detected.`}
+                            {isProcessing
+                                ? `Analyzing records... ${progress}% `
+                                : pendingItems.length > 0
+                                    ? `${pendingItems.length} new records detected.`
+                                    : `${incompleteItems.length} records missing detailed metadata.`
+                            }
                         </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {!isProcessing && (
-                        <button onClick={() => startBatch(null, false)} className={`px - 3 py - 1 text - xs font - bold rounded transition - colors ${pendingItems.some(i => i.artist === 'Error') ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-primary text-black hover:bg-white'} `}>
-                            {pendingItems.some(i => i.artist === 'Error') ? 'Retry Failures' : 'Start Analysis'}
-                        </button>
+                        <>
+                            {pendingItems.length > 0 && (
+                                <button onClick={() => startBatch(pendingItems, false)} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${pendingItems.some(i => i.artist === 'Error') ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-primary text-black hover:bg-white'} `}>
+                                    {pendingItems.some(i => i.artist === 'Error') ? 'Retry Failures' : 'Start Analysis'}
+                                </button>
+                            )}
+                            {pendingItems.length === 0 && incompleteItems.length > 0 && (
+                                <button onClick={() => startBatch(incompleteItems, false)} className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded border border-emerald-500/50 hover:bg-emerald-500/20 transition-colors">
+                                    Enhance {incompleteItems.length} Records
+                                </button>
+                            )}
+                        </>
                     )}
                     <button onClick={() => setIsExpanded(true)} className="px-3 py-1 bg-white/10 text-white text-xs rounded hover:bg-white/20 transition-colors">
                         Show Logs
@@ -349,14 +375,23 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                         <div className="flex gap-2">
                             {pendingItems.length > 0 && (
                                 <button
-                                    onClick={() => startBatch(null, false)}
-                                    className={`flex items - center gap - 2 px - 4 py - 2 rounded - lg border transition - colors ${hasErrors
+                                    onClick={() => startBatch(pendingItems, false)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${hasErrors
                                         ? 'bg-red-500/10 text-red-500 border-red-500/50 hover:bg-red-500/20'
                                         : 'bg-primary/10 text-primary border-primary/50 hover:bg-primary/20'
                                         } `}
                                 >
                                     <Play className="w-4 h-4" />
-                                    {hasErrors ? 'Retry Failures' : 'Resume'}
+                                    {hasErrors ? 'Retry Failures' : 'Resume New'}
+                                </button>
+                            )}
+                            {incompleteItems.length > 0 && (
+                                <button
+                                    onClick={() => startBatch(incompleteItems, false)}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                                >
+                                    <Wand2 className="w-4 h-4" />
+                                    Enhance {incompleteItems.length} Existing
                                 </button>
                             )}
                             <button
