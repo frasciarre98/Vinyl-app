@@ -132,15 +132,29 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
-            // Use Serverless Function Proxy to bypass CORS & Header issues
-            const proxyEndpoint = '/api/proxy-image';
-            const targetUrl = encodeURIComponent(vinyl.image_url);
-            const fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
+            let fetchUrl;
+            let fetchHeaders = { 'Cache-Control': 'no-cache' };
 
-            console.log("Using Serverless Proxy:", fetchUrl);
+            if (import.meta.env.DEV) {
+                // Localhost: Direct fetch (Appwrite allows localhost origin)
+                fetchUrl = vinyl.image_url;
+                // Append project ID to URL query for direct access auth (safest for public buckets)
+                const separator = fetchUrl.includes('?') ? '&' : '?';
+                fetchUrl = `${fetchUrl}${separator}project=${PROJECT_ID}`;
+            } else {
+                // Production: Use Serverless Proxy
+                const proxyEndpoint = '/api/proxy-image';
+                const targetUrl = encodeURIComponent(vinyl.image_url);
+                fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
+            }
 
-            // Fetch blob from our own proxy (which handles Auth & CORS)
-            const response = await fetch(fetchUrl);
+            console.log("Fetching Image (Mode: " + (import.meta.env.DEV ? "DEV" : "PROD") + "):", fetchUrl);
+
+            // Fetch blob
+            const response = await fetch(fetchUrl, {
+                mode: 'cors',
+                headers: fetchHeaders
+            });
             if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
@@ -169,12 +183,25 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
-            // Use Serverless Function Proxy
-            const proxyEndpoint = '/api/proxy-image';
-            const targetUrl = encodeURIComponent(vinyl.image_url);
-            const fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
+            let fetchUrl;
+            let fetchHeaders = { 'Cache-Control': 'no-cache' };
 
-            const response = await fetch(fetchUrl);
+            if (import.meta.env.DEV) {
+                // Localhost: Direct fetch
+                fetchUrl = vinyl.image_url;
+                const separator = fetchUrl.includes('?') ? '&' : '?';
+                fetchUrl = `${fetchUrl}${separator}project=${PROJECT_ID}`;
+            } else {
+                // Production: Use Serverless Proxy
+                const proxyEndpoint = '/api/proxy-image';
+                const targetUrl = encodeURIComponent(vinyl.image_url);
+                fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
+            }
+
+            const response = await fetch(fetchUrl, {
+                mode: 'cors',
+                headers: fetchHeaders
+            });
             if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
