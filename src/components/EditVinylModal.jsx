@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera } from 'lucide-react';
-import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
+import { databases, storage, DATABASE_ID, BUCKET_ID, PROJECT_ID } from '../lib/appwrite';
 import { ID } from 'appwrite';
 import { resizeImage } from '../lib/openai';
 import Cropper from 'react-easy-crop';
@@ -146,8 +146,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 console.log("Using Proxy URL for CORS:", fetchUrl);
             }
 
-            // Add timestamp to prevent caching of previous CORS errors
-            const cacheBuster = (fetchUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+            // Add timestamp AND Project ID to authenticate the request
+            const separator = fetchUrl.includes('?') ? '&' : '?';
+            const cacheBuster = `${separator}t=${Date.now()}&project=${PROJECT_ID}&mode=admin`;
 
             // Fetch as blob with explicit CORS mode
             const response = await fetch(fetchUrl + cacheBuster, {
@@ -187,8 +188,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
             }
 
-            // Add timestamp
-            const cacheBuster = (fetchUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+            // Add timestamp and Project ID
+            const separator = fetchUrl.includes('?') ? '&' : '?';
+            const cacheBuster = `${separator}t=${Date.now()}&project=${PROJECT_ID}&mode=admin`;
 
             const response = await fetch(fetchUrl + cacheBuster, {
                 mode: 'cors',
@@ -201,9 +203,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             setCropImageSrc(objectUrl);
             setIsCropping(true);
             setPerspectiveMode(true);
+            setPerspectiveMode(true);
         } catch (error) {
-            console.error(error);
-            alert("Error loading image for perspective: " + error.message);
+            console.error("Failed to load image for perspective:", error);
+            // DEBUG: Show exact URL and error
+            alert(`DEBUG ERROR (Perspective):\nURL: ${fetchUrl}\nERR: ${error.message}\n\nPlease screenshot this.`);
         } finally {
             setUploadingImage(false);
         }
