@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, DollarSign, PlayCircle, Youtube, Wand2, Loader2 } from 'lucide-react';
+import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, Euro, PlayCircle, Youtube, Wand2, Loader2 } from 'lucide-react';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 import { databases, DATABASE_ID } from '../lib/appwrite';
 
@@ -193,7 +193,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                             </div>
                             {(vinyl.avarege_cost || vinyl.average_cost) && (
                                 <div className="bg-green-900/20 px-4 py-2 rounded-full border border-green-500/20 flex items-center gap-2 text-green-400">
-                                    <DollarSign className="w-4 h-4" />
+                                    <Euro className="w-4 h-4" />
                                     {vinyl.avarege_cost || vinyl.average_cost}
                                 </div>
                             )}
@@ -282,7 +282,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                             {(vinyl.purchase_price || vinyl.purchase_year) && (
                                 <div className="p-4 bg-emerald-900/10 rounded-xl border border-emerald-500/20 space-y-3">
                                     <h4 className="text-xs uppercase text-emerald-400 font-bold flex items-center gap-2">
-                                        <DollarSign className="w-4 h-4" /> Acquisition
+                                        <Euro className="w-4 h-4" /> Acquisition
                                     </h4>
                                     <div className="flex gap-8 text-sm">
                                         {vinyl.purchase_price && (
