@@ -13,6 +13,7 @@ export function VinylGrid({ refreshTrigger }) {
     const [vinyls, setVinyls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [trackSearch, setTrackSearch] = useState('');
     const [selectedArtist, setSelectedArtist] = useState('');
     const [selectedGenre, setSelectedGenre] = useState('');
     const [selectedRating, setSelectedRating] = useState('0');
@@ -248,6 +249,7 @@ export function VinylGrid({ refreshTrigger }) {
 
     const resetFilters = () => {
         setSearch('');
+        setTrackSearch('');
         setSelectedArtist('');
         setSelectedGenre('');
         setSelectedRating('0');
@@ -272,7 +274,9 @@ export function VinylGrid({ refreshTrigger }) {
                 matchesRating = (vinyl.rating || 0) >= parseInt(selectedRating);
             }
 
-            return matchesSearch && matchesArtist && matchesGenre && matchesRating;
+            const matchesTrack = !trackSearch || (vinyl.tracks?.toLowerCase() || '').includes(trackSearch.toLowerCase());
+
+            return matchesSearch && matchesArtist && matchesGenre && matchesRating && matchesTrack;
         });
 
         // Sort
@@ -284,7 +288,7 @@ export function VinylGrid({ refreshTrigger }) {
         });
 
         return result;
-    }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder]);
+    }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch]);
 
     const visibleVinyls = filteredVinyls.slice(0, visibleCount);
 
@@ -349,6 +353,7 @@ export function VinylGrid({ refreshTrigger }) {
                 <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6" />
                 <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Filters</h3>{activeFiltersCount > 0 && <button onClick={resetFilters} className="text-sm text-red-400 font-medium">Reset All</button>}</div>
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto pb-8">
+                    <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Track Name</label><div className="relative"><input type="text" value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} placeholder="Search for a song..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder-white/30" /></div></div>
                     <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Artist</label><div className="relative"><select value={selectedArtist} onChange={(e) => setSelectedArtist(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="">All Artists</option>{uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
                     <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Genre</label><div className="relative"><select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
                     <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Rating</label><div className="relative"><select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="0">Any Rating</option><option value="5">Excellent (5 Stars)</option><option value="4">Great (4+ Stars)</option><option value="3">Good (3+ Stars)</option><option value="unrated">Unrated</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
@@ -363,6 +368,7 @@ export function VinylGrid({ refreshTrigger }) {
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-secondary" /></div>
                         <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm" />
                     </div>
+                    <input type="text" placeholder="Track Name..." value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} className="bg-surface border border-border text-primary rounded-full px-4 py-3 max-w-[200px] text-sm placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50" />
                     <select value={selectedArtist} onChange={(e) => setSelectedArtist(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="">All Artists</option>{uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}</select>
                     <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select>
                     <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="0">All Ratings</option><option value="5">5 Stars Only</option><option value="4">4+ Stars</option><option value="3">3+ Stars</option><option value="2">2+ Stars</option><option value="1">1+ Star</option><option value="unrated">Unrated</option></select>
