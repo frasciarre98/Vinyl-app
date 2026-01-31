@@ -153,7 +153,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             // Fetch as blob with explicit CORS mode
             const response = await fetch(fetchUrl + cacheBuster, {
                 mode: 'cors',
-                headers: { 'Cache-Control': 'no-cache' }
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'X-Appwrite-Project': PROJECT_ID
+                }
             });
             if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
@@ -198,7 +201,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
             const response = await fetch(fetchUrl + cacheBuster, {
                 mode: 'cors',
-                headers: { 'Cache-Control': 'no-cache' }
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'X-Appwrite-Project': PROJECT_ID
+                }
             });
             if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
