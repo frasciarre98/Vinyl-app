@@ -146,9 +146,15 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 console.log("Using Proxy URL for CORS:", fetchUrl);
             }
 
-            // Fetch as blob to avoid CORS issues with Canvas
-            const response = await fetch(fetchUrl);
-            if (!response.ok) throw new Error("Network response was not ok");
+            // Add timestamp to prevent caching of previous CORS errors
+            const cacheBuster = (fetchUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+
+            // Fetch as blob with explicit CORS mode
+            const response = await fetch(fetchUrl + cacheBuster, {
+                mode: 'cors',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
 
@@ -181,8 +187,14 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
             }
 
-            const response = await fetch(fetchUrl);
-            if (!response.ok) throw new Error("Network response was not ok");
+            // Add timestamp
+            const cacheBuster = (fetchUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+
+            const response = await fetch(fetchUrl + cacheBuster, {
+                mode: 'cors',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
 
