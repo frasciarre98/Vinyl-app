@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+        {
+            "source": "/appwrite-proxy/:match*",
+            "destination": "https://cloud.appwrite.io/v1/:match*"
+        }
+    ]
+}

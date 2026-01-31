@@ -132,19 +132,18 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
-            // Use proxy to bypass CORS on mobile LAN (192.168.x.x)
-            // If the URL matches our Appwrite Endpoint, route it through Vite proxy
+            // Use proxy to bypass CORS on mobile LAN (192.168.x.x) AND Vercel Production
+            // Vite handles this locally, Vercel Rewrites handle this in production (vercel.json)
             const PROXY_PREFIX = '/appwrite-proxy';
             const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 
             // Start with original URL
             let fetchUrl = vinyl.image_url;
 
-            // Use proxy ONLY in DEV mode to bypass CORS on mobile LAN (192.168.x.x)
-            // On Vercel (Production), we must use the direct URL (and ensure Appwrite CORS is configured)
-            if (import.meta.env.DEV && vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
+            // ALWAYS use proxy if URL is from Appwrite Cloud
+            if (vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
                 fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
-                console.log("Using Proxy URL for CORS (Dev):", fetchUrl);
+                console.log("Using Proxy URL for CORS:", fetchUrl);
             }
 
             // Fetch as blob to avoid CORS issues with Canvas
@@ -171,13 +170,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
-            // Use proxy to bypass CORS on mobile LAN (192.168.x.x)
-            // If the URL matches our Appwrite Endpoint, route it through Vite proxy
+            // Use proxy to bypass CORS on mobile LAN (192.168.x.x) AND Vercel Production
             const PROXY_PREFIX = '/appwrite-proxy';
             const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
 
             let fetchUrl = vinyl.image_url;
-            if (import.meta.env.DEV && vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
+            if (vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
                 fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
             }
 
