@@ -146,9 +146,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 console.log("Using Proxy URL for CORS:", fetchUrl);
             }
 
-            // Add timestamp AND Project ID to authenticate the request
+            // Add timestamp only (Auth is handled by Header)
             const separator = fetchUrl.includes('?') ? '&' : '?';
-            const cacheBuster = `${separator}t=${Date.now()}&project=${PROJECT_ID}&mode=admin`;
+            const cacheBuster = `${separator}t=${Date.now()}`;
 
             // Fetch as blob with explicit CORS mode
             const response = await fetch(fetchUrl + cacheBuster, {
@@ -195,9 +195,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
             }
 
-            // Add timestamp and Project ID
+            // Add timestamp only
             const separator = fetchUrl.includes('?') ? '&' : '?';
-            const cacheBuster = `${separator}t=${Date.now()}&project=${PROJECT_ID}&mode=admin`;
+            const cacheBuster = `${separator}t=${Date.now()}`;
 
             const response = await fetch(fetchUrl + cacheBuster, {
                 mode: 'cors',
