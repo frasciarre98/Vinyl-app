@@ -160,20 +160,20 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="hidden md:flex p-2 md:p-3 bg-black/20 hover:bg-black/40 active:scale-95 text-[#1DB954] rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all font-bold"
+                                className="hidden md:flex p-2 md:p-3 active:scale-95 text-[#1DB954] rounded-full hover:bg-black/40 transition-all font-bold drop-shadow-md"
                                 title="Play on Spotify"
                             >
-                                <PlayCircle className="w-4 h-4 md:w-5 md:h-5 fill-current" />
+                                <PlayCircle className="w-5 h-5 md:w-6 md:h-6 fill-current filter drop-shadow-sm" />
                             </a >
                             <a
                                 href={`https://www.youtube.com/results?search_query=${encodeURIComponent((localVinyl.artist === 'Pending AI' ? '' : localVinyl.artist || '') + ' ' + (localVinyl.title || ''))}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="hidden md:flex p-2 md:p-3 bg-black/20 hover:bg-black/40 active:scale-95 text-red-500 rounded-full backdrop-blur-md shadow-lg border border-white/10 transition-all"
+                                className="hidden md:flex p-2 md:p-3 active:scale-95 text-red-500 rounded-full hover:bg-black/40 transition-all drop-shadow-md"
                                 title="Search on YouTube"
                             >
-                                <Youtube className="w-4 h-4 md:w-5 md:h-5" />
+                                <Youtube className="w-5 h-5 md:w-6 md:h-6 filter drop-shadow-sm" />
                             </a>
                         </div >
                     )}
