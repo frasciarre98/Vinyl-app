@@ -4,6 +4,7 @@ import { databases, DATABASE_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
 import { VinylCard } from './VinylCard';
 import { BatchAnalysisBanner } from './BatchAnalysisBanner';
+import { CollectionValueKPI } from './CollectionValueKPI';
 import { VinylDetailModal } from './VinylDetailModal';
 import { EditVinylModal } from './EditVinylModal';
 import { UndoToast } from './UndoToast';
@@ -313,6 +314,11 @@ export function VinylGrid({ refreshTrigger }) {
             )}
 
             <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
+
+            <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
+
+            {/* --- COLLECTION VALUE KPI --- */}
+            <CollectionValueKPI vinyls={vinyls} />
 
             {/* --- MOBILE STICKY HEADER --- */}
             <div className={`

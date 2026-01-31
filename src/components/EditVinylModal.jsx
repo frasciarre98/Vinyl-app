@@ -20,6 +20,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         tracks: '',
         group_members: '',
         is_tracks_validated: false,
+        is_price_locked: false,
         rating: 0
     });
     const [saving, setSaving] = useState(false);
@@ -50,6 +51,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 notes: vinyl.notes || '',
                 tracks: vinyl.tracks || '',
                 is_tracks_validated: vinyl.is_tracks_validated || false,
+                is_price_locked: vinyl.is_price_locked || false,
                 rating: vinyl.rating || 0
             });
         }
@@ -71,7 +73,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             onClose();
         } catch (err) {
             console.error('Error updating vinyl:', err);
-            alert(`Errore nel salvataggio: ${err.message}\n\nProbabilmente manca l'attributo 'is_tracks_validated' (boolean) nel database Appwrite.`);
+            console.error('Error updating vinyl:', err);
+            alert(`Errore nel salvataggio: ${err.message}\n\nProbabilmente mancano gli attributi 'is_tracks_validated' o 'is_price_locked' nel database Appwrite.`);
         } finally {
             setSaving(false);
         }

@@ -1,0 +1,64 @@
+import React, { useMemo } from 'react';
+import { Gem, TrendingUp } from 'lucide-react';
+
+export function CollectionValueKPI({ vinyls }) {
+    const totalValue = useMemo(() => {
+        if (!vinyls || vinyls.length === 0) return 0;
+
+        return vinyls.reduce((acc, vinyl) => {
+            const costStr = vinyl.avarege_cost || vinyl.average_cost;
+            if (!costStr) return acc;
+
+            // Remove currency symbols and whitespace
+            let cleanStr = String(costStr).replace(/[€$£]/g, '').trim();
+
+            // Handle ranges (e.g., "20-30") -> take average (25)
+            if (cleanStr.includes('-')) {
+                const parts = cleanStr.split('-').map(p => parseFloat(p.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    return acc + ((parts[0] + parts[1]) / 2);
+                }
+            }
+
+            // Handle single values
+            const val = parseFloat(cleanStr);
+            return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+    }, [vinyls]);
+
+    // Format with Euro symbol and thousand separators
+    const formattedValue = new Intl.NumberFormat('it-IT', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumFractionDigits: 0
+    }).format(totalValue);
+
+    return (
+        <div className="relative overflow-hidden mb-4 group">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/40 via-emerald-900/20 to-transparent border border-emerald-500/20 rounded-xl" />
+
+            <div className="relative p-3 flex flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg ring-1 ring-emerald-500/40 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]">
+                        <Gem className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-emerald-100/60 text-[10px] uppercase tracking-wider font-semibold leading-tight">Total Collection Value</h3>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-bold text-white tracking-tight drop-shadow-sm leading-none">
+                                {formattedValue}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                    <TrendingUp className="w-3 h-3 text-emerald-400" />
+                    <span className="text-[10px] font-medium text-emerald-200 whitespace-nowrap">
+                        {vinyls.length} items
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}
