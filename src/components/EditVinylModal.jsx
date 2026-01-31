@@ -132,32 +132,15 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
-            // Use proxy to bypass CORS on mobile LAN (192.168.x.x) AND Vercel Production
-            // Vite handles this locally, Vercel Rewrites handle this in production (vercel.json)
-            const PROXY_PREFIX = '/appwrite-proxy';
-            const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
+            // Use Serverless Function Proxy to bypass CORS & Header issues
+            const proxyEndpoint = '/api/proxy-image';
+            const targetUrl = encodeURIComponent(vinyl.image_url);
+            const fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
 
-            // Start with original URL
-            let fetchUrl = vinyl.image_url;
+            console.log("Using Serverless Proxy:", fetchUrl);
 
-            // ALWAYS use proxy if URL is from Appwrite Cloud
-            if (vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
-                fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
-                console.log("Using Proxy URL for CORS:", fetchUrl);
-            }
-
-            // Add timestamp and Project ID (without mode=admin to allow public access)
-            const separator = fetchUrl.includes('?') ? '&' : '?';
-            const cacheBuster = `${separator}t=${Date.now()}&project=${PROJECT_ID}`;
-
-            // Fetch as blob with explicit CORS mode
-            const response = await fetch(fetchUrl + cacheBuster, {
-                mode: 'cors',
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'X-Appwrite-Project': PROJECT_ID
-                }
-            });
+            // Fetch blob from our own proxy (which handles Auth & CORS)
+            const response = await fetch(fetchUrl);
             if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
@@ -186,33 +169,18 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         if (!vinyl.image_url) return;
         setUploadingImage(true);
         try {
-            // Use proxy to bypass CORS on mobile LAN (192.168.x.x) AND Vercel Production
-            const PROXY_PREFIX = '/appwrite-proxy';
-            const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
+            // Use Serverless Function Proxy
+            const proxyEndpoint = '/api/proxy-image';
+            const targetUrl = encodeURIComponent(vinyl.image_url);
+            const fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
 
-            let fetchUrl = vinyl.image_url;
-            if (vinyl.image_url.startsWith(APPWRITE_ENDPOINT)) {
-                fetchUrl = vinyl.image_url.replace(APPWRITE_ENDPOINT, PROXY_PREFIX);
-            }
-
-            // Add timestamp and Project ID
-            const separator = fetchUrl.includes('?') ? '&' : '?';
-            const cacheBuster = `${separator}t=${Date.now()}&project=${PROJECT_ID}`;
-
-            const response = await fetch(fetchUrl + cacheBuster, {
-                mode: 'cors',
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'X-Appwrite-Project': PROJECT_ID
-                }
-            });
+            const response = await fetch(fetchUrl);
             if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
 
             setCropImageSrc(objectUrl);
             setIsCropping(true);
-            setPerspectiveMode(true);
             setPerspectiveMode(true);
         } catch (error) {
             console.error("Failed to load image for perspective:", error);
