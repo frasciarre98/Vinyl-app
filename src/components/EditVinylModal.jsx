@@ -545,13 +545,16 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-secondary mb-1">Average Cost</label>
-                                <input
-                                    type="text"
-                                    value={formData.average_cost || ''}
-                                    onChange={e => setFormData({ ...formData, average_cost: e.target.value })}
-                                    placeholder="e.g. €20-30"
-                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
-                                />
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-gray-500">€</span>
+                                    <input
+                                        type="text"
+                                        value={formData.average_cost || ''}
+                                        onChange={e => setFormData({ ...formData, average_cost: e.target.value })}
+                                        placeholder="20-30"
+                                        className="w-full bg-white/50 border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                    />
+                                </div>
                                 <div className="mt-1 flex justify-end">
                                     <label className="flex items-center gap-2 cursor-pointer text-xs select-none text-secondary hover:text-primary transition-colors">
                                         <input
@@ -611,13 +614,16 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-secondary mb-1">Purchase Price</label>
-                                        <input
-                                            type="text"
-                                            value={formData.purchase_price}
-                                            onChange={e => setFormData({ ...formData, purchase_price: e.target.value })}
-                                            placeholder="e.g. 25.00"
-                                            className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
-                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-gray-500">€</span>
+                                            <input
+                                                type="text"
+                                                value={formData.purchase_price}
+                                                onChange={e => setFormData({ ...formData, purchase_price: e.target.value })}
+                                                placeholder="25.00"
+                                                className="w-full bg-white/50 border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-secondary mb-1">Year Bought</label>
