@@ -97,47 +97,33 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                     <X className="w-8 h-8" />
                 </button>
                 <div className="flex gap-2">
-                    <button
-                        onClick={handleAnalyze}
-                        disabled={analyzing}
-                        className={`p-2 rounded-full transition-all ${analyzing ? 'bg-yellow-500/20 text-yellow-400' : 'text-purple-400 hover:text-purple-300 bg-purple-500/10'}`}
-                    >
-                        {analyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wand2 className="w-6 h-6" />}
-                    </button>
-                    <button
-                        onClick={() => onEdit(vinyl)}
-                        className="p-2 text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-full"
-                    >
-                        <Edit2 className="w-6 h-6" />
-                    </button>
-                    {/* External Links */}
+                    {/* External Links - Transparent Mode */}
                     <a
                         href={`https://open.spotify.com/search/${encodeURIComponent((vinyl.artist || '') + ' ' + (vinyl.title || ''))}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 text-[#1DB954] hover:text-[#1ed760] bg-[#1DB954]/10 rounded-full"
+                        className="p-2 text-[#1DB954] hover:text-[#1ed760] hover:bg-white/10 rounded-full transition-colors"
                     >
-                        <icons.PlayCircle className="w-6 h-6" />
+                        <icons.PlayCircle className="w-8 h-8" />
                     </a>
                     <a
                         href={`https://www.youtube.com/results?search_query=${encodeURIComponent((vinyl.artist || '') + ' ' + (vinyl.title || ''))}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 text-red-500 hover:text-red-400 bg-red-500/10 rounded-full"
+                        className="p-2 text-red-500 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors"
                     >
-                        <icons.Youtube className="w-6 h-6" />
+                        <icons.Youtube className="w-8 h-8" />
                     </a>
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             if (typeof onDelete !== 'function') {
                                 alert("Error: Delete function is missing. Please reload.");
-                                console.error("onDelete prop is missing in VinylDetailModal");
                                 return;
                             }
                             onDelete(vinyl.id);
                         }}
-                        className="p-2 text-red-500 hover:text-red-400 bg-red-500/10 rounded-full"
+                        className="p-2 text-white/40 hover:text-red-500 hover:bg-white/10 rounded-full transition-colors"
                     >
                         <Trash2 className="w-6 h-6" />
                     </button>
@@ -175,6 +161,26 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                             <p className="text-xl text-primary font-medium">
                                 {vinyl.artist || 'Unknown Artist'}
                             </p>
+                        </div>
+
+                        {/* Actions Row (Moved from Header) */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => onEdit(vinyl)}
+                                className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors border border-white/10"
+                            >
+                                <Edit2 className="w-4 h-4" /> Edit Metadata
+                            </button>
+                            <button
+                                onClick={handleAnalyze}
+                                disabled={analyzing}
+                                className={`flex-1 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all border ${analyzing
+                                    ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                    : 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20'}`}
+                            >
+                                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                                {analyzing ? 'Analyzing...' : 'AI Analyze'}
+                            </button>
                         </div>
 
                         {/* Quick Stats Row */}
