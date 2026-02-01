@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera } from 'lucide-react';
-import { databases, storage, DATABASE_ID, BUCKET_ID, PROJECT_ID } from '../lib/appwrite';
-import { ID } from 'appwrite';
+import { pb } from '../lib/pocketbase';
 import { resizeImage } from '../lib/openai';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../lib/imageUtils';
@@ -78,7 +77,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             const payload = { ...formData, avarege_cost: cleanCost };
             delete payload.average_cost;
 
-            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, payload);
+            // PocketBase update
+            await pb.collection('vinyls').update(vinyl.id, payload);
             onUpdate();
             onClose();
         } catch (err) {
@@ -99,7 +99,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             if (!confirm('Are you sure you want to delete this record?')) return;
             setSaving(true);
             try {
-                await databases.deleteDocument(DATABASE_ID, 'vinyls', vinyl.id);
+                await pb.collection('vinyls').delete(vinyl.id);
                 onUpdate();
                 onClose();
             } catch (err) {
@@ -136,16 +136,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             let fetchHeaders = { 'Cache-Control': 'no-cache' };
 
             if (import.meta.env.DEV) {
-                // Localhost: Direct fetch (Appwrite allows localhost origin)
+                // Localhost: Direct fetch
                 fetchUrl = vinyl.image_url;
-                // Append project ID to URL query for direct access auth (safest for public buckets)
-                const separator = fetchUrl.includes('?') ? '&' : '?';
-                fetchUrl = `${fetchUrl}${separator}project=${PROJECT_ID}`;
             } else {
-                // Production: Use Serverless Proxy
-                const proxyEndpoint = '/api/proxy-image';
-                const targetUrl = encodeURIComponent(vinyl.image_url);
-                fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
+                // Production: Use Proxy if needed, or direct if allowed
+                // For now, assume direct fetch works for PocketBase unless blocked
+                fetchUrl = vinyl.image_url;
             }
 
             console.log("Fetching Image (Mode: " + (import.meta.env.DEV ? "DEV" : "PROD") + "):", fetchUrl);
@@ -167,7 +163,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             console.error("Failed to load image for cropping:", error);
 
             if (error.message.includes("401")) {
-                alert("🔒 ACCESS DENIED (401)\n\nYour Appwrite Storage Bucket is set to 'Private'.\n\nPlease go to Appwrite Console > Storage > Settings > Permissions > Add Role 'Any' > Select 'Read'.\n\nThis allows the app to load images for editing.");
+                alert("🔒 ACCESS DENIED (401)\n\nStorage permission error. Please check your PocketBase collection API rules.");
             } else {
                 alert(`DEBUG ERROR:\nURL: ${fetchUrl}\nERR: ${error.message}`);
             }
@@ -186,17 +182,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             let fetchUrl;
             let fetchHeaders = { 'Cache-Control': 'no-cache' };
 
-            if (import.meta.env.DEV) {
-                // Localhost: Direct fetch
-                fetchUrl = vinyl.image_url;
-                const separator = fetchUrl.includes('?') ? '&' : '?';
-                fetchUrl = `${fetchUrl}${separator}project=${PROJECT_ID}`;
-            } else {
-                // Production: Use Serverless Proxy
-                const proxyEndpoint = '/api/proxy-image';
-                const targetUrl = encodeURIComponent(vinyl.image_url);
-                fetchUrl = `${proxyEndpoint}?url=${targetUrl}`;
-            }
+            fetchUrl = vinyl.image_url;
 
             const response = await fetch(fetchUrl, {
                 mode: 'cors',
@@ -213,7 +199,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             console.error("Failed to load image for perspective:", error);
 
             if (error.message.includes("401")) {
-                alert("🔒 ACCESS DENIED (401)\n\nYour Appwrite Storage Bucket is set to 'Private'.\n\nPlease go to Appwrite Console > Storage > Settings > Permissions > Add Role 'Any' > Select 'Read'.");
+                alert("🔒 ACCESS DENIED (401)\n\nStorage permission error. Please check your PocketBase collection API rules.");
             } else {
                 alert(`DEBUG ERROR (Perspective):\nURL: ${fetchUrl}\nERR: ${error.message}`);
             }
@@ -235,18 +221,15 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             // No need to resizeImage again.
             const uploadFile = new File([blob], `warped-${Date.now()}.jpg`, { type: 'image/jpeg' });
 
-            const fileUpload = await storage.createFile(
-                BUCKET_ID,
-                ID.unique(),
-                uploadFile
-            );
+            const formData = new FormData();
+            formData.append('image', uploadFile);
 
-            const viewResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
-            const publicUrl = viewResult.href ? viewResult.href : String(viewResult);
+            const record = await pb.collection('vinyls').update(vinyl.id, formData);
+            const publicUrl = pb.files.getUrl(record, record.image);
 
-            console.log("New Perspective URL:", publicUrl);
-
-            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { image_url: publicUrl });
+            onUpdate(); // Refresh grid
+            // Update local view manually if needed, or rely on onUpdate
+            // setVinyl(record) - but props are immutable, so onUpdate handles refetch
 
             onUpdate();
             setIsCropping(false);
@@ -285,25 +268,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             const uploadFile = new File([compressedBlob], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
 
             // Upload to Appwrite Storage
-            const fileUpload = await storage.createFile(
-                BUCKET_ID,
-                ID.unique(),
-                uploadFile
-            );
+            const formData = new FormData();
+            formData.append('image', uploadFile);
 
-            console.log("Step 4: final update...");
-            // Get Public URL - Handle both URL object (newer SDK) and string (older SDK)
-            const viewResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
-            const publicUrl = viewResult.href ? viewResult.href : String(viewResult);
-
-            if (!publicUrl || publicUrl === 'undefined') {
-                throw new Error(`Failed to generate Public URL. Result was: ${JSON.stringify(viewResult)}`);
-            }
-
-            console.log("Updating with URL:", publicUrl);
-
-            // Update Vinyl Record immediately
-            await databases.updateDocument(DATABASE_ID, 'vinyls', vinyl.id, { image_url: publicUrl });
+            const record = await pb.collection('vinyls').update(vinyl.id, formData);
+            const publicUrl = pb.files.getUrl(record, record.image);
 
             onUpdate();
             setIsCropping(false);

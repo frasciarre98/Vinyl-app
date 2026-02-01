@@ -1,23 +1,29 @@
-import React, { useState } from 'react';
-import { Settings, Plus, Download, Loader2, Bug } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
 import { VinylLogo } from './VinylLogo';
-import { databases, DATABASE_ID, isAppwriteConfigured } from '../lib/appwrite';
-import { Query } from 'appwrite';
+import { pb } from '../lib/pocketbase';
+
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) {
-    const isConfigured = isAppwriteConfigured();
     const [isExporting, setIsExporting] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
+    // User state can be used if we want to show profile/logout in the header
+    const [user, setUser] = useState(pb.authStore.model);
+
+    useEffect(() => {
+        return pb.authStore.onChange((token, model) => {
+            setUser(model);
+        });
+    }, []);
 
     const handleExport = async () => {
         setIsExporting(true);
         try {
-            // Appwrite: listDocuments (Note: Limit is default 25, need to increase or paginate for full export)
-            // For now, fetching up to 5000 (Appwrite max limit per request)
-            const { documents: data } = await databases.listDocuments(
-                DATABASE_ID,
-                'vinyls',
-                [Query.limit(5000), Query.orderDesc('$createdAt')]
-            );
+            // PocketBase: getFullList
+            const data = await pb.collection('vinyls').getFullList({
+                sort: '-created',
+            });
 
             if (!data || data.length === 0) {
                 alert('No vinyls to export!');
@@ -67,13 +73,28 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
         }
     };
 
+    const handlePublish = async () => {
+        if (!confirm("🚀 MAGIC PUBLISH\n\nThis will export your current collection (data + images) and push it to GitHub/Vercel.\n\nContinue?")) return;
+
+        setIsPublishing(true);
+        try {
+            const res = await fetch('/api/publish');
+            const data = await res.json();
+            if (data.success) {
+                alert("✨ PUBLISHED!\n\nYour collection has been sent to GitHub. Vercel will update the site in 1-2 minutes.");
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        } catch (err) {
+            console.error('Publish failed:', err);
+            alert(`❌ PUBLISH FAILED\n\n${err.message}\n\nCheck the terminal for details.`);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     return (
         <div className="min-h-[100dvh] flex flex-col w-full overflow-x-hidden relative">
-            {!isConfigured && (
-                <div className="bg-red-600 text-white text-center py-2 px-4 font-bold animate-pulse">
-                    ⚠️ Errore Configurazione: PROJECT_ID mancante in src/lib/appwrite.js
-                </div>
-            )}
 
             {/* Fixed Background for Mobile Stability */}
             <div className="fixed inset-0 -z-50 bg-[#0f172a]" style={{
@@ -96,30 +117,52 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     </div>
 
                     <nav className="flex items-center gap-4">
-
-                        <button
-                            onClick={handleExport}
-                            disabled={isExporting}
-                            className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
-                            title="Export to Excel/CSV"
-                        >
-                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                            <span className="hidden sm:inline">Export</span>
-                        </button>
-                        <button
-                            onClick={onOpenUpload}
-                            className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>Add Vinyls</span>
-                        </button>
-                        <button
-                            onClick={onOpenSettings}
-                            className="p-2 text-secondary hover:text-primary transition-colors hover:bg-white/5 rounded-full"
-                            title="Settings"
-                        >
-                            <Settings className="w-5 h-5" />
-                        </button>
+                        {!IS_STATIC && (
+                            <>
+                                <button
+                                    onClick={handlePublish}
+                                    disabled={isPublishing}
+                                    className={`
+                                        flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all
+                                        ${isPublishing ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-600 text-white hover:bg-purple-500 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] active:scale-95'}
+                                    `}
+                                    title="Publish Static Mirror to Vercel"
+                                >
+                                    {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                                    <span>{isPublishing ? 'Publishing...' : 'Magic Publish'}</span>
+                                </button>
+                                <button
+                                    onClick={handleExport}
+                                    disabled={isExporting}
+                                    className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                    title="Export to Excel/CSV"
+                                >
+                                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                    <span className="hidden sm:inline">Export</span>
+                                </button>
+                                <button
+                                    onClick={onOpenUpload}
+                                    className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Add Vinyls</span>
+                                </button>
+                                <button
+                                    onClick={onOpenDebug}
+                                    className="p-2 text-secondary hover:text-red-400 transition-colors hover:bg-white/5 rounded-full"
+                                    title="Debug / Admin"
+                                >
+                                    <Bug className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={onOpenSettings}
+                                    className="p-2 text-secondary hover:text-primary transition-colors hover:bg-white/5 rounded-full"
+                                    title="Settings"
+                                >
+                                    <Settings className="w-5 h-5" />
+                                </button>
+                            </>
+                        )}
                     </nav>
                 </div>
             </header>

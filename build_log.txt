@@ -1,0 +1,49 @@
+
+> vinyl-catalog@0.0.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 7 modules transformed.
+x Build failed in 467ms
+error during build:
+[vite:esbuild] Transform failed with 3 errors:
+/Users/francesco/.gemini/antigravity/playground/ionized-hubble/src/components/UploadModal.jsx:4:9: ERROR: The symbol "analyzeImage" has already been declared
+/Users/francesco/.gemini/antigravity/playground/ionized-hubble/src/components/UploadModal.jsx:4:23: ERROR: The symbol "getApiKey" has already been declared
+/Users/francesco/.gemini/antigravity/playground/ionized-hubble/src/components/UploadModal.jsx:4:34: ERROR: The symbol "resizeImage" has already been declared
+file: /Users/francesco/.gemini/antigravity/playground/ionized-hubble/src/components/UploadModal.jsx:4:9
+
+The symbol "analyzeImage" has already been declared
+2  |  import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug } from 'lucide-react';
+3  |  import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+4  |  import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+   |           ^
+5  |  import { pb } from '../lib/pocketbase';
+6  |  
+
+The symbol "getApiKey" has already been declared
+2  |  import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug } from 'lucide-react';
+3  |  import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+4  |  import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+   |                         ^
+5  |  import { pb } from '../lib/pocketbase';
+6  |  
+
+The symbol "resizeImage" has already been declared
+2  |  import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug } from 'lucide-react';
+3  |  import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+4  |  import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+   |                                    ^
+5  |  import { pb } from '../lib/pocketbase';
+6  |  
+
+    at failureErrorWithLog (/Users/francesco/.gemini/antigravity/playground/ionized-hubble/node_modules/esbuild/lib/main.js:1472:15)
+    at /Users/francesco/.gemini/antigravity/playground/ionized-hubble/node_modules/esbuild/lib/main.js:755:50
+    at responseCallbacks.<computed> (/Users/francesco/.gemini/antigravity/playground/ionized-hubble/node_modules/esbuild/lib/main.js:622:9)
+    at handleIncomingPacket (/Users/francesco/.gemini/antigravity/playground/ionized-hubble/node_modules/esbuild/lib/main.js:677:12)
+    at Socket.readFromStdout (/Users/francesco/.gemini/antigravity/playground/ionized-hubble/node_modules/esbuild/lib/main.js:600:7)
+    at Socket.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:559:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+    at Readable.push (node:internal/streams/readable:390:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2, Terminal } from 'lucide-react';
 import { saveApiKey, getApiKey, getProvider, setProvider, getGeminiTier, setGeminiTier, resizeImage, testConnection } from '../lib/openai';
-import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
-import { Query } from 'appwrite';
+import { pb } from '../lib/pocketbase';
 
 export function SettingsModal({ onClose, onSave }) {
     const [apiKey, setApiKey] = useState('');
@@ -58,21 +57,12 @@ export function SettingsModal({ onClose, onSave }) {
 
         setCleaning(true);
         try {
-            // Appwrite: Fetch all documents first
-            const { documents } = await databases.listDocuments(
-                DATABASE_ID,
-                'vinyls',
-                [Query.limit(1000)]
-            );
+            // PocketBase: Fetch all documents
+            const documents = await pb.collection('vinyls').getFullList();
 
-            // Loop updates (Appwrite doesn't have bulk update)
+            // Loop updates
             const promises = documents.map(doc =>
-                databases.updateDocument(
-                    DATABASE_ID,
-                    'vinyls',
-                    doc.$id,
-                    { artist: 'Pending AI', notes: null, tracks: null }
-                )
+                pb.collection('vinyls').update(doc.id, { artist: 'Pending AI', notes: null, tracks: null })
             );
 
             await Promise.all(promises);
@@ -95,12 +85,10 @@ export function SettingsModal({ onClose, onSave }) {
 
         setCompressing(true);
         try {
-            // 1. Fetch all vinyls
-            const { documents: vinyls } = await databases.listDocuments(
-                DATABASE_ID,
-                'vinyls',
-                [Query.isNotNull('image_url'), Query.limit(1000)]
-            );
+            // 1. Fetch all vinyls with images
+            const vinyls = await pb.collection('vinyls').getFullList({
+                filter: 'image != ""',
+            });
 
             setCompressProgress({ current: 0, total: vinyls.length });
 
@@ -109,8 +97,9 @@ export function SettingsModal({ onClose, onSave }) {
                 setCompressProgress({ current: i + 1, total: vinyls.length });
 
                 try {
+                    const imageUrl = pb.files.getUrl(v, v.image);
                     // Fetch Blob
-                    const response = await fetch(v.image_url);
+                    const response = await fetch(imageUrl);
                     if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
                     const blob = await response.blob();
 
@@ -124,29 +113,16 @@ export function SettingsModal({ onClose, onSave }) {
                     const compressedDataUrl = await resizeImage(blob);
                     const compressedBlob = await (await fetch(compressedDataUrl)).blob();
 
-                    // Reconstruct File for Appwrite
-                    const ext = v.image_url.split('.').pop().split('?')[0] || 'jpg';
-                    const fileName = `compressed_${v.$id}_${Date.now()}.${ext}`;
+                    // Reconstruct File for PocketBase
+                    const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+                    const fileName = `compressed_${v.id}_${Date.now()}.${ext}`;
                     const uploadFile = new File([compressedBlob], fileName, { type: 'image/jpeg' });
 
-                    // Upload
-                    const fileUpload = await storage.createFile(
-                        BUCKET_ID,
-                        'unique()',
-                        uploadFile
-                    );
+                    // Upload (Update record with new image)
+                    const formData = new FormData();
+                    formData.append('image', uploadFile);
 
-                    // Get Public URL
-                    const publicUrl = storage.getFileView(BUCKET_ID, fileUpload.$id).href;
-
-
-                    // Update DB
-                    await databases.updateDocument(
-                        DATABASE_ID,
-                        'vinyls',
-                        v.$id,
-                        { image_url: publicUrl }
-                    );
+                    await pb.collection('vinyls').update(v.id, formData);
 
                 } catch (err) {
                     console.error(`Failed to compress ${v.title}:`, err);
@@ -172,11 +148,9 @@ export function SettingsModal({ onClose, onSave }) {
     const scanForDuplicates = async () => {
         setCleaning(true);
         try {
-            const { documents: vinyls } = await databases.listDocuments(
-                DATABASE_ID,
-                'vinyls',
-                [Query.isNotNull('artist'), Query.isNotNull('title'), Query.limit(5000)]
-            );
+            const vinyls = await pb.collection('vinyls').getFullList({
+                sort: '-created',
+            });
 
             const groups = {};
 
@@ -201,7 +175,7 @@ export function SettingsModal({ onClose, onSave }) {
                         const aScore = (a.image_url ? 2 : 0) + (a.year && a.year.length === 4 ? 2 : 0) + (a.notes && a.notes.length > 20 ? 1 : 0);
                         const bScore = (b.image_url ? 2 : 0) + (b.year && b.year.length === 4 ? 2 : 0) + (b.notes && b.notes.length > 20 ? 1 : 0);
                         if (aScore !== bScore) return bScore - aScore;
-                        return new Date(a.$createdAt) - new Date(b.$createdAt); // Oldest wins logic
+                        return new Date(a.created) - new Date(b.created); // Oldest wins logic
                     });
 
                     const keeper = items[0];
@@ -233,7 +207,7 @@ export function SettingsModal({ onClose, onSave }) {
             const chunk = 5;
             for (let i = 0; i < allDeleteIds.length; i += chunk) {
                 const batch = allDeleteIds.slice(i, i + chunk);
-                await Promise.all(batch.map(id => databases.deleteDocument(DATABASE_ID, 'vinyls', id)));
+                await Promise.all(batch.map(id => pb.collection('vinyls').delete(id)));
             }
 
             alert(`Successfully deleted ${allDeleteIds.length} duplicates!`);
@@ -278,8 +252,8 @@ export function SettingsModal({ onClose, onSave }) {
                                 {/* Keeper */}
                                 <div className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/30 rounded mb-2">
                                     <div className="flex items-center gap-4">
-                                        {group.keeper.image_url ? (
-                                            <img src={group.keeper.image_url} alt="Keep" className="w-24 h-24 rounded object-cover border border-green-500/50" />
+                                        {group.keeper.image ? (
+                                            <img src={pb.files.getUrl(group.keeper, group.keeper.image)} alt="Keep" className="w-24 h-24 rounded object-cover border border-green-500/50" />
                                         ) : (
                                             <div className="w-24 h-24 rounded bg-white/5 flex items-center justify-center border border-white/10">
                                                 <span className="text-xs">No Img</span>
@@ -299,8 +273,8 @@ export function SettingsModal({ onClose, onSave }) {
                                 {group.toDelete.map(d => (
                                     <div key={d.$id} className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/30 rounded mb-1 last:mb-0 opacity-70 hover:opacity-100 transition-opacity">
                                         <div className="flex items-center gap-4">
-                                            {d.image_url ? (
-                                                <img src={d.image_url} alt="Delete" className="w-24 h-24 rounded object-cover grayscale border border-red-500/30" />
+                                            {d.image ? (
+                                                <img src={pb.files.getUrl(d, d.image)} alt="Delete" className="w-24 h-24 rounded object-cover grayscale border border-red-500/30" />
                                             ) : (
                                                 <div className="w-24 h-24 rounded bg-white/5 flex items-center justify-center border border-white/10">
                                                     <span className="text-xs text-white/30">No Img</span>
@@ -470,9 +444,9 @@ export function SettingsModal({ onClose, onSave }) {
                             <button
                                 onClick={async () => {
                                     try {
-                                        const { documents } = await databases.listDocuments(DATABASE_ID, 'vinyls', [Query.limit(1)]);
-                                        if (documents.length > 0) {
-                                            alert(JSON.stringify(documents[0], null, 2));
+                                        const records = await pb.collection('vinyls').getList(1, 1);
+                                        if (records.items.length > 0) {
+                                            alert(JSON.stringify(records.items[0], null, 2));
                                         } else {
                                             alert("No vinyls found.");
                                         }

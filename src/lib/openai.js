@@ -111,7 +111,7 @@ export async function analyzeImageUrl(publicUrl, apiKey, hint = null) {
         // Append timestamp to bypass browser cache (fixes CORS issues if cached without headers)
         const fetchUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
         const response = await fetch(fetchUrl).catch(err => {
-            throw new Error(`Could not access image. Possible CORS issue. \nSolution: Add "${window.location.hostname}" as a Web Platform in Appwrite Console.`);
+            throw new Error(`Could not access image. Possible CORS issue. \\nSolution: Check PocketBase file permissions.`);
         });
         if (!response.ok) throw new Error("Failed to download image from URL");
 
@@ -377,14 +377,14 @@ Your goal is to provide **Forensic Level Metadata**.
 - **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
 - **year**: Original release year.
 
-Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes (Detailed history, anecdotes, trivia, approx 300-500 words).` },
+Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes (Concise summary, max 100 words).` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }
                 ],
 
-                // response_format: { type: "json_object" }, // Removing strict mode to debug empty content
-                max_tokens: 1200,
+                response_format: { type: "json_object" },
+                max_tokens: 3000,
                 temperature: 0.1
             })
         });
@@ -399,11 +399,15 @@ Return JSON keys: artist, title, genre, year, tracks, group_members, average_cos
         const choice = data.choices[0];
         if (!choice.message.content) {
             console.error("[OpenAI] Empty Response. Full Choice:", JSON.stringify(choice, null, 2));
-            // Check for refusal specifically
             if (choice.message.refusal) {
                 throw new Error(`OpenAI Refusal: ${choice.message.refusal}`);
             }
-            throw new Error(`OpenAI returned empty content.Reason: ${choice.finish_reason}`);
+            throw new Error(`OpenAI returned empty content. Reason: ${choice.finish_reason}`);
+        }
+
+        // Check for truncation
+        if (choice.finish_reason === 'length') {
+            throw new Error("AI Response Truncated. Try reducing image complexity or prompt length.");
         }
 
         console.log("[OpenAI] Raw Response:", choice.message.content); // CRITICAL DEBUG LOG
@@ -419,33 +423,124 @@ Return JSON keys: artist, title, genre, year, tracks, group_members, average_cos
 // --- HELPERS ---
 
 function parseAIResponse(jsonString) {
-    let content = jsonString;
+    if (!jsonString) throw new Error("Empty AI response");
 
-    // 1. Try clean parse first
-    try {
-        return normalizeParsedData(JSON.parse(content));
-    } catch (e) {
-        // Continue to extraction...
-    }
+    let content = jsonString.trim();
 
-    // 2. Extract JSON object substring (Find first '{' and last '}')
+    // 1. Strip Markdown Code Blocks
+    // Remove ```json ... ``` or just ``` ... ```
+    // We use a multi-step replacement to ensure we catch the start and end cleanly
+    content = content.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '');
+
+    // 2. Locate the outermost JSON object bounds
     const firstOpen = content.indexOf('{');
     const lastClose = content.lastIndexOf('}');
 
-    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-        const jsonCandidate = content.substring(firstOpen, lastClose + 1);
+    // HANDLING TRUNCATION:
+    // If we have a start '{' but missing '}' (or it's before the start),
+    // we attempt to REPAIR it instead of throwing.
+    if (firstOpen !== -1 && (lastClose === -1 || lastClose < firstOpen)) {
+        console.warn("JSON Truncated. Attempting Auto-Repair...");
         try {
-            return normalizeParsedData(JSON.parse(jsonCandidate));
-        } catch (e2) {
-            console.error("[OpenAI] JSON Extraction Failed:", e2);
-            throw new Error(`Invalid JSON from AI: ${e2.message} -- Raw: ${content.substring(0, 100)}...`);
+            // Take everything from the first bracket
+            const incomplete = content.substring(firstOpen);
+            const repaired = repairBrokenJSON(incomplete);
+            console.log("Repaired JSON:", repaired);
+            return normalizeParsedData(JSON.parse(repaired));
+        } catch (repairErr) {
+            console.error("Auto-Repair Failed:", repairErr);
+            throw new Error(`JSON Truncated & Irreparable: ${repairErr.message}`);
         }
     }
 
-    throw new Error(`Invalid JSON from AI: No JSON object found in response.Raw: "${content.substring(0, 100)}..."`);
+    if (firstOpen === -1) {
+        throw new Error(`AI returned text, not JSON: "${content.substring(0, 50)}..."`);
+    }
+
+    // Isolate the candidate string
+    let candidate = content.substring(firstOpen, lastClose + 1);
+
+    // 3. Attempt Parsing with progressive fallback sanitization
+    try {
+        return normalizeParsedData(JSON.parse(candidate));
+    } catch (e1) {
+        // Error? Common cause: Newlines in strings.
+        // Attempt to fix: Replace literal newlines inside the string with \n
+        // (This is a naive regex but catches the most common "Notes" field issue)
+        try {
+            const sanitized = candidate.replace(/\n/g, "\\n").replace(/\r/g, "");
+            return normalizeParsedData(JSON.parse(sanitized));
+        } catch (e2) {
+            // Still failing?
+            console.error("JSON PARSE FAILED. Raw:", candidate);
+            // Throw a specific error with the start of the content so the user can report it
+            // We truncate it to fit in the toast
+            throw new Error(`JSON Syntax Error: ${e1.message}.`);
+        }
+    }
+}
+
+/**
+ * Tries to close a truncated JSON string by appending missing quotes and braces.
+ */
+function repairBrokenJSON(json) {
+    let repaired = json;
+
+    // 1. Check if inside a string (Odd number of quotes, ignoring escaped ones)
+    // We count quotes from the start. 
+    // Note: This is a simplified check.
+    let quoteCount = 0;
+    let escape = false;
+    for (let c of repaired) {
+        if (escape) { escape = false; continue; }
+        if (c === '\\') { escape = true; continue; }
+        if (c === '"') quoteCount++;
+    }
+
+    if (quoteCount % 2 !== 0) {
+        // We are inside a string. Close it.
+        repaired += '"';
+    }
+
+    // 2. Count Braces and Brackets to close them
+    // Reset parser state to scan the (possibly string-closed) content
+    let depthBrace = 0; // {}
+    let depthBracket = 0; // []
+    let inString = false;
+    escape = false;
+
+    for (let i = 0; i < repaired.length; i++) {
+        const c = repaired[i];
+        if (escape) { escape = false; continue; }
+        if (c === '\\') { escape = true; continue; }
+
+        if (c === '"') { inString = !inString; continue; }
+
+        if (!inString) {
+            if (c === '{') depthBrace++;
+            else if (c === '}') depthBrace--;
+            else if (c === '[') depthBracket++;
+            else if (c === ']') depthBracket--;
+        }
+    }
+
+    // Append missing closing brackets/braces in reverse order of likelihood (usually close stack)
+    // Ideally we'd track a stack, but simplistic counting works for trailing truncation.
+    // Close arrays first (inner), then objects.
+    while (depthBracket > 0) {
+        repaired += ']';
+        depthBracket--;
+    }
+    while (depthBrace > 0) {
+        repaired += '}';
+        depthBrace--;
+    }
+
+    return repaired;
 }
 
 function normalizeParsedData(parsed) {
+    if (!parsed) return {};
     return {
         artist: parsed.artist || "Unknown",
         title: parsed.title || "Unknown",

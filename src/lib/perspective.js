@@ -141,13 +141,15 @@ export async function warpImage(image, corners) {
     srcCanvas.width = image.naturalWidth || image.width;
     srcCanvas.height = image.naturalHeight || image.height;
     const srcCtx = srcCanvas.getContext('2d');
+    let srcData;
     try {
         srcCtx.drawImage(image, 0, 0);
+        srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height).data;
     } catch (e) {
-        throw new Error("Cannot access image data (CORS or Load Error)");
+        console.error("Canvas Security Error:", e);
+        throw new Error("Cannot access image data. Possible CORS issue. " + e.message);
     }
 
-    const srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height).data;
     const srcWidth = srcCanvas.width;
     const srcHeight = srcCanvas.height;
 

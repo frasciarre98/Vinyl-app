@@ -111,6 +111,7 @@ export function PerspectiveCropper({ imageSrc, onComplete, onCancel }) {
                     <img
                         src={imageSrc}
                         onLoad={onImgLoad}
+                        crossOrigin="anonymous"
                         className="max-h-[50vh] max-w-[80vw] select-none pointer-events-none block"
                         alt="Perspective Target"
                     />

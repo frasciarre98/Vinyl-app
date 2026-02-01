@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug } from 'lucide-react';
 import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
-import { databases, storage, DATABASE_ID, BUCKET_ID } from '../lib/appwrite';
-import { ID, Query } from 'appwrite';
+import { pb } from '../lib/pocketbase';
 
 // Error Boundary for debugging
 class ErrorBoundary extends React.Component {
@@ -84,14 +83,13 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
             setProgress({});
             const fetchExisting = async () => {
                 try {
-                    const response = await databases.listDocuments(
-                        DATABASE_ID,
-                        'vinyls',
-                        [Query.select(['original_filename']), Query.limit(1000)]
-                    );
+                    // PocketBase list
+                    const records = await pb.collection('vinyls').getList(1, 1000, {
+                        fields: 'original_filename',
+                    });
 
-                    if (response.documents) {
-                        setExistingFilenames(new Set(response.documents.map(d => d.original_filename).filter(Boolean)));
+                    if (records.items) {
+                        setExistingFilenames(new Set(records.items.map(d => d.original_filename).filter(Boolean)));
                     }
                 } catch (err) {
                     console.error("Failed to check duplicates:", err);
@@ -205,47 +203,39 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                         // Don't verify or stop, just continue to upload
                     }
 
-                    // 2. Upload to Storage
+                    // 2. Upload to PB (Create Record with File)
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 50, error: null } }));
 
-                    const fileUpload = await storage.createFile(
-                        BUCKET_ID,
-                        ID.unique(),
-                        optimizedFile // Upload the optimized file
-                    );
+                    const formData = new FormData();
+                    formData.append('image', optimizedFile);
 
-                    // Get View URL
-                    const publicUrlResult = storage.getFileView(BUCKET_ID, fileUpload.$id);
-                    const publicUrl = publicUrlResult.href ? publicUrlResult.href : publicUrlResult.toString();
+                    // Add Metadata
+                    const metadata = {
+                        // Use AI metadata if available, otherwise defaults to 'Pending AI' for retry later
+                        artist: String(aiMetadata.artist || (apiKey ? 'Pending AI' : 'Unknown Artist')).substring(0, 100),
+                        title: String(aiMetadata.title || file.name.replace(/\.[^/.]+$/, "")).substring(0, 100),
+                        genre: String(aiMetadata.genre || '').substring(0, 50),
+                        year: String(aiMetadata.year || '').substring(0, 50),
+                        notes: String(aiMetadata.notes || '').substring(0, 1000),
+                        tracks: String(aiMetadata.tracks || '').substring(0, 5000),
+                        group_members: String(aiMetadata.group_members || '').substring(0, 255),
+                        condition: String(aiMetadata.condition || '').substring(0, 50),
+                        avarege_cost: String(aiMetadata.average_cost || '').substring(0, 50),
+                        original_filename: file.name,
+                        format: currentFormat
+                    };
+
+                    for (const [key, value] of Object.entries(metadata)) {
+                        formData.append(key, value);
+                    }
 
                     // 3. Insert to DB
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'saving', progress: 80, error: null } }));
 
-                    const dbData = await databases.createDocument(
-                        DATABASE_ID,
-                        'vinyls',
-                        ID.unique(),
-                        {
-                            image_url: publicUrl,
-                            // Use AI metadata if available, otherwise defaults
-                            // Use AI metadata if available, otherwise defaults to 'Pending AI' for retry later
-                            artist: String(aiMetadata.artist || (apiKey ? 'Pending AI' : 'Unknown Artist')).substring(0, 100),
-                            title: String(aiMetadata.title || file.name.replace(/\.[^/.]+$/, "")).substring(0, 100),
-                            genre: String(aiMetadata.genre || '').substring(0, 50),
-                            // SAFE CAST for year to String(50) to prevent Appwrite errors
-                            year: String(aiMetadata.year || '').substring(0, 50),
-                            notes: String(aiMetadata.notes || '').substring(0, 1000),
-                            tracks: String(aiMetadata.tracks || '').substring(0, 5000),
-                            group_members: String(aiMetadata.group_members || '').substring(0, 255),
-                            condition: String(aiMetadata.condition || '').substring(0, 50),
-                            // Sanitise cost to strict String(50) for DB
-                            avarege_cost: String(aiMetadata.average_cost || '').substring(0, 50),
-                            original_filename: file.name,
-                            format: currentFormat
-                        }
-                    );
+                    const record = await pb.collection('vinyls').create(formData);
+                    const publicUrl = pb.files.getUrl(record, record.image);
 
-                    uploadedRecords.push({ id: dbData.$id, file, name: file.name, publicUrl });
+                    uploadedRecords.push({ id: record.id, file, name: file.name, publicUrl });
 
                     // 4. Complete
                     setProgress(prev => ({

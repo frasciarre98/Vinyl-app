@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle, Youtube } from 'lucide-react';
-import { databases, DATABASE_ID } from '../lib/appwrite';
+import { pb } from '../lib/pocketbase';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
+
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip, onViewDetail }) {
     const [analyzing, setAnalyzing] = useState(false);
@@ -38,7 +40,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
             const analysis = await analyzeImageUrl(localVinyl.image_url, apiKey, hint);
 
-            // Update Appwrite
+            // Update Database
             // Update Supabase (Adaptive: Try Full, Fallback to Basic)
             const fullUpdate = {
                 artist: analysis.artist,
@@ -59,19 +61,13 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 delete fullUpdate.tracks;
             }
 
-            // Try Full Update - If this fails, it means Schema is missing attributes in Appwrite.
-            // We want to know WHICH one failed validation.
+            // Try Full Update
             try {
-                await databases.updateDocument(
-                    DATABASE_ID,
-                    'vinyls',
-                    localVinyl.id,
-                    fullUpdate
-                );
+                await pb.collection('vinyls').update(localVinyl.id, fullUpdate);
             } catch (fullError) {
-                console.error("APPWRITE UPDATE FAILED:", fullError);
+                console.error("DATABASE UPDATE FAILED:", fullError);
                 // Alert the user so they see it
-                alert(`Update Failed: ${fullError.message}. Check if 'average_cost', 'tracks', or 'group_members' exist in Appwrite Database Attributes.`);
+                alert(`Update Failed: ${fullError.message}. Check if 'average_cost', 'tracks', or 'group_members' exist in the database schema.`);
                 throw fullError;
             }
 
@@ -309,7 +305,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 ← Back to Cover
                             </button>
 
-                            {!selectionMode && (
+                            {!selectionMode && !IS_STATIC && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

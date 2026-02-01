@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, Euro, PlayCircle, Youtube, Wand2, Loader2 } from 'lucide-react';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
-import { databases, DATABASE_ID } from '../lib/appwrite';
+import { pb } from '../lib/pocketbase';
 
 const icons = { PlayCircle, Youtube }; // Quick fix for previous replacement using icons.Namespace
+
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit, onDelete }) {
     // Local state to handle updates immediately
@@ -45,7 +47,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
 
             const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
-            // Appwrite Update
+            // Database Update
             const fullUpdate = {
                 artist: analysis.artist,
                 title: analysis.title,
@@ -54,7 +56,6 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                 notes: String(analysis.notes || '').substring(0, 4000),
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
-                avarege_cost: String(analysis.average_cost || '').substring(0, 50),
                 avarege_cost: String(analysis.average_cost || '').substring(0, 50),
                 tracks: String(analysis.tracks || '').substring(0, 4999),
                 label: analysis.label || vinyl.label || '', // Preserve existing if not returned
@@ -67,12 +68,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                 delete fullUpdate.tracks;
             }
 
-            await databases.updateDocument(
-                DATABASE_ID,
-                'vinyls',
-                vinyl.id,
-                fullUpdate
-            );
+            await pb.collection('vinyls').update(vinyl.id, fullUpdate);
 
             // Update local view
             setVinyl(prev => ({ ...prev, ...analysis }));
@@ -97,19 +93,23 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                     <X className="w-8 h-8" />
                 </button>
                 <div className="flex gap-2">
-                    <button
-                        onClick={handleAnalyze}
-                        disabled={analyzing}
-                        className={`p-2 rounded-full transition-all ${analyzing ? 'bg-yellow-500/20 text-yellow-400' : 'text-purple-400 hover:text-purple-300 bg-purple-500/10'}`}
-                    >
-                        {analyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wand2 className="w-6 h-6" />}
-                    </button>
-                    <button
-                        onClick={() => onEdit(vinyl)}
-                        className="p-2 text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-full"
-                    >
-                        <Edit2 className="w-6 h-6" />
-                    </button>
+                    {!IS_STATIC && (
+                        <>
+                            <button
+                                onClick={handleAnalyze}
+                                disabled={analyzing}
+                                className={`p-2 rounded-full transition-all ${analyzing ? 'bg-yellow-500/20 text-yellow-400' : 'text-purple-400 hover:text-purple-300 bg-purple-500/10'}`}
+                            >
+                                {analyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wand2 className="w-6 h-6" />}
+                            </button>
+                            <button
+                                onClick={() => onEdit(vinyl)}
+                                className="p-2 text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-full"
+                            >
+                                <Edit2 className="w-6 h-6" />
+                            </button>
+                        </>
+                    )}
 
                     {/* External Links - Transparent Mode */}
                     <a
@@ -128,19 +128,21 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                     >
                         <icons.Youtube className="w-6 h-6" />
                     </a>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (typeof onDelete !== 'function') {
-                                alert("Error: Delete function is missing. Please reload.");
-                                return;
-                            }
-                            onDelete(vinyl.id);
-                        }}
-                        className="p-2 text-white/40 hover:text-red-500 hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <Trash2 className="w-6 h-6" />
-                    </button>
+                    {!IS_STATIC && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (typeof onDelete !== 'function') {
+                                    alert("Error: Delete function is missing. Please reload.");
+                                    return;
+                                }
+                                onDelete(vinyl.id);
+                            }}
+                            className="p-2 text-white/40 hover:text-red-500 hover:bg-white/10 rounded-full transition-colors"
+                        >
+                            <Trash2 className="w-6 h-6" />
+                        </button>
+                    )}
                 </div>
             </div>
 
