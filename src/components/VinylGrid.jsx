@@ -328,9 +328,9 @@ export function VinylGrid({ refreshTrigger }) {
                 </div>
             )}
 
-            <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
-
-            <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
+            {!IS_STATIC && (
+                <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
+            )}
 
             {/* --- COLLECTION VALUE KPI --- */}
             <CollectionValueKPI vinyls={vinyls} />

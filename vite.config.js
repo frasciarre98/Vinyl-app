@@ -31,14 +31,25 @@ export default defineConfig({
 
             // 2. Git Automation
             process.stdout.write('  💾 Committing changes... ');
+            await runCommand('git config http.postBuffer 524288000'); // Increase buffer for large pushes
             await runCommand('git add .');
-            // We use || true to ignore "nothing to commit" errors
             await runCommand('git commit -m "🚀 Auto-publish collection" || true');
             console.log('DONE');
 
             process.stdout.write('  ☁️  Pushing to GitHub... ');
-            await runCommand('git push');
-            console.log('DONE');
+            try {
+              await runCommand('git push');
+              console.log('DONE');
+            } catch (pushErr) {
+              if (pushErr.includes('400') || pushErr.includes('postBuffer')) {
+                console.error('⚠️  Push failed due to size. Retrying with larger buffer...');
+                await runCommand('git config http.postBuffer 1048576000');
+                await runCommand('git push');
+                console.log('DONE (after retry)');
+              } else {
+                throw pushErr;
+              }
+            }
 
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
