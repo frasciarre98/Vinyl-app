@@ -11,11 +11,12 @@ import { analyzeImageUrl, getApiKey } from '../lib/openai';
 import { SearchableSelect } from './SearchableSelect';
 import staticData from '../data/vinyls-static.json';
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
 
 export function VinylGrid({ refreshTrigger }) {
     const [vinyls, setVinyls] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [trackSearch, setTrackSearch] = useState('');
     const [selectedArtist, setSelectedArtist] = useState('');
@@ -59,14 +60,15 @@ export function VinylGrid({ refreshTrigger }) {
             setLoading(true);
 
             if (IS_STATIC) {
-                console.log("📁 Running in STATIC MODE (Reading from JSON)");
+                console.log("📁 Running in STATIC MODE (Reading from JSON)", staticData?.length, "records");
                 // Static data already has image_url mapped to /storage/...
-                // Map PB 'created' to '$createdAt' for compatibility if needed
-                const allVinyls = staticData.map(doc => ({
+                const allVinyls = (staticData || []).map(doc => ({
                     ...doc,
                     $createdAt: doc.created || doc.$createdAt || new Date().toISOString()
                 }));
+                console.log("✅ Static records mapped:", allVinyls.length);
                 setVinyls(allVinyls);
+                setLoading(false); // <--- Explicitly set here just in case
                 return;
             }
 
@@ -83,8 +85,10 @@ export function VinylGrid({ refreshTrigger }) {
             setVinyls(allVinyls);
             setSelectedIds([]);
             setIsSelectionMode(false);
+            setError(null);
         } catch (err) {
             console.error('Error fetching vinyls:', err);
+            setError(`Connection Failed: ${err.message}. Ensure you are on the same WiFi as the Mac.`);
         } finally {
             setLoading(false);
         }
@@ -370,6 +374,18 @@ export function VinylGrid({ refreshTrigger }) {
                 )}
             </div>
 
+            {/* Mobile Artist Quick Search */}
+            <div className="md:hidden px-4 -mt-2 mb-4">
+                <SearchableSelect
+                    options={uniqueArtists}
+                    value={selectedArtist}
+                    onChange={setSelectedArtist}
+                    placeholder="Filter by Artist..."
+                    className="w-full"
+                    icon={Search}
+                />
+            </div>
+
             {/* --- MOBILE BOTTOM SHEET FILTERS --- */}
             {isFiltersOpen && <div className="fixed inset-0 bg-black/60 z-50 md:hidden backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsFiltersOpen(false)} />}
             <div className={`fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-white/10 rounded-t-3xl p-6 md:hidden transition-transform duration-300 ease-out shadow-2xl ${isFiltersOpen ? 'translate-y-0' : 'translate-y-full'}`}>
@@ -377,7 +393,16 @@ export function VinylGrid({ refreshTrigger }) {
                 <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Filters</h3>{activeFiltersCount > 0 && <button onClick={resetFilters} className="text-sm text-red-400 font-medium">Reset All</button>}</div>
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto pb-8">
                     <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Track Name</label><div className="relative"><input type="text" name="mobile_track_search" autoComplete="off" value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} placeholder="Search for a song..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder-white/30" /></div></div>
-                    <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Artist</label><div className="relative"><select value={selectedArtist} onChange={(e) => setSelectedArtist(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="">All Artists</option>{uniqueArtists.map((artist, i) => <option key={i} value={artist}>{artist}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
+                    <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Artist</label>
+                        <SearchableSelect
+                            options={uniqueArtists}
+                            value={selectedArtist}
+                            onChange={setSelectedArtist}
+                            placeholder="Search artist..."
+                            className="w-full"
+                        />
+                    </div>
                     <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Genre</label><div className="relative"><select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
                     <div className="space-y-2"><label className="text-xs uppercase tracking-wider text-white/40 font-bold ml-1">Rating</label><div className="relative"><select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="w-full appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"><option value="0">Any Rating</option><option value="needs_attention">⚠ Needs Attention</option><option value="5">Excellent (5 Stars)</option><option value="4">Great (4+ Stars)</option><option value="3">Good (3+ Stars)</option><option value="unrated">Unrated</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" /></div></div>
                 </div>
@@ -443,13 +468,7 @@ export function VinylGrid({ refreshTrigger }) {
 
             {/* Grid */}
             <div className="relative">
-                {loading && (
-                    <div className="absolute inset-0 z-10 flex items-start justify-center pt-40 bg-background/50 backdrop-blur-[1px]">
-                        <Loader2 className="w-10 h-10 animate-spin text-primary sticky top-40" />
-                    </div>
-                )}
-
-                {filteredVinyls.length === 0 && !loading ? (
+                {filteredVinyls.length === 0 && !loading && !error ? (
                     <div className="text-center py-20 text-secondary">
                         <p className="text-xl font-light">No records found.</p>
                         <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>

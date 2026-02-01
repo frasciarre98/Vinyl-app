@@ -5,7 +5,7 @@ import { pb } from '../lib/pocketbase';
 
 const icons = { PlayCircle, Youtube }; // Quick fix for previous replacement using icons.Namespace
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
 
 export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit, onDelete }) {
     // Local state to handle updates immediately

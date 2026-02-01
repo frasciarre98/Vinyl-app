@@ -3,7 +3,7 @@ import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircl
 import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
 
 export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) {
     const [isExporting, setIsExporting] = useState(false);
