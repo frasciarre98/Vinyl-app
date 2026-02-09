@@ -30,7 +30,8 @@ export function VinylGrid({ refreshTrigger }) {
     }, [sortOrder]);
 
     // Pagination State (Local Performance Optimization)
-    const [visibleCount, setVisibleCount] = useState(24);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 12; // Reduced to 12 for maximum mobile stability
 
     // Selection Mode State
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -43,13 +44,22 @@ export function VinylGrid({ refreshTrigger }) {
     const [editingVinyl, setEditingVinyl] = useState(null); // Local state for Edit Modal
     const [isSearchExpanded, setIsSearchExpanded] = useState(false); // For mobile compacted search
 
+    // Reset pagination when any filter changes to prevent massive renders
     useEffect(() => {
+        // console.log("Resetting to Page 1 due to filter change:", { search, trackSearch, selectedArtist, selectedGenre, selectedRating, sortOrder });
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        }
+    }, [search, trackSearch, selectedArtist, selectedGenre, selectedRating, sortOrder]);
+
+    useEffect(() => {
+        console.log('🔄 VinylGrid: refreshTrigger changed to', refreshTrigger);
         fetchVinyls();
     }, [refreshTrigger]);
 
     // Compute Filter Options
-    const uniqueArtists = [...new Set(vinyls.map(v => v.artist).filter(Boolean).sort())];
-    const uniqueGenres = [...new Set(vinyls.map(v => v.genre).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
+    const uniqueArtists = [...new Set(vinyls.map(v => String(v.artist || '')).filter(Boolean).sort())];
+    const uniqueGenres = [...new Set(vinyls.map(v => String(v.genre || '')).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
 
     // Compute Format Counts
     const vinylCount = vinyls.filter(v => !v.format || v.format === 'Vinyl').length;
@@ -73,13 +83,19 @@ export function VinylGrid({ refreshTrigger }) {
             }
 
             const records = await pb.collection('vinyls').getFullList({
+                sort: '-created',
                 requestKey: null
             });
 
+            console.log("🔍 Loaded", records.length, "records. Sample:", records[0]); // Debug Log
+
             const allVinyls = records.map(doc => ({
                 ...doc,
-                $createdAt: doc.created,
-                image_url: doc.image ? pb.files.getUrl(doc, doc.image) : null
+                $createdAt: doc.created || new Date(0).toISOString(),
+                // Use 400x400 thumbnail for grid performance (PocketBase default quality)
+                image_url: doc.image ? pb.files.getUrl(doc, doc.image, { thumb: '400x400' }) : null,
+                // Store full res url for Detail Modal
+                full_image_url: doc.image ? pb.files.getUrl(doc, doc.image) : null
             }));
 
             setVinyls(allVinyls);
@@ -134,7 +150,7 @@ export function VinylGrid({ refreshTrigger }) {
             executePermanentDelete(itemsToDelete);
             setDeletedItems([]);
             undoTimeoutRef.current = null;
-        }, 600000);
+        }, 5000); // Reduced to 5 seconds
     };
 
     const handleUndo = () => {
@@ -169,8 +185,15 @@ export function VinylGrid({ refreshTrigger }) {
                 try {
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, `${vinyl.artist} - ${vinyl.title}`);
                     if (analysis.average_cost) {
-                        await pb.collection('vinyls').update(vinyl.id, { average_cost: analysis.average_cost });
-                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, average_cost: analysis.average_cost } : v));
+                        const updateData = {
+                            average_cost: analysis.average_cost,
+                            // Also save label, catalog_number, edition if returned
+                            label: String(analysis.label || '').substring(0, 100),
+                            catalog_number: String(analysis.catalog_number || '').substring(0, 50),
+                            edition: String(analysis.edition || '').substring(0, 100)
+                        };
+                        await pb.collection('vinyls').update(vinyl.id, updateData);
+                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...updateData } : v));
                         count++;
                     }
                     await new Promise(r => setTimeout(r, 1000));
@@ -230,8 +253,12 @@ export function VinylGrid({ refreshTrigger }) {
                         notes: String(analysis.notes || '').substring(0, 4000),
                         group_members: analysis.group_members,
                         condition: analysis.condition,
-                        avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-                        tracks: analysis.tracks
+                        average_cost: String(analysis.average_cost || '').substring(0, 50),
+                        tracks: analysis.tracks,
+                        // CRITICAL: Save label, catalog_number, edition
+                        label: String(analysis.label || '').substring(0, 100),
+                        catalog_number: String(analysis.catalog_number || '').substring(0, 50),
+                        edition: String(analysis.edition || '').substring(0, 100)
                     };
 
                     if (vinyl.is_tracks_validated) {
@@ -281,13 +308,18 @@ export function VinylGrid({ refreshTrigger }) {
 
             let matchesRating = true;
             if (selectedRating === 'needs_attention') {
-                // Filter for Errors OR Missing key metadata
-                matchesRating = (vinyl.artist === 'Error' ||
-                    vinyl.artist === 'Pending AI' ||
+                // Filter for Errors OR Missing key metadata (aligned with BatchAnalysisBanner)
+                const isErrorOrPending = vinyl.artist === 'Error' || vinyl.artist === 'Pending AI';
+                const isMissingDetails = !vinyl.label ||
+                    !vinyl.edition ||
+                    !vinyl.average_cost;
+
+                matchesRating = isErrorOrPending ||
                     !vinyl.artist ||
                     vinyl.artist === 'Unknown Artist' ||
                     !vinyl.title ||
-                    vinyl.title === 'Unknown Title');
+                    vinyl.title === 'Unknown Title' ||
+                    isMissingDetails;
             } else if (selectedRating === 'unrated') {
                 matchesRating = !vinyl.rating || vinyl.rating === 0;
             } else if (selectedRating !== '0') {
@@ -304,22 +336,62 @@ export function VinylGrid({ refreshTrigger }) {
             if (sortOrder === 'artist_asc') {
                 return (a.artist || '').localeCompare(b.artist || '');
             }
-            return new Date(b.$createdAt) - new Date(a.$createdAt);
+            // Robust Date Sort with Image Timestamp & ID fallback
+            // Simple, Robust Date Sort
+            const getTimestamp = (record) => {
+                let dateStr = record.created || record.$createdAt;
+                // DEBUG LOG for the first few items to see what we are getting
+                // if (Math.random() < 0.01) console.log("Sort Date:", dateStr, record.id);
+
+                if (!dateStr) return 0;
+                // Ensure ISO format for Safari/Mobile compatibility
+                if (typeof dateStr === 'string' && dateStr.includes(" ") && !dateStr.includes("T")) {
+                    dateStr = dateStr.replace(" ", "T");
+                }
+                const ts = new Date(dateStr).getTime();
+                return isNaN(ts) ? 0 : ts;
+            };
+
+            const dateA = getTimestamp(a);
+            const dateB = getTimestamp(b);
+
+            // Console log if NaN found
+            if (dateA === 0 && a.created) console.warn("Invalid Date A:", a.created);
+            if (dateB === 0 && b.created) console.warn("Invalid Date B:", b.created);
+
+            if (dateA !== dateB) {
+                return dateB - dateA; // Newest first
+            }
+
+            // Fallback to ID
+            return (b.id || '').localeCompare(a.id || '');
         });
 
         return result;
     }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch]);
 
-    const visibleVinyls = filteredVinyls.slice(0, visibleCount);
+    const totalPages = Math.ceil(filteredVinyls.length / pageSize);
+    const visibleVinyls = filteredVinyls.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-    const handleLoadMore = () => {
-        setVisibleCount(prev => prev + 24);
+    // --- PAGINATION LOGIC ---
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(prev => prev + 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(prev => prev - 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     };
 
     const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
     return (
-        <div className="space-y-6 relative pb-4 md:pb-0">
-            {/* --- UNDO TOAST --- */}
+        <div className="space-y-6 relative pb-24 md:pb-0">
+            {/* --- UNDO TOAST --- --- --- --- --- --- --- --- --- --- --- --- */}
             {deletedItems.length > 0 && (
                 <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] bg-zinc-900 border border-white/20 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300 backdrop-blur-md">
                     <span className="font-medium">
@@ -328,7 +400,7 @@ export function VinylGrid({ refreshTrigger }) {
                     <button onClick={handleUndo} className="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:bg-gray-200 active:scale-95 transition-all flex items-center gap-2">
                         <RotateCcw className="w-4 h-4" /> UNDO
                     </button>
-                    <button onClick={() => executePermanentDelete(deletedItems)} className="ml-2 text-white/20 hover:text-white transition-colors">✕</button>
+                    <button onClick={() => { executePermanentDelete(deletedItems); setDeletedItems([]); }} className="ml-2 text-white/20 hover:text-white transition-colors">✕</button>
                 </div>
             )}
 
@@ -466,6 +538,28 @@ export function VinylGrid({ refreshTrigger }) {
                 </div>
             </div>
 
+            {/* Error Display */}
+            {error && (
+                <div className="p-4 mb-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-200 text-center animate-in fade-in slide-in-from-top-4">
+                    <p className="font-bold mb-1">Error Loading Records</p>
+                    <p className="text-sm opacity-80">{error}</p>
+                    <button onClick={fetchVinyls} className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-full text-sm font-bold transition-colors">
+                        Retry Connection
+                    </button>
+                </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+                <div className="p-4 mb-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-200 text-center animate-in fade-in slide-in-from-top-4">
+                    <p className="font-bold mb-1">Connection Error</p>
+                    <p className="text-sm opacity-80">{error}</p>
+                    <button onClick={fetchVinyls} className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-full text-sm font-bold transition-colors">
+                        Retry Connection
+                    </button>
+                </div>
+            )}
+
             {/* Grid */}
             <div className="relative">
                 {filteredVinyls.length === 0 && !loading && !error ? (
@@ -474,7 +568,7 @@ export function VinylGrid({ refreshTrigger }) {
                         <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>
                     </div>
                 ) : (
-                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-4 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                    <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-4 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                         {visibleVinyls.map(vinyl => (
                             <VinylCard
                                 key={vinyl.id}
@@ -492,12 +586,88 @@ export function VinylGrid({ refreshTrigger }) {
                     </div>
                 )}
 
-                {/* Load More Button */}
-                {visibleCount < filteredVinyls.length && (
-                    <div className="flex justify-center py-4">
-                        <button onClick={handleLoadMore} className="px-8 py-3 bg-white/5 hover:bg-white/10 text-secondary hover:text-white rounded-full transition-colors border border-white/10 text-sm font-medium shadow-lg hover:shadow-xl active:scale-95">
-                            Load More ({filteredVinyls.length - visibleCount} remaining)
-                        </button>
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex flex-col items-center gap-4 py-8 pb-32 md:pb-8">
+                        <div className="flex items-center gap-2">
+                            {/* First Page */}
+                            <button
+                                onClick={() => { setCurrentPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                disabled={currentPage === 1}
+                                className={`p-2 rounded-full transition-colors ${currentPage === 1 ? 'text-white/30 cursor-not-allowed' : 'bg-white/10 hover:bg-white/20 text-white hover:shadow-lg active:scale-95'}`}
+                                title="First Page"
+                            >
+                                <span className="text-sm font-bold">«</span>
+                            </button>
+
+                            {/* Prev Page */}
+                            <button
+                                onClick={handlePrevPage}
+                                disabled={currentPage === 1}
+                                className={`px-5 py-2.5 rounded-full text-base font-bold transition-colors ${currentPage === 1 ? 'text-white/30 cursor-not-allowed hidden' : 'bg-white/10 hover:bg-white/20 text-white hover:shadow-lg active:scale-95'}`}
+                            >
+                                Prev
+                            </button>
+
+                            {/* Page Indicator & Selector */}
+                            <div className="flex items-center gap-2 bg-white/10 px-5 py-2.5 rounded-full border border-white/10">
+                                <span className="text-gray-200 text-sm font-medium">Page</span>
+                                <select
+                                    value={currentPage}
+                                    onChange={(e) => {
+                                        setCurrentPage(Number(e.target.value));
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    className="bg-transparent text-white text-lg font-bold outline-none text-center appearance-none cursor-pointer hover:text-accent transition-colors"
+                                >
+                                    {[...Array(totalPages)].map((_, i) => (
+                                        <option key={i + 1} value={i + 1} className="bg-slate-800 text-white text-base">
+                                            {i + 1}
+                                        </option>
+                                    ))}
+                                </select>
+                                <span className="text-gray-200 text-sm font-medium">of {totalPages}</span>
+                            </div>
+
+                            {/* Next Page */}
+                            <button
+                                onClick={handleNextPage}
+                                disabled={currentPage === totalPages}
+                                className={`px-5 py-2.5 rounded-full text-base font-bold transition-colors ${currentPage === totalPages ? 'text-white/30 cursor-not-allowed hidden' : 'bg-white/10 hover:bg-white/20 text-white hover:shadow-lg active:scale-95'}`}
+                            >
+                                Next
+                            </button>
+
+                            {/* Last Page */}
+                            <button
+                                onClick={() => { setCurrentPage(totalPages); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                disabled={currentPage === totalPages}
+                                className={`p-2 rounded-full transition-colors ${currentPage === totalPages ? 'text-white/20 cursor-not-allowed' : 'bg-white/5 hover:bg-white/10 text-white hover:shadow-lg active:scale-95'}`}
+                                title="Last Page"
+                            >
+                                <span className="text-xs font-bold">»</span>
+                            </button>
+                        </div>
+
+                        {/* Quick Jump Buttons (+5 / -5) */}
+                        <div className="flex gap-2">
+                            {currentPage > 5 && (
+                                <button
+                                    onClick={() => { setCurrentPage(p => Math.max(1, p - 5)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                    className="text-xs text-secondary hover:text-white px-3 py-1 bg-white/5 rounded-full"
+                                >
+                                    -5 Pages
+                                </button>
+                            )}
+                            {currentPage < totalPages - 5 && (
+                                <button
+                                    onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 5)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                    className="text-xs text-secondary hover:text-white px-3 py-1 bg-white/5 rounded-full"
+                                >
+                                    +5 Pages
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

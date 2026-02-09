@@ -26,6 +26,15 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
         };
     }, [isOpen]);
 
+    const missingFields = React.useMemo(() => {
+        if (!vinyl) return [];
+        const fields = [];
+        if (!vinyl.label || vinyl.label === 'Unknown') fields.push('Label');
+        if (!vinyl.edition || vinyl.edition === 'Unknown') fields.push('Edition');
+        if (!vinyl.average_cost) fields.push('Estimated Value');
+        return fields;
+    }, [vinyl]);
+
     if (!isOpen || !vinyl) return null;
 
     const handleAnalyze = async () => {
@@ -56,7 +65,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                 notes: String(analysis.notes || '').substring(0, 4000),
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
-                avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+                average_cost: String(analysis.average_cost || '').substring(0, 50),
                 tracks: String(analysis.tracks || '').substring(0, 4999),
                 label: analysis.label || vinyl.label || '', // Preserve existing if not returned
                 catalog_number: analysis.catalog_number || vinyl.catalog_number || '',
@@ -150,6 +159,17 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
                 <div className="flex flex-col min-h-full pb-20">
 
+                    {/* Missing Info Warning */}
+                    {missingFields.length > 0 && !IS_STATIC && (
+                        <div className="bg-yellow-500/20 border-b border-yellow-500/30 p-3 flex items-center justify-between animate-in fade-in slide-in-from-top duration-300">
+                            <div className="flex items-center gap-2 text-yellow-500 text-sm font-medium">
+                                <AlertCircle className="w-4 h-4" />
+                                <span>Missing: {missingFields.join(', ')}</span>
+                            </div>
+                            <span className="text-[10px] uppercase tracking-widest text-yellow-500/50">Needs AI or Manual Fix</span>
+                        </div>
+                    )}
+
                     {/* Large Cover Art with Gradient */}
                     <div className="relative w-full aspect-square max-h-[50vh] bg-black shrink-0">
                         {vinyl.image_url ? (
@@ -195,10 +215,10 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                                 <Disc className="w-4 h-4 text-secondary" />
                                 <span className="text-white">{vinyl.format || 'Vinyl'}</span>
                             </div>
-                            {(vinyl.avarege_cost || vinyl.average_cost) && (
+                            {vinyl.average_cost && (
                                 <div className="bg-green-900/20 px-4 py-2 rounded-full border border-green-500/20 flex items-center gap-2 text-green-400">
                                     <Euro className="w-4 h-4" />
-                                    {vinyl.avarege_cost || vinyl.average_cost}
+                                    {vinyl.average_cost}
                                 </div>
                             )}
                             {/* Rating Display */}
@@ -309,6 +329,6 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

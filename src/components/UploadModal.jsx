@@ -172,18 +172,32 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'preparing', progress: 5, error: null } }));
                     console.log(`Preparing ${file.name}...`);
 
-                    const compressedDataUrl = await resizeImage(file);
-                    const compressedBlob = await (await fetch(compressedDataUrl)).blob();
-                    // Create a manageable file object (e.g. < 1MB)
-                    const optimizedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+                    let optimizedFile = file;
+                    try {
+                        const compressedDataUrl = await resizeImage(file);
+                        const compressedBlob = await (await fetch(compressedDataUrl)).blob();
+                        // Create a manageable file object (e.g. < 1MB)
+                        optimizedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+                        console.log(`Resized ${file.name} from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(optimizedFile.size / 1024 / 1024).toFixed(2)}MB`);
+                    } catch (resizeErr) {
+                        console.warn(`Resize failed for ${file.name}, using original:`, resizeErr);
+                        // If resize fails (e.g. memory issue on mobile), try with original file
+                        // This is risky but better than crashing
+                        if (file.size > 5 * 1024 * 1024) { // > 5MB
+                            throw new Error(`Image too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please use a smaller image or try from desktop.`);
+                        }
+                    }
 
-                    // 1. Client-Side AI Analysis (With Timeout)
-                    setProgress(prev => ({ ...prev, [file.name]: { status: 'analyzing', progress: 20, error: null } }));
+                    // 1. SKIP AI Analysis During Upload (User will trigger manually via BatchAnalysisBanner)
+                    // This allows fast photo uploads without waiting for AI processing
+                    setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 20, error: null } }));
 
                     let aiMetadata = {};
+                    // AI Analysis is now DISABLED during upload for faster performance
+                    // Users can trigger batch analysis after upload via the banner
+                    /* DISABLED - AI Analysis moved to manual trigger
                     try {
                         if (apiKey) {
-                            // 10s Timeout Race to prevent hanging
                             // Smart Hint: Use filename if it's not generic (IMG_XXXX)
                             let hint = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
                             if (/^(IMG|DSC|PXL|VIDEO|MOV|VID)[\d_-]/i.test(hint) || hint.length < 4) {
@@ -191,10 +205,11 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                             }
 
                             const aiPromise = analyzeImage(optimizedFile, hint);
-                            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Timeout (10s)")), 10000));
+                            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Timeout (30s)")), 30000));
 
                             aiMetadata = await Promise.race([aiPromise, timeoutPromise]);
-                            console.log("AI Analysis Success:", aiMetadata);
+                            console.log("✅ AI Analysis Success:", aiMetadata);
+                            console.log(`📊 Metadata completeness: ${Object.keys(aiMetadata).filter(k => aiMetadata[k] && aiMetadata[k] !== 'Unknown').length}/${Object.keys(aiMetadata).length} fields`);
                         } else {
                             console.log("No API Key, skipping AI analysis.");
                         }
@@ -202,6 +217,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                         console.warn("AI Analysis skipped:", aiErr);
                         // Don't verify or stop, just continue to upload
                     }
+                    */
 
                     // 2. Upload to PB (Create Record with File)
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 50, error: null } }));
@@ -211,8 +227,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
 
                     // Add Metadata
                     const metadata = {
-                        // Use AI metadata if available, otherwise defaults to 'Pending AI' for retry later
-                        artist: String(aiMetadata.artist || (apiKey ? 'Pending AI' : 'Unknown Artist')).substring(0, 100),
+                        // Since AI is skipped, mark as 'Pending AI' for batch processing later
+                        artist: 'Pending AI',
                         title: String(aiMetadata.title || file.name.replace(/\.[^/.]+$/, "")).substring(0, 100),
                         genre: String(aiMetadata.genre || '').substring(0, 50),
                         year: String(aiMetadata.year || '').substring(0, 50),
@@ -220,7 +236,11 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                         tracks: String(aiMetadata.tracks || '').substring(0, 5000),
                         group_members: String(aiMetadata.group_members || '').substring(0, 255),
                         condition: String(aiMetadata.condition || '').substring(0, 50),
-                        avarege_cost: String(aiMetadata.average_cost || '').substring(0, 50),
+                        average_cost: String(aiMetadata.average_cost || '').substring(0, 50),
+                        // CRITICAL: Save AI-analyzed fields that were previously missing
+                        label: String(aiMetadata.label || '').substring(0, 100),
+                        edition: String(aiMetadata.edition || '').substring(0, 100),
+                        catalog_number: String(aiMetadata.catalog_number || '').substring(0, 50),
                         original_filename: file.name,
                         format: currentFormat
                     };
@@ -240,7 +260,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                     // 4. Complete
                     setProgress(prev => ({
                         ...prev,
-                        [file.name]: { status: 'complete', progress: 100, dbId: dbData.$id, publicUrl }
+                        [file.name]: { status: 'complete', progress: 100, dbId: record.id, publicUrl }
                     }));
 
                 } catch (err) {
@@ -255,7 +275,12 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
             console.error("Upload error:", e);
         } finally {
             setUploading(false);
+            // Trigger refresh and close modal after upload
             onUploadComplete();
+            // Close modal after a short delay to show completion
+            setTimeout(() => {
+                onClose();
+            }, 500);
         }
     };
 

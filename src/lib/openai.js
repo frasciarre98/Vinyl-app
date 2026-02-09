@@ -32,6 +32,8 @@ export function getApiKey(provider = null) {
 export function saveApiKey(key, provider = 'gemini') {
     if (provider === 'openai') localStorage.setItem('openai_api_key', key);
     else localStorage.setItem('gemini_api_key', key);
+    // Auto-set provider to match the saved key
+    setProvider(provider);
 }
 
 export function getGeminiTier() {
@@ -108,14 +110,19 @@ export async function analyzeImage(file, hint = null) {
 // Wrapper for URLs (Batch Analysis)
 export async function analyzeImageUrl(publicUrl, apiKey, hint = null) {
     try {
+        console.log(`[Analysis] Fetching image: ${publicUrl}`);
         // Append timestamp to bypass browser cache (fixes CORS issues if cached without headers)
         const fetchUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-        const response = await fetch(fetchUrl).catch(err => {
-            throw new Error(`Could not access image. Possible CORS issue. \\nSolution: Check PocketBase file permissions.`);
-        });
-        if (!response.ok) throw new Error("Failed to download image from URL");
 
-        const blob = await response.blob();
+        let blob;
+        try {
+            const response = await fetch(fetchUrl, { mode: 'cors' });
+            if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+            blob = await response.blob();
+        } catch (imgErr) {
+            console.error("Image Fetch Error:", imgErr);
+            throw new Error(`Failed to download image from local server. Ensure you are on the same Wi-Fi. Details: ${imgErr.message}`);
+        }
 
         // Resize image to prevent massive payload/memory freeze (CRITICAL)
         const resizedBase64 = await resizeImage(blob);
@@ -125,8 +132,13 @@ export async function analyzeImageUrl(publicUrl, apiKey, hint = null) {
         // If apiKey is passed, use it, otherwise fetch based on provider
         const keyToUse = apiKey || getApiKey(provider);
 
-        if (provider === 'openai') return analyzeOpenAI(base64Content, keyToUse, hint, 'image/jpeg');
-        return analyzeGemini(base64Content, 'image/jpeg', keyToUse, hint);
+        try {
+            if (provider === 'openai') return await analyzeOpenAI(base64Content, keyToUse, hint, 'image/jpeg');
+            return await analyzeGemini(base64Content, 'image/jpeg', keyToUse, hint);
+        } catch (aiErr) {
+            console.error("AI Provider Error:", aiErr);
+            throw new Error(`AI Provider Connection Failed: ${aiErr.message}`);
+        }
 
     } catch (error) {
         throw error;
@@ -357,13 +369,17 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                 messages: [
                     {
                         role: "system",
-                        content: `You are an expert musicologist and archivist.
-Your goal is to provide **Forensic Level Metadata**.
-1. **Back Cover (Visual Truth):** If you see a tracklist, you are a SCANNER. Transcribe text EXACTLY as printed (including typos, e.g. "Liberi di- liberida"). Do not correct it.
-2. **Front Cover (Database Truth):** If using the database, finding the **Italian First Pressing** is mandatory for Italian artists. 
-   - For "Dirotta su Cuba", look for the 1994 CGD release.
-   - For "Formula 3", look for the original Numero Uno release.
-   - Do NOT use CD reissues with bonus tracks.`
+                        content: `You are an expert musicologist and **Professional Vinyl Appraiser**.
+Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuation**.
+1. **Back Cover (Visual Truth):** If you see a tracklist, you are a SCANNER. Transcribe text EXACTLY as printed.
+2. **Edition Identification:** Look for Catalog Numbers, Barcodes (post-1980), Label Logos, and Copyright dates.
+   - No Barcode? Likely pre-1980.
+   - "Digitally Remastered"? Modern Reissue.
+3. **Valuation Logic (EURO):**
+   - **Modern Reissue / Common Used:** €15 - €25 (The "20 euro" standard).
+   - **Vintage VG+ (1970s/80s):** €30 - €60 (Pink Floyd, Zeppelin etc. in used condition).
+   - **Rare Collector Items (1st Press):** €100 - €500+ (REQUIRE HARD PROOF).
+   - *Always provide a realistic VG+ range for the specific identified edition.*`
                     },
                     {
                         role: "user",
@@ -557,54 +573,77 @@ function normalizeParsedData(parsed) {
     };
 }
 
-// Helper to resize image using Canvas (Memory Optimized)
+// Helper to resize image using Canvas (Memory Optimized for Mobile)
 export function resizeImage(fileOrBlob) {
     return new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(fileOrBlob);
-        const img = new Image();
-        img.src = url;
+        try {
+            const url = URL.createObjectURL(fileOrBlob);
+            const img = new Image();
 
-        img.crossOrigin = 'Anonymous'; // Check for CORS
-        img.onload = () => {
-            try {
-                const maxWidth = 2048;
-                const maxHeight = 2048;
-                let width = img.width;
-                let height = img.height;
+            img.crossOrigin = 'Anonymous'; // Check for CORS
 
-                if (width > height) {
-                    if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
+            img.onload = () => {
+                try {
+                    // Reduced from 2048 to 1600 for better mobile compatibility
+                    const maxWidth = 1600;
+                    const maxHeight = 1600;
+                    let width = img.width;
+                    let height = img.height;
+
+                    console.log(`Original image size: ${width}x${height}`);
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
                     }
-                } else {
-                    if (height > maxHeight) {
-                        width *= maxHeight / height;
-                        height = maxHeight;
+
+                    console.log(`Resized to: ${Math.round(width)}x${Math.round(height)}`);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+
+                    if (!ctx) {
+                        URL.revokeObjectURL(url);
+                        reject(new Error("Failed to get canvas context"));
+                        return;
                     }
+
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Release source memory immediately
+                    URL.revokeObjectURL(url);
+
+                    // Reduced quality from 0.7 to 0.6 for smaller file size
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    resolve(dataUrl);
+                } catch (e) {
+                    URL.revokeObjectURL(url);
+                    console.error("Canvas processing error:", e);
+                    reject(new Error("Image processing failed: " + e.message));
                 }
+            };
 
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Release source memory immediately
+            img.onerror = (e) => {
                 URL.revokeObjectURL(url);
+                console.error("Image load error:", e);
+                reject(new Error("Image load failed. File may be corrupted or unsupported format."));
+            };
 
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                resolve(dataUrl);
-            } catch (e) {
-                URL.revokeObjectURL(url);
-                reject(new Error("Image processing failed: " + e.message));
-            }
-        };
+            img.src = url;
 
-        img.onerror = () => {
-            URL.revokeObjectURL(url);
-            reject(new Error("Image load failed"));
-        };
+        } catch (e) {
+            console.error("ResizeImage setup error:", e);
+            reject(new Error("Failed to initialize image resize: " + e.message));
+        }
     });
 }
 

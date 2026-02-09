@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle, Upload } from 'lucide-react';
 import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
+import { ImportModal } from './ImportModal';
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
 
 export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) {
     const [isExporting, setIsExporting] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
+
     // User state can be used if we want to show profile/logout in the header
     const [user, setUser] = useState(pb.authStore.model);
 
@@ -21,9 +24,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
         setIsExporting(true);
         try {
             // PocketBase: getFullList
-            const data = await pb.collection('vinyls').getFullList({
-                sort: '-created',
-            });
+            const data = await pb.collection('vinyls').getFullList();
 
             if (!data || data.length === 0) {
                 alert('No vinyls to export!');
@@ -31,22 +32,38 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             }
 
             // CSV Headers (Semicolon for Excel compatibility in IT/EU)
-            const headers = ['Title', 'Artist', 'Year', 'Genre', 'Group Members', 'Condition', 'Format', 'Notes', 'Tracks'];
-
+            const headers = [
+                'ID', 'Title', 'Artist', 'Year', 'Genre', 'Group Members',
+                'Condition', 'Format', 'Rating', 'Label', 'Catalog No.',
+                'Edition / Variant', 'Average Cost', 'Purchase Price',
+                'Purchase Year', 'Price Locked', 'Tracks Validated',
+                'Locked Fields', 'Notes', 'Tracks'
+            ];
             // Convert data to CSV format
             const csvRows = [
                 headers.join(';'), // Header row
                 ...data.map(row => {
                     return [
-                        `"${(row.title || '').replace(/"/g, '""')}"`,
-                        `"${(row.artist || '').replace(/"/g, '""')}"`,
-                        `"${(row.year || '').replace(/"/g, '""')}"`,
-                        `"${(row.genre || '').replace(/"/g, '""')}"`,
-                        `"${(row.group_members || '').replace(/"/g, '""')}"`,
-                        `"${(row.condition || '').replace(/"/g, '""')}"`,
-                        `"${(row.format || 'Vinyl').replace(/"/g, '""')}"`,
-                        `"${(row.notes || '').replace(/"/g, '""')}"`,
-                        `"${(row.tracks || '').replace(/"/g, '""').replace(/\n/g, ', ')}"` // Replace newlines with commas for single line
+                        `"${row.id}"`,
+                        `"${String(row.title || '').replace(/"/g, '""')}"`,
+                        `"${String(row.artist || '').replace(/"/g, '""')}"`,
+                        `"${String(row.year || '').replace(/"/g, '""')}"`,
+                        `"${String(row.genre || '').replace(/"/g, '""')}"`,
+                        `"${String(row.group_members || '').replace(/"/g, '""')}"`,
+                        `"${String(row.condition || '').replace(/"/g, '""')}"`,
+                        `"${String(row.format || 'Vinyl').replace(/"/g, '""')}"`,
+                        `"${row.rating || 0}"`,
+                        `"${String(row.label || '').replace(/"/g, '""')}"`,
+                        `"${String(row.catalog_number || '').replace(/"/g, '""')}"`,
+                        `"${String(row.edition || '').replace(/"/g, '""')}"`,
+                        `"${String(row.avarege_cost || row.average_cost || '').replace(/"/g, '""')}"`,
+                        `"${String(row.purchase_price || '').replace(/"/g, '""')}"`,
+                        `"${String(row.purchase_year || '').replace(/"/g, '""')}"`,
+                        `"${row.is_price_locked ? 'Yes' : 'No'}"`,
+                        `"${row.is_tracks_validated ? 'Yes' : 'No'}"`,
+                        `"${(Array.isArray(row.locked_fields) ? row.locked_fields : []).join(', ')}"`,
+                        `"${String(row.notes || '').replace(/"/g, '""')}"`,
+                        `"${String(row.tracks || '').replace(/"/g, '""').replace(/\n/g, ', ')}"`
                     ].join(';');
                 })
             ];
@@ -67,7 +84,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
         } catch (err) {
             console.error('Export failed:', err);
-            alert('Failed to export database. Check console for details.');
+            alert(`Export failed: ${err.message}`);
         } finally {
             setIsExporting(false);
         }
@@ -99,12 +116,12 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             {/* Fixed Background for Mobile Stability */}
             <div className="fixed inset-0 -z-50 bg-[#0f172a]" style={{
                 backgroundImage: `
-                    radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
-                    radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),
-                    radial-gradient(at 50% 50%, hsla(220, 60%, 92%, 1) 0, transparent 60%),
-                    radial-gradient(at 20% 80%, hsla(200, 50%, 85%, 1) 0, transparent 50%),
-                    radial-gradient(at 80% 90%, hsla(240, 40%, 88%, 1) 0, transparent 50%)
-                `
+                        radial-gradient(at 10% 20%, hsla(210, 60%, 85%, 1) 0, transparent 50%),
+                        radial-gradient(at 90% 10%, hsla(270, 40%, 88%, 1) 0, transparent 40%),
+                        radial-gradient(at 50% 50%, hsla(220, 60%, 92%, 1) 0, transparent 60%),
+                        radial-gradient(at 20% 80%, hsla(200, 50%, 85%, 1) 0, transparent 50%),
+                        radial-gradient(at 80% 90%, hsla(240, 40%, 88%, 1) 0, transparent 50%)
+                    `
             }} />
 
             <header className="glass-panel sticky top-0 z-50 border-b-0">
@@ -116,33 +133,56 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                         </h1>
                     </div>
 
-                    <nav className="flex items-center gap-4">
+                    <nav className="flex items-center gap-2 md:gap-4">
                         {!IS_STATIC && (
                             <>
+                                {/* Desktop: Full button with text */}
                                 <button
                                     onClick={handlePublish}
                                     disabled={isPublishing}
                                     className={`
-                                        flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all
-                                        ${isPublishing ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-600 text-white hover:bg-purple-500 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] active:scale-95'}
-                                    `}
+                                            hidden md:flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all
+                                            ${isPublishing ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-600 text-white hover:bg-purple-500 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] active:scale-95'}
+                                        `}
                                     title="Publish Static Mirror to Vercel"
                                 >
                                     {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
                                     <span>{isPublishing ? 'Publishing...' : 'Magic Publish'}</span>
                                 </button>
+
+                                {/* Mobile: Icon-only button */}
+                                <button
+                                    onClick={handlePublish}
+                                    disabled={isPublishing}
+                                    className={`
+                                            md:hidden p-2 rounded-full transition-all
+                                            ${isPublishing ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-600 text-white hover:bg-purple-500 active:scale-95'}
+                                        `}
+                                    title="Publish to Vercel"
+                                >
+                                    {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5" />}
+                                </button>
+
                                 <button
                                     onClick={handleExport}
                                     disabled={isExporting}
-                                    className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                    className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
                                     title="Export to Excel/CSV"
                                 >
                                     {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                                     <span className="hidden sm:inline">Export</span>
                                 </button>
                                 <button
+                                    onClick={() => setIsImportOpen(true)}
+                                    className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                    title="Import CSV"
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Import</span>
+                                </button>
+                                <button
                                     onClick={onOpenUpload}
-                                    className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
+                                    className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span>Add Vinyls</span>
@@ -171,13 +211,33 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 {children}
             </main>
 
+            {/* Floating Action Button for Mobile */}
+            {!IS_STATIC && (
+                <button
+                    onClick={onOpenUpload}
+                    className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center"
+                    title="Add Vinyls"
+                    aria-label="Add Vinyls"
+                >
+                    <Plus className="w-6 h-6" />
+                </button>
+            )}
+
+            <ImportModal
+                isOpen={isImportOpen}
+                onClose={() => setIsImportOpen(false)}
+                onComplete={() => {
+                    setIsImportOpen(false);
+                    // Force refresh
+                    window.location.reload();
+                }}
+            />
+
             <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-white/40 text-sm">
                     <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v2.2</span></p>
                 </div>
             </footer>
-
-
         </div>
     );
 }

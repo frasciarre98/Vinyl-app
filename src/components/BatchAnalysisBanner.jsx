@@ -13,7 +13,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
         vinyls.filter(v =>
             v.artist !== 'Pending AI' &&
             v.artist !== 'Error' &&
-            (!v.label || !v.catalog_number || !v.edition || !v.average_cost)
+            (!v.label || !v.edition || !v.average_cost)
         ),
         [vinyls]
     );
@@ -112,17 +112,33 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     group_members: analysis.group_members,
                     condition: analysis.condition,
                     // Sanitise cost to strict String(50)
-                    avarege_cost: String(analysis.average_cost || '').substring(0, 50),
+                    average_cost: String(analysis.average_cost || '').substring(0, 50),
                     tracks: analysis.tracks,
                     label: String(analysis.label || '').substring(0, 100),
                     catalog_number: String(analysis.catalog_number || '').substring(0, 50),
                     edition: String(analysis.edition || '').substring(0, 100)
                 };
 
-                // CRITICAL: Respect User Validation
-                if (item.is_tracks_validated) {
-                    addLog(`Created by User: Tracks are locked. Validated by User. Preserving...`, "info");
+                // CRITICAL: Respect locked_fields array (Field Protection System)
+                const lockedFields = Array.isArray(item.locked_fields) ? item.locked_fields : [];
+                let protectedCount = 0;
+
+                lockedFields.forEach(field => {
+                    if (fullUpdate.hasOwnProperty(field)) {
+                        delete fullUpdate[field];
+                        protectedCount++;
+                    }
+                });
+
+                // Legacy support: is_tracks_validated (backwards compatibility)
+                if (item.is_tracks_validated && !lockedFields.includes('tracks')) {
                     delete fullUpdate.tracks;
+                    protectedCount++;
+                }
+
+                // Log protection status
+                if (protectedCount > 0) {
+                    addLog(`🛡️ Protected ${protectedCount} field(s) from AI update`, "info");
                 }
 
                 // Update PocketBase with analysis results
@@ -270,7 +286,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                                 ? `Analyzing records... ${progress}% `
                                 : pendingItems.length > 0
                                     ? `${pendingItems.length} new records detected.`
-                                    : `${incompleteItems.length} records missing detailed metadata.`
+                                    : `${incompleteItems.length} records missing key release details (Label, Edition, or Price).`
                             }
                         </p>
                     </div>

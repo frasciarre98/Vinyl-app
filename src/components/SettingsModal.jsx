@@ -12,13 +12,22 @@ export function SettingsModal({ onClose, onSave }) {
     const [cleaning, setCleaning] = useState(false);
 
     useEffect(() => {
-        setApiKey(localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '');
+        // 1. Initial Load from LocalStorage
+        const localKey = localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
+        setApiKey(localKey);
         setOpenaiKey(localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY || '');
 
         const storedProvider = localStorage.getItem('ai_provider');
+        const envOpenAI = import.meta.env.VITE_OPENAI_API_KEY;
+        const envGemini = import.meta.env.VITE_GEMINI_API_KEY; // local variable for check
+
         if (storedProvider) {
             setProvider(storedProvider);
-        } else if (import.meta.env.VITE_OPENAI_API_KEY) {
+            // Safety Check: If user is on Gemini but has no key, switch to OpenAI if available
+            if (storedProvider === 'gemini' && !localStorage.getItem('gemini_api_key') && !envGemini && envOpenAI) {
+                setProvider('openai');
+            }
+        } else if (envOpenAI) {
             setProvider('openai');
         } else {
             setProvider('gemini');
@@ -26,14 +35,57 @@ export function SettingsModal({ onClose, onSave }) {
 
         setGeminiTierState(localStorage.getItem('gemini_tier') || 'free');
         setGeminiModel(localStorage.getItem('gemini_model') || 'auto');
+
+        // 2. AUTO-SYNC: Check Cloud (PocketBase) for API Key
+        const syncKey = async () => {
+            if (pb.authStore.isValid && pb.authStore.model) {
+                try {
+                    // Refresh user data to get latest custom fields
+                    const user = await pb.collection('users').getOne(pb.authStore.model.id);
+
+                    if (user.gemini_api_key && user.gemini_api_key.length > 10) {
+                        // FOUND IN CLOUD! Update LocalStorage if different
+                        if (user.gemini_api_key !== localKey) {
+                            console.log("☁️ Syncing API Key from Cloud to Device...");
+                            setApiKey(user.gemini_api_key);
+                            localStorage.setItem('gemini_api_key', user.gemini_api_key);
+                        }
+                    } else if (localKey && localKey.length > 10) {
+                        // FOUND LOCALLY BUT MISSING IN CLOUD! Push to Cloud
+                        console.log("☁️ Pushing Local API Key to Cloud...");
+                        await pb.collection('users').update(user.id, {
+                            gemini_api_key: localKey
+                        });
+                    }
+                } catch (err) {
+                    console.error("Sync Error:", err);
+                }
+            }
+        };
+
+        // Run sync after a short delay to ensure auth is ready
+        setTimeout(syncKey, 1000);
+
     }, []);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         localStorage.setItem('gemini_api_key', apiKey);
         localStorage.setItem('openai_api_key', openaiKey);
         localStorage.setItem('ai_provider', provider);
         localStorage.setItem('gemini_tier', geminiTier);
         localStorage.setItem('gemini_model', geminiModel);
+
+        // CLOUD SAVE: Also update the user profile
+        if (pb.authStore.isValid && pb.authStore.model && apiKey) {
+            try {
+                await pb.collection('users').update(pb.authStore.model.id, {
+                    gemini_api_key: apiKey
+                });
+                console.log("✅ API Key backed up to Cloud Account");
+            } catch (err) {
+                console.error("Failed to backup key to cloud:", err);
+            }
+        }
 
         onClose();
     };
@@ -144,12 +196,21 @@ export function SettingsModal({ onClose, onSave }) {
 
 
     const [duplicatesPreview, setDuplicatesPreview] = useState(null); // { groups: [], totalToDelete: 0 }
+    const [selectedForDeletion, setSelectedForDeletion] = useState(new Set()); // Set of IDs to delete
 
     const scanForDuplicates = async () => {
         setCleaning(true);
         try {
+            // FETCH OPTIMIZATION: Removed server-side sort to prevent 400 Errors on large datasets
             const vinyls = await pb.collection('vinyls').getFullList({
-                sort: '-created',
+                requestKey: null // disable auto-cancellation
+            });
+
+            // Sort client-side (Newest first) - Robust
+            vinyls.sort((a, b) => {
+                const dateA = a.created ? new Date(a.created).getTime() : 0;
+                const dateB = b.created ? new Date(b.created).getTime() : 0;
+                return dateB - dateA;
             });
 
             const groups = {};
@@ -186,12 +247,19 @@ export function SettingsModal({ onClose, onSave }) {
             if (duplicateGroups.length === 0) {
                 alert("No duplicates found!");
             } else {
+                // Initialize selection with all duplicates selected
+                const allDuplicateIds = new Set(
+                    duplicateGroups.flatMap(g => g.toDelete.map(d => d.id))
+                );
+                setSelectedForDeletion(allDuplicateIds);
                 setDuplicatesPreview(duplicateGroups);
             }
 
         } catch (e) {
-            console.error(e);
-            alert("Error scanning: " + e.message);
+            console.error("Scan error:", e);
+            let msg = e.message;
+            if (e.data) msg += "\nData: " + JSON.stringify(e.data);
+            alert("Error scanning details:\n" + msg);
         } finally {
             setCleaning(false);
         }
@@ -199,25 +267,75 @@ export function SettingsModal({ onClose, onSave }) {
 
     const confirmCleanup = async () => {
         if (!duplicatesPreview) return;
+
+        // Only delete selected items
+        const idsToDelete = Array.from(selectedForDeletion);
+
+        if (idsToDelete.length === 0) {
+            alert("No duplicates selected for deletion!");
+            return;
+        }
+
         setCleaning(true);
         try {
-            const allDeleteIds = duplicatesPreview.flatMap(g => g.toDelete.map(d => d.$id));
-
             // Chunk deletions to avoid limits
             const chunk = 5;
-            for (let i = 0; i < allDeleteIds.length; i += chunk) {
-                const batch = allDeleteIds.slice(i, i + chunk);
+            for (let i = 0; i < idsToDelete.length; i += chunk) {
+                const batch = idsToDelete.slice(i, i + chunk);
                 await Promise.all(batch.map(id => pb.collection('vinyls').delete(id)));
             }
 
-            alert(`Successfully deleted ${allDeleteIds.length} duplicates!`);
+            alert(`Successfully deleted ${idsToDelete.length} duplicates!`);
             window.location.reload();
         } catch (err) {
             alert("Error deleting: " + err.message);
         } finally {
             setCleaning(false);
             setDuplicatesPreview(null);
+            setSelectedForDeletion(new Set());
         }
+    };
+
+    // Toggle selection of a duplicate item
+    const toggleSelection = (id) => {
+        setSelectedForDeletion(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    // Swap keeper with a duplicate
+    const swapKeeper = (groupIdx, duplicateId) => {
+        setDuplicatesPreview(prev => {
+            const newGroups = [...prev];
+            const group = newGroups[groupIdx];
+
+            // Find the duplicate to promote
+            const duplicateIdx = group.toDelete.findIndex(d => d.id === duplicateId);
+            if (duplicateIdx === -1) return prev;
+
+            const newKeeper = group.toDelete[duplicateIdx];
+            const oldKeeper = group.keeper;
+
+            // Swap them
+            group.keeper = newKeeper;
+            group.toDelete = [oldKeeper, ...group.toDelete.filter((_, i) => i !== duplicateIdx)];
+
+            // Update selection: remove new keeper, add old keeper
+            setSelectedForDeletion(prevSel => {
+                const newSet = new Set(prevSel);
+                newSet.delete(newKeeper.id);
+                newSet.add(oldKeeper.id);
+                return newSet;
+            });
+
+            return newGroups;
+        });
     };
 
     return (
@@ -243,7 +361,8 @@ export function SettingsModal({ onClose, onSave }) {
                         <p className="text-sm text-secondary mb-2">
                             The system found {duplicatesPreview.length} duplicate groups.
                             <br /><span className="text-green-400">Green</span> = Keeping (Best Data).
-                            <br /><span className="text-red-400">Red</span> = Will be deleted.
+                            <br /><span className="text-red-400">Red</span> = Will be deleted (uncheck to keep).
+                            <br />Selected for deletion: <span className="text-yellow-400 font-bold">{selectedForDeletion.size}</span>
                         </p>
 
                         {duplicatesPreview.map((group, idx) => (
@@ -270,26 +389,50 @@ export function SettingsModal({ onClose, onSave }) {
                                     <Check className="w-6 h-6 text-green-500 flex-shrink-0" />
                                 </div>
                                 {/* Deletions */}
-                                {group.toDelete.map(d => (
-                                    <div key={d.$id} className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/30 rounded mb-1 last:mb-0 opacity-70 hover:opacity-100 transition-opacity">
-                                        <div className="flex items-center gap-4">
-                                            {d.image ? (
-                                                <img src={pb.files.getUrl(d, d.image)} alt="Delete" className="w-24 h-24 rounded object-cover grayscale border border-red-500/30" />
-                                            ) : (
-                                                <div className="w-24 h-24 rounded bg-white/5 flex items-center justify-center border border-white/10">
-                                                    <span className="text-xs text-white/30">No Img</span>
-                                                </div>
-                                            )}
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-red-400 mb-1">DELETE</span>
-                                                <div className="text-sm text-red-200">
-                                                    {d.year || 'No Year'} • {d.quality || 'No Quality'}
+                                {group.toDelete.map(d => {
+                                    const isSelected = selectedForDeletion.has(d.id);
+                                    return (
+                                        <div key={d.id} className={`flex items-center justify-between p-2 border rounded mb-1 last:mb-0 transition-all ${isSelected
+                                            ? 'bg-red-500/10 border-red-500/30 opacity-70 hover:opacity-100'
+                                            : 'bg-gray-500/10 border-gray-500/30 opacity-40'
+                                            }`}>
+                                            <div className="flex items-center gap-3">
+                                                {/* Checkbox */}
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleSelection(d.id)}
+                                                    className="w-5 h-5 cursor-pointer accent-red-500"
+                                                />
+                                                {d.image ? (
+                                                    <img src={pb.files.getUrl(d, d.image)} alt="Delete" className={`w-20 h-20 rounded object-cover border ${isSelected ? 'grayscale border-red-500/30' : 'border-gray-500/30'}`} />
+                                                ) : (
+                                                    <div className="w-20 h-20 rounded bg-white/5 flex items-center justify-center border border-white/10">
+                                                        <span className="text-xs text-white/30">No Img</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex flex-col flex-1">
+                                                    <span className={`text-xs font-bold mb-1 ${isSelected ? 'text-red-400' : 'text-gray-400 line-through'}`}>
+                                                        {isSelected ? 'DELETE' : 'KEEPING'}
+                                                    </span>
+                                                    <div className={`text-sm ${isSelected ? 'text-red-200' : 'text-gray-400'}`}>
+                                                        {d.year || 'No Year'} • {d.quality || 'No Quality'}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => swapKeeper(idx, d.id)}
+                                                    className="px-2 py-1 text-xs bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 rounded text-blue-300 transition-colors"
+                                                    title="Make this the keeper"
+                                                >
+                                                    ↑ Keep This
+                                                </button>
+                                                {isSelected && <Trash2 className="w-5 h-5 text-red-500 flex-shrink-0" />}
+                                            </div>
                                         </div>
-                                        <Trash2 className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>
@@ -475,11 +618,14 @@ export function SettingsModal({ onClose, onSave }) {
                             </button>
                             <button
                                 onClick={confirmCleanup}
-                                disabled={cleaning}
-                                className="flex items-center gap-2 bg-red-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-500 transition-all shadow-lg"
+                                disabled={cleaning || selectedForDeletion.size === 0}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all shadow-lg ${selectedForDeletion.size === 0
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    : 'bg-red-600 text-white hover:bg-red-500'
+                                    }`}
                             >
                                 {cleaning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                Confirm Delete ({duplicatesPreview.reduce((acc, g) => acc + g.toDelete.length, 0)})
+                                Confirm Delete ({selectedForDeletion.size})
                             </button>
                         </>
                     ) : (

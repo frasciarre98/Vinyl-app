@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera } from 'lucide-react';
+import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { resizeImage } from '../lib/openai';
 import Cropper from 'react-easy-crop';
@@ -27,6 +27,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         purchase_price: '',
         purchase_year: ''
     });
+    const [lockedFields, setLockedFields] = useState([]);
     const [saving, setSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef(null);
@@ -63,6 +64,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 purchase_price: vinyl.purchase_price || '',
                 purchase_year: vinyl.purchase_year || ''
             });
+            setLockedFields(vinyl.locked_fields || []);
         }
     }, [vinyl]);
 
@@ -74,10 +76,11 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         try {
             // Map average_cost to avarege_cost (DB typo) and sanitize
             const cleanCost = String(formData.average_cost || '').substring(0, 50);
-            const payload = { ...formData, avarege_cost: cleanCost };
-            delete payload.average_cost;
 
             // PocketBase update
+            const payload = { ...formData, avarege_cost: cleanCost, locked_fields: lockedFields };
+            delete payload.average_cost;
+
             await pb.collection('vinyls').update(vinyl.id, payload);
             onUpdate();
             onClose();
@@ -130,82 +133,21 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
     const handleEditExisting = async () => {
         if (!vinyl.image_url) return;
-        setUploadingImage(true);
-        try {
-            let fetchUrl;
-            let fetchHeaders = { 'Cache-Control': 'no-cache' };
-
-            if (import.meta.env.DEV) {
-                // Localhost: Direct fetch
-                fetchUrl = vinyl.image_url;
-            } else {
-                // Production: Use Proxy if needed, or direct if allowed
-                // For now, assume direct fetch works for PocketBase unless blocked
-                fetchUrl = vinyl.image_url;
-            }
-
-            console.log("Fetching Image (Mode: " + (import.meta.env.DEV ? "DEV" : "PROD") + "):", fetchUrl);
-
-            // Fetch blob
-            const response = await fetch(fetchUrl, {
-                mode: 'cors',
-                headers: fetchHeaders
-            });
-            if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-
-            setCropImageSrc(objectUrl);
-            setIsCropping(true);
-            setZoom(1);
-            setRotation(0);
-        } catch (error) {
-            console.error("Failed to load image for cropping:", error);
-
-            if (error.message.includes("401")) {
-                alert("🔒 ACCESS DENIED (401)\n\nStorage permission error. Please check your PocketBase collection API rules.");
-            } else {
-                alert(`DEBUG ERROR:\nURL: ${fetchUrl}\nERR: ${error.message}`);
-            }
-
-            // Fallback
-            fileInputRef.current?.click();
-        } finally {
-            setUploadingImage(false);
-        }
+        // DIRECT URL MODE: Bypass Manual Fetch to avoid Mobile constraints
+        // We let the 'img' tag in the Cropper handle the loading with crossorigin="anonymous"
+        // This usually works better for PocketBase served files.
+        setCropImageSrc(vinyl.image_url);
+        setIsCropping(true);
+        setZoom(1);
+        setRotation(0);
     };
 
     const handleStartPerspective = async () => {
         if (!vinyl.image_url) return;
-        setUploadingImage(true);
-        try {
-            let fetchUrl;
-            let fetchHeaders = { 'Cache-Control': 'no-cache' };
-
-            fetchUrl = vinyl.image_url;
-
-            const response = await fetch(fetchUrl, {
-                mode: 'cors',
-                headers: fetchHeaders
-            });
-            if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-
-            setCropImageSrc(objectUrl);
-            setIsCropping(true);
-            setPerspectiveMode(true);
-        } catch (error) {
-            console.error("Failed to load image for perspective:", error);
-
-            if (error.message.includes("401")) {
-                alert("🔒 ACCESS DENIED (401)\n\nStorage permission error. Please check your PocketBase collection API rules.");
-            } else {
-                alert(`DEBUG ERROR (Perspective):\nURL: ${fetchUrl}\nERR: ${error.message}`);
-            }
-        } finally {
-            setUploadingImage(false);
-        }
+        // DIRECT URL MODE
+        setCropImageSrc(vinyl.image_url);
+        setIsCropping(true);
+        setPerspectiveMode(true);
     };
 
     const handleSavePerspective = async (blob) => {
@@ -295,6 +237,25 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             is_tracks_validated: true // Auto-check validation on manual edit
         }));
     };
+
+    const toggleLock = (fieldName) => {
+        setLockedFields(prev =>
+            prev.includes(fieldName)
+                ? prev.filter(f => f !== fieldName)
+                : [...prev, fieldName]
+        );
+    };
+
+    const FieldLock = ({ field }) => (
+        <button
+            type="button"
+            onClick={() => toggleLock(field)}
+            title={lockedFields.includes(field) ? "Locked - AI will not modify this" : "Unlocked - AI can update this"}
+            className={`transition-all p-1 rounded-md ${lockedFields.includes(field) ? 'text-primary bg-primary/10' : 'text-white/20 hover:text-white/40 hover:bg-white/5'}`}
+        >
+            {lockedFields.includes(field) ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+        </button>
+    );
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -453,9 +414,46 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                         </div>
 
+                        {/* AI Protection Section */}
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-bold text-blue-300 flex items-center gap-2">
+                                    <ShieldCheck className="w-4 h-4" />
+                                    AI Protection
+                                </h3>
+                                <span className="text-xs text-secondary">
+                                    {lockedFields.length} field{lockedFields.length !== 1 ? 's' : ''} locked
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setLockedFields(['artist', 'title', 'label', 'catalog_number', 'edition'])}
+                                    className="text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                                >
+                                    <Lock className="w-3 h-3" />
+                                    Lock Critical Fields
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setLockedFields([])}
+                                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                                >
+                                    <Unlock className="w-3 h-3" />
+                                    Unlock All
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-white/40 mt-2">
+                                Locked fields won't be modified by AI analysis. Use individual locks below for fine control.
+                            </p>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-secondary mb-1">Album Title</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Album Title</label>
+                                    <FieldLock field="title" />
+                                </div>
                                 <input
                                     type="text"
                                     value={formData.title}
@@ -464,7 +462,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-secondary mb-1">Artist</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Artist</label>
+                                    <FieldLock field="artist" />
+                                </div>
                                 <input
                                     type="text"
                                     value={formData.artist}
@@ -473,7 +474,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-secondary mb-1">Year</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Year</label>
+                                    <FieldLock field="year" />
+                                </div>
                                 <input
                                     type="text"
                                     value={formData.year}
@@ -482,7 +486,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-secondary mb-1">Genre</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Genre</label>
+                                    <FieldLock field="genre" />
+                                </div>
                                 <input
                                     type="text"
                                     value={formData.genre}
@@ -491,7 +498,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-secondary mb-1">Group Members</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Group Members</label>
+                                    <FieldLock field="group_members" />
+                                </div>
                                 <input
                                     type="text"
                                     value={formData.group_members || ''}
@@ -526,7 +536,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-secondary mb-1">Average Cost</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-secondary">Average Cost</label>
+                                    <FieldLock field="average_cost" />
+                                </div>
                                 <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-gray-500">€</span>
                                     <input
@@ -558,7 +571,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">Collector Details</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-secondary mb-1">Label</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-sm font-medium text-secondary">Label</label>
+                                            <FieldLock field="label" />
+                                        </div>
                                         <input
                                             type="text"
                                             value={formData.label}
@@ -568,7 +584,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-secondary mb-1">Catalog No.</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-sm font-medium text-secondary">Catalog No.</label>
+                                            <FieldLock field="catalog_number" />
+                                        </div>
                                         <input
                                             type="text"
                                             value={formData.catalog_number}
@@ -578,7 +597,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-secondary mb-1">Edition / Variant</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-sm font-medium text-secondary">Edition / Variant</label>
+                                            <FieldLock field="edition" />
+                                        </div>
                                         <input
                                             type="text"
                                             value={formData.edition}
@@ -595,7 +617,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">My History</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-secondary mb-1">Purchase Price</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-sm font-medium text-secondary">Purchase Price</label>
+                                            <FieldLock field="purchase_price" />
+                                        </div>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-gray-500">€</span>
                                             <input
@@ -608,7 +633,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-secondary mb-1">Year Bought</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-sm font-medium text-secondary">Year Bought</label>
+                                            <FieldLock field="purchase_year" />
+                                        </div>
                                         <input
                                             type="text"
                                             value={formData.purchase_year}
@@ -621,7 +649,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div className="col-span-2">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Tracks (One per line)</label>
+                                    <div className="flex items-center gap-2">
+                                        <label className="block text-sm font-medium text-secondary">Tracks</label>
+                                        <FieldLock field="tracks" />
+                                    </div>
                                     <label className="flex items-center gap-2 cursor-pointer text-xs select-none bg-white/5 px-2 py-1 rounded border border-white/10 hover:bg-white/10 transition-colors">
                                         <input
                                             type="checkbox"

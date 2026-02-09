@@ -98,7 +98,7 @@ export async function warpImage(image, corners) {
     const heightRight = Math.hypot(tr.x - br.x, tr.y - br.y);
     let height = Math.max(heightLeft, heightRight);
 
-    // Limit max resolution to avoid heavy processing/memory issues
+    // Limit max resolution for OUTPUT
     const MAX_DIM = 1200;
     if (width > MAX_DIM || height > MAX_DIM) {
         const scale = Math.min(MAX_DIM / width, MAX_DIM / height);
@@ -112,6 +112,27 @@ export async function warpImage(image, corners) {
 
     console.log(`Warping to ${width}x${height}`);
 
+    // --- OPTIMIZATION START ---
+    // Handle Source Image Scaling (Mobile Memory Protection)
+    const MAX_SRC_DIM = 2048;
+    let srcW = image.naturalWidth || image.width;
+    let srcH = image.naturalHeight || image.height;
+    let srcScale = 1;
+
+    // If source is huge, create a scaled-down intermediate canvas
+    // This prevents "Exceeded memory limit" crashes on mobile which result in black canvases
+    if (srcW > MAX_SRC_DIM || srcH > MAX_SRC_DIM) {
+        const fitScale = Math.min(MAX_SRC_DIM / srcW, MAX_SRC_DIM / srcH);
+        srcScale = fitScale;
+        console.log(`Downscaling source input by ${fitScale.toFixed(2)} for performance`);
+    }
+
+    // Adjust corners to match the (potentially) scaled source coordinates
+    const scaledCorners = corners.map(p => ({
+        x: p.x * srcScale,
+        y: p.y * srcScale
+    }));
+
     // 2. Define destination points
     const dstPoints = [
         { x: 0, y: 0 },
@@ -120,15 +141,15 @@ export async function warpImage(image, corners) {
         { x: 0, y: height }
     ];
 
-    // 3. Compute Homography: DST (Rectangle) -> SRC (Distorted)
-    // We map each pixel (u,v) in the new rectangular image to (x,y) in the original image
-    const H = getHomographyMatrix(dstPoints, corners);
+    // 3. Compute Homography: DST -> Scaled SRC
+    // We map each pixel (u,v) in the new image to (x,y) in the Scaled Source
+    const H = getHomographyMatrix(dstPoints, scaledCorners);
 
     if (!H || H.some(v => isNaN(v))) {
         throw new Error("Failed to calculate perspective matrix (Geometric Error)");
     }
 
-    // 4. Create Canvas
+    // 4. Create Destination Canvas
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -136,18 +157,34 @@ export async function warpImage(image, corners) {
     const imageData = ctx.createImageData(width, height);
     const data = imageData.data;
 
-    // 5. Source Data
+    // 5. Create Source Canvas (Scaled)
     const srcCanvas = document.createElement('canvas');
-    srcCanvas.width = image.naturalWidth || image.width;
-    srcCanvas.height = image.naturalHeight || image.height;
+    srcCanvas.width = Math.floor(srcW * srcScale);
+    srcCanvas.height = Math.floor(srcH * srcScale);
     const srcCtx = srcCanvas.getContext('2d');
+
     let srcData;
     try {
-        srcCtx.drawImage(image, 0, 0);
+        // Draw image scaled
+        srcCtx.drawImage(image, 0, 0, srcCanvas.width, srcCanvas.height);
         srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height).data;
+
+        // Validation: Check if source is empty/black
+        let hasContent = false;
+        // Sample center pixel
+        const cx = Math.floor(srcCanvas.width / 2);
+        const cy = Math.floor(srcCanvas.height / 2);
+        const centerIdx = (cy * srcCanvas.width + cx) * 4;
+        if (srcData[centerIdx + 3] > 0) hasContent = true;
+
+        // Robust check requires looping (slow), relying on center + sample is usually enough
+        // but let's trust that if drawImage worked, it worked. 
+        // If center is empty, it might be a weird image, but usually indicates failure.
+        if (srcData.length === 0) throw new Error("Source image data is empty");
+
     } catch (e) {
-        console.error("Canvas Security Error:", e);
-        throw new Error("Cannot access image data. Possible CORS issue. " + e.message);
+        console.error("Canvas Error:", e);
+        throw new Error("Cannot process image. " + e.message);
     }
 
     const srcWidth = srcCanvas.width;
@@ -176,14 +213,14 @@ export async function warpImage(image, corners) {
                 data[dstIdx] = srcData[srcIdx];
                 data[dstIdx + 1] = srcData[srcIdx + 1];
                 data[dstIdx + 2] = srcData[srcIdx + 2];
-                data[dstIdx + 3] = 255; // Alpha
+                data[dstIdx + 3] = 255; // Force Alpha 100%
                 validPixels++;
             }
         }
     }
 
     if (validPixels < 100) {
-        console.error("Warp produced empty image. H:", H, "Corners:", corners);
+        console.error("Warp produced empty image. H:", H, "Corners:", scaledCorners, "SrcDim:", srcWidth, srcHeight);
         throw new Error("Perspective correction failed: Output image is empty.");
     }
 

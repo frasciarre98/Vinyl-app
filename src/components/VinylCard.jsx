@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle, Youtube } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
@@ -18,6 +18,17 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
     // ... handleAnalyze ...
     const isPending = localVinyl.artist === 'Pending AI' || localVinyl.artist === 'Error';
     const isActiveAnalysis = localVinyl.artist === 'Pending AI';
+
+    const missingFields = useMemo(() => {
+        const fields = [];
+        // Only flag truly empty fields, not "Unknown" (which is a valid AI response)
+        if (!localVinyl.label || localVinyl.label.trim() === '') fields.push('Label');
+        if (!localVinyl.edition || localVinyl.edition.trim() === '') fields.push('Edition');
+        if (!localVinyl.average_cost) fields.push('Price');
+        return fields;
+    }, [localVinyl]);
+
+    const hasMissingInfo = missingFields.length > 0 && !isPending && !IS_STATIC;
 
     const handleAnalyze = async (e) => {
         e.stopPropagation();
@@ -41,7 +52,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
             const analysis = await analyzeImageUrl(localVinyl.image_url, apiKey, hint);
 
             // Update Database
-            // Update Supabase (Adaptive: Try Full, Fallback to Basic)
+            // Update PocketBase (Adaptive: Try Full, Fallback to Basic)
             const fullUpdate = {
                 artist: analysis.artist,
                 title: analysis.title,
@@ -51,8 +62,12 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 // Sanitise cost to strict String(50)
-                avarege_cost: String(analysis.average_cost || '').substring(0, 50),
-                tracks: String(analysis.tracks || '').substring(0, 4999)
+                average_cost: String(analysis.average_cost || '').substring(0, 50),
+                tracks: String(analysis.tracks || '').substring(0, 4999),
+                // CRITICAL: Save label, catalog_number, edition to prevent "NEEDS INFO" false positives
+                label: String(analysis.label || '').substring(0, 100),
+                catalog_number: String(analysis.catalog_number || '').substring(0, 50),
+                edition: String(analysis.edition || '').substring(0, 100)
             };
 
             // CRITICAL: Respect User Validation
@@ -96,7 +111,8 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
     return (
         <div
             className={`
-                group relative w-full h-0 pb-[100%] md:h-[320px] md:pb-0 perspective-1000
+                group relative w-full h-0 pb-[100%] md:h-[320px] md:pb-0 
+                md:perspective-1000  
                 ${selectionMode ? 'cursor-pointer' : 'cursor-zoom-in'}
                 ${isFlipped ? 'z-50' : 'z-0'}
 `}
@@ -116,10 +132,18 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 </div>
             )}
 
-            <div className={`absolute inset-0 md:relative md:inset-auto md:w-full md:h-full transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+            <div className={`absolute inset-0 md:relative md:inset-auto md:w-full md:h-full transition-all duration-500 md:transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
 
                 {/* FRONT FACE - FULL COVER ART */}
                 <div className="absolute inset-0 backface-hidden glass-card rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300">
+
+                    {/* Missing Data Badge */}
+                    {hasMissingInfo && (
+                        <div className={`absolute left-3 z-50 bg-yellow-400/90 text-black text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1 backdrop-blur-sm animate-pulse ${selectionMode ? 'top-12' : 'top-3'}`}>
+                            <AlertCircle className="w-3 h-3" />
+                            NEEDS INFO
+                        </div>
+                    )}
 
                     {/* Full Image */}
                     {localVinyl.image_url ? (
@@ -254,6 +278,21 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 </p>
                             </div>
 
+                            {missingFields.length > 0 && (
+                                <div className="mt-4 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                    <h5 className="text-[10px] uppercase tracking-widest text-yellow-500 font-bold mb-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" /> Missing Metadata
+                                    </h5>
+                                    <div className="flex flex-wrap gap-1">
+                                        {missingFields.map(f => (
+                                            <span key={f} className="text-[9px] bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded">
+                                                {f}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Meta Grid */}
                             <div className="grid grid-cols-2 gap-y-3 gap-x-2 bg-white/5 p-3 rounded-lg border border-white/5 mt-2">
                                 <div>
@@ -274,7 +313,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 </div>
                                 <div>
                                     <span className="block text-[10px] text-gray-500 uppercase">Est. Value</span>
-                                    <span className="text-xs font-medium text-green-400">{localVinyl.avarege_cost || localVinyl.average_cost || '-'}</span>
+                                    <span className="text-xs font-medium text-green-400">{localVinyl.average_cost || '-'}</span>
                                 </div>
                                 <div className="col-span-1">
                                     <span className="block text-[10px] text-gray-500 uppercase">Rating</span>

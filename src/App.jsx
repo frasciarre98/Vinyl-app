@@ -12,6 +12,7 @@ function App() {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const handleRefresh = () => {
+        console.log('🔄 App: handleRefresh called, incrementing refreshTrigger from', refreshTrigger);
         setRefreshTrigger(prev => prev + 1);
     };
 
