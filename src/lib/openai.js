@@ -281,7 +281,7 @@ Return JSON with these keys:
 - year (original release)
 - tracks (full list, newline separated)
 - group_members (key members, comma separated)
-- average_cost (e.g. "€20-30")
+- average_cost (e.g. "€20-30" or "€150-200" if rare. STRICTLY in Euro. Differentiate between 1st Press (High Value) and Reissues (Low Value) based on cover clues. NEVER say "Varies". If unsure, default to "€15-25".)
 - condition (visual estimate: Good/Fair/Mint)
 - label (Record Label, e.g. "Blue Note", "Columbia")
 - catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
@@ -378,8 +378,11 @@ Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuat
 3. **Valuation Logic (EURO):**
    - **Modern Reissue / Common Used:** €15 - €25 (The "20 euro" standard).
    - **Vintage VG+ (1970s/80s):** €30 - €60 (Pink Floyd, Zeppelin etc. in used condition).
-   - **Rare Collector Items (1st Press):** €100 - €500+ (REQUIRE HARD PROOF).
-   - *Always provide a realistic VG+ range for the specific identified edition.*`
+   - **Rare Collector Items (1st Press):** €100 - €500+ (CRITICAL: If you see specific indicators like "Harvest" label without EMI logo, "Swirl" Vertigo, or specific catalog numbers, VALUE ACCORDINGLY. Do not lowball rare items).
+   - *Logic:* Look for Catalog Number and Label on the cover. A 1st UK Pressing of Pink Floyd is worth €200+, a 2016 Reissue is worth €25. DISTINGUISH THEM based on visual clues.
+   - **STRICT FORBIDDEN:** Do NOT use output "Varies", "Unknown", or "$". 
+   - **STRICT REQUIRED:** You MUST output a range in EURO (€) specific to the matched edition.
+   - **UNCERTAINTY FALLBACK:** If you cannot find the exact price, **ESTIMATE** based on similar albums. Use "€15-25" for common records, "€30-50" for vintage. **NEVER RETURN EMPTY OR UNKNOWN**.`
                     },
                     {
                         role: "user",
@@ -393,7 +396,7 @@ Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuat
 - **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
 - **year**: Original release year.
 
-Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes (Concise summary, max 100 words).` },
+Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost (Value in EURO €, based on the Identified Edition in VG+ condition. e.g. "€40-60". JUSTIFY this in notes.), condition, label, catalog_number, edition, notes (Appraisal summary: Identify the pressing, mention Matrix/Label clues, and explain the price).` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }
@@ -565,12 +568,46 @@ function normalizeParsedData(parsed) {
         group_members: Array.isArray(parsed.group_members) ? parsed.group_members.join(', ') : (parsed.group_members || ""),
         tracks: Array.isArray(parsed.tracks) ? parsed.tracks.join('\n') : (parsed.tracks || ""),
         condition: parsed.condition || "Good",
-        average_cost: parsed.average_cost || "",
-        label: parsed.label || "",
-        catalog_number: parsed.catalog_number || "",
-        edition: parsed.edition || "",
+        average_cost: sanitizeCurrency(parsed.average_cost),
+        // Use "Unknown" so that the "Missing Details" filter considers them processed
+        label: parsed.label || "Unknown",
+        catalog_number: parsed.catalog_number || "Unknown",
+        edition: parsed.edition || "Unknown",
         notes: parsed.notes || parsed.note || "Analyzed by AI"
     };
+}
+
+function sanitizeCurrency(cost) {
+    if (!cost) return "";
+    let str = String(cost);
+
+    // REJECT "Varies" or ambiguous terms to force re-analysis
+    if (str.match(/varies|unknown|tbd|check/i)) {
+        // FALLBACK: If AI fails, return a safe "Manual Check" or empty to trigger UI warning
+        // But user said "doesn't return ANY value". matching strict rules.
+        // Let's return empty to force the UI "Missing Details" but we need to ensure the AI *provides* a value next time.
+        return "";
+    }
+
+    // Replace USD variants with €
+    // Matches: USD, U.S.D, Dollars, $, etc. case insensitive
+    if (str.match(/USD|U\.S\.D|Dollar|\$/i)) {
+        str = str.replace(/USD|U\.S\.D|Dollar|\$/gi, "").trim();
+        // Remove trailing '.' if left by U.S.D.
+        str = str.replace(/\.+$/, "").trim();
+        if (!str) return "€15-25"; // Fallback if it was just "$"
+        return "€" + str; // Force Euro prefix
+    }
+    // Ensure it has a Euro symbol if it's just numbers
+    if (!str.includes("€") && !str.includes("EUR")) {
+        // Check if it looks like a number or range "20-30"
+        if (/\d/.test(str)) return "€" + str;
+    }
+    // Normalize "EUR 20" to "€20"
+    if (str.includes("EUR")) {
+        str = str.replace("EUR", "€").trim();
+    }
+    return str;
 }
 
 // Helper to resize image using Canvas (Memory Optimized for Mobile)

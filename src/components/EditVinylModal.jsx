@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
-import { resizeImage } from '../lib/openai';
+import { resizeImage, analyzeImageUrl, getApiKey } from '../lib/openai';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../lib/imageUtils';
 import { PerspectiveCropper } from './PerspectiveCropper';
@@ -44,6 +44,28 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
     useEffect(() => {
         if (vinyl) {
+            let cost = vinyl.avarege_cost || vinyl.average_cost || '';
+
+            // AUTO-FIX: Sanitize Currency on Load
+            if (cost && typeof cost === 'string') {
+                // 1. Remove USD/Dollar variants
+                if (cost.match(/USD|U\.S\.D|Dollar|\$/i)) {
+                    cost = cost.replace(/USD|U\.S\.D|Dollar|\$/gi, "").trim();
+                    cost = cost.replace(/\.+$/, "").trim();
+                }
+                // 2. Ensure € symbol is present if it's a number/range
+                if (!cost.includes("€") && !cost.includes("EUR") && /\d/.test(cost)) {
+                    cost = "€ " + cost;
+                }
+                // 3. Normalize EUR -> €
+                if (cost.includes("EUR")) cost = cost.replace("EUR", "€").trim();
+
+                // 4. BLAST "Varies" / Ambiguity
+                if (cost.match(/varies|unknown|tbd|check/i)) {
+                    cost = "";
+                }
+            }
+
             setFormData({
                 title: vinyl.title || '',
                 artist: vinyl.artist || '',
@@ -52,7 +74,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                 format: vinyl.format || 'Vinyl',
                 group_members: vinyl.group_members || '',
                 condition: vinyl.condition || '',
-                average_cost: vinyl.avarege_cost || vinyl.average_cost || '',
+                average_cost: cost, // Use sanitized cost
                 notes: vinyl.notes || '',
                 tracks: vinyl.tracks || '',
                 is_tracks_validated: vinyl.is_tracks_validated || false,
@@ -451,7 +473,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-2">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Album Title</label>
+                                    <label className="block text-sm font-semibold text-white/90">Album Title</label>
                                     <FieldLock field="title" />
                                 </div>
                                 <input
@@ -463,7 +485,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div className="col-span-2">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Artist</label>
+                                    <label className="block text-sm font-semibold text-white/90">Artist</label>
                                     <FieldLock field="artist" />
                                 </div>
                                 <input
@@ -475,7 +497,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Year</label>
+                                    <label className="block text-sm font-semibold text-white/90">Year</label>
                                     <FieldLock field="year" />
                                 </div>
                                 <input
@@ -487,7 +509,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Genre</label>
+                                    <label className="block text-sm font-semibold text-white/90">Genre</label>
                                     <FieldLock field="genre" />
                                 </div>
                                 <input
@@ -499,7 +521,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div className="col-span-2">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Group Members</label>
+                                    <label className="block text-sm font-semibold text-white/90">Group Members</label>
                                     <FieldLock field="group_members" />
                                 </div>
                                 <input
@@ -511,7 +533,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-secondary mb-1">Format</label>
+                                <label className="block text-sm font-semibold text-white/90 mb-1">Format</label>
                                 <select
                                     value={formData.format}
                                     onChange={e => setFormData({ ...formData, format: e.target.value })}
@@ -522,7 +544,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-secondary mb-1">Condition</label>
+                                <label className="block text-sm font-semibold text-white/90 mb-1">Condition</label>
                                 <select
                                     value={formData.condition}
                                     onChange={e => setFormData({ ...formData, condition: e.target.value })}
@@ -537,19 +559,65 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-secondary">Average Cost</label>
+                                    <div className="flex items-center gap-2">
+                                        <label className="block text-sm font-semibold text-white/90">Estimated Value (AI)</label>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const apiKey = getApiKey();
+                                                if (!apiKey) return alert("API Key missing.");
+                                                if (!vinyl.image_url) return alert("No image to analyze.");
+
+                                                const originalText = "Estimated Value (AI)";
+                                                const label = document.querySelector("label[for='avg_cost_label']"); // Hacky selector or just change button state
+
+                                                // Visual feedback
+                                                const btn = document.getElementById('refresh-price-btn');
+                                                if (btn) btn.classList.add('animate-spin');
+
+                                                try {
+                                                    const hint = `${formData.artist} - ${formData.title}`;
+                                                    // Use toast or alert? Let's just update the field
+                                                    const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
+
+                                                    if (analysis.average_cost) {
+                                                        const cleanCost = String(analysis.average_cost).substring(0, 50);
+                                                        // 1. Update Local State
+                                                        setFormData(prev => ({ ...prev, average_cost: cleanCost }));
+
+                                                        // 2. IMMEDIATE SAVE to Database
+                                                        await pb.collection('vinyls').update(vinyl.id, { avarege_cost: cleanCost });
+                                                        onUpdate(); // Refresh grid data in background
+
+                                                        // 3. Feedback
+                                                        // Maybe a small checkmark? For now, the input updates.
+                                                    } else {
+                                                        alert("AI could not estimate a price. Try manually.");
+                                                    }
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    alert("Price check failed: " + e.message);
+                                                } finally {
+                                                    if (btn) btn.classList.remove('animate-spin');
+                                                }
+                                            }}
+                                            id="refresh-price-btn"
+                                            className="p-1 rounded-full bg-white/5 hover:bg-white/10 text-xs text-blue-300 transition-colors"
+                                            title="Re-run AI Valuation"
+                                        >
+                                            <RotateCcw className="w-3 h-3" />
+                                        </button>
+                                    </div>
                                     <FieldLock field="average_cost" />
                                 </div>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-gray-500">€</span>
-                                    <input
-                                        type="text"
-                                        value={formData.average_cost || ''}
-                                        onChange={e => setFormData({ ...formData, average_cost: e.target.value })}
-                                        placeholder="20-30"
-                                        className="w-full bg-white/50 border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    id="avg_cost_label"
+                                    value={formData.average_cost || ''}
+                                    onChange={e => setFormData({ ...formData, average_cost: e.target.value })}
+                                    placeholder="€ 20-30"
+                                    className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
+                                />
                                 <div className="mt-1 flex justify-end">
                                     <label className="flex items-center gap-2 cursor-pointer text-xs select-none text-secondary hover:text-primary transition-colors">
                                         <input
@@ -572,7 +640,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-sm font-medium text-secondary">Label</label>
+                                            <label className="block text-sm font-semibold text-white/90">Label</label>
                                             <FieldLock field="label" />
                                         </div>
                                         <input
@@ -585,7 +653,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-sm font-medium text-secondary">Catalog No.</label>
+                                            <label className="block text-sm font-semibold text-white/90">Catalog No.</label>
                                             <FieldLock field="catalog_number" />
                                         </div>
                                         <input
@@ -598,7 +666,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                     </div>
                                     <div className="col-span-2">
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-sm font-medium text-secondary">Edition / Variant</label>
+                                            <label className="block text-sm font-semibold text-white/90">Edition / Variant</label>
                                             <FieldLock field="edition" />
                                         </div>
                                         <input
@@ -618,7 +686,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-sm font-medium text-secondary">Purchase Price</label>
+                                            <label className="block text-sm font-semibold text-white/90">Purchase Price</label>
                                             <FieldLock field="purchase_price" />
                                         </div>
                                         <div className="relative">
@@ -634,7 +702,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-sm font-medium text-secondary">Year Bought</label>
+                                            <label className="block text-sm font-semibold text-white/90">Year Bought</label>
                                             <FieldLock field="purchase_year" />
                                         </div>
                                         <input
@@ -675,7 +743,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-secondary mb-1">Notes</label>
+                                <label className="block text-sm font-semibold text-white/90 mb-1">Notes</label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
@@ -685,7 +753,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
 
                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-secondary mb-1">Rating</label>
+                                <label className="block text-sm font-semibold text-white/90 mb-1">Rating</label>
                                 <div className="flex gap-2">
                                     {[1, 2, 3, 4, 5].map((star) => (
                                         <button
@@ -749,7 +817,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                     </form>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
 

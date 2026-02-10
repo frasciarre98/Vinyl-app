@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2, Terminal } from 'lucide-react';
+import { X, Save, Key, Cpu, Sparkles, Zap, Check, Settings, AlertTriangle, Database, Loader2, Trash2, Terminal, RefreshCw } from 'lucide-react';
 import { saveApiKey, getApiKey, getProvider, setProvider, getGeminiTier, setGeminiTier, resizeImage, testConnection } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
 
@@ -583,6 +583,48 @@ export function SettingsModal({ onClose, onSave }) {
                             <p className="text-[10px] text-secondary text-center">
                                 Reduces size of ALL existing vinyl covers to ~300KB.
                             </p>
+
+                            <button
+                                onClick={async () => {
+                                    if (!confirm("Start DB Cleanup? This will convert 'USD' to '€' in all records.")) return;
+                                    setCleaning(true);
+                                    try {
+                                        const result = await pb.collection('vinyls').getFullList();
+                                        let count = 0;
+                                        for (const r of result) {
+                                            if (!r.average_cost) continue;
+                                            let cost = String(r.average_cost);
+                                            if (cost.match(/USD|U\.S\.D|Dollar|\$/i)) {
+                                                // Sanitize
+                                                let newCost = cost.replace(/USD|U\.S\.D|Dollar|\$/gi, "").trim();
+                                                newCost = newCost.replace(/\.+$/, "").trim();
+                                                if (!newCost.includes("€") && !newCost.includes("EUR")) {
+                                                    if (/\d/.test(newCost)) newCost = "€" + newCost;
+                                                }
+                                                if (newCost.includes("EUR")) newCost = newCost.replace("EUR", "€").trim();
+
+                                                if (newCost !== cost) {
+                                                    await pb.collection('vinyls').update(r.id, { average_cost: newCost });
+                                                    count++;
+                                                    console.log(`Fixed ${r.id}: ${cost} -> ${newCost}`);
+                                                }
+                                            }
+                                        }
+                                        alert(`Cleanup Complete. Fixed ${count} records.`);
+                                        window.location.reload();
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert("Cleanup failed: " + e.message);
+                                    } finally {
+                                        setCleaning(false);
+                                    }
+                                }}
+                                disabled={cleaning}
+                                className="w-full p-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white transition-colors flex justify-center items-center gap-2 text-sm font-bold mt-4 shadow-lg"
+                            >
+                                {cleaning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                Fix Currency (USD to €)
+                            </button>
 
                             <button
                                 onClick={async () => {

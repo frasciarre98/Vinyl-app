@@ -6,21 +6,26 @@ export function CollectionValueKPI({ vinyls }) {
         if (!vinyls || vinyls.length === 0) return 0;
 
         return vinyls.reduce((acc, vinyl) => {
-            const costStr = vinyl.avarege_cost || vinyl.average_cost;
-            if (!costStr) return acc;
+            // 1. Convert to string and clean
+            let costStr = String(vinyl.avarege_cost || vinyl.average_cost || '');
 
-            // Remove currency symbols and whitespace
-            let cleanStr = String(costStr).replace(/[€$£]/g, '').trim();
+            // Remove all non-numeric chars except dash and dot
+            // This strips € $ EUR USD and spaces around them, leaving "20-30" or "25.50"
+            let cleanStr = costStr.replace(/[^0-9.\-]/g, '');
 
-            // Handle ranges (e.g., "20-30") -> take average (25)
+            // Handle range "20-30"
             if (cleanStr.includes('-')) {
-                const parts = cleanStr.split('-').map(p => parseFloat(p.trim()));
-                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                    return acc + ((parts[0] + parts[1]) / 2);
+                const parts = cleanStr.split('-').filter(p => p.trim() !== '');
+                if (parts.length >= 2) {
+                    const low = parseFloat(parts[0]);
+                    const high = parseFloat(parts[1]);
+                    if (!isNaN(low) && !isNaN(high)) {
+                        return acc + ((low + high) / 2);
+                    }
                 }
             }
 
-            // Handle single values
+            // Handle single value
             const val = parseFloat(cleanStr);
             return acc + (isNaN(val) ? 0 : val);
         }, 0);

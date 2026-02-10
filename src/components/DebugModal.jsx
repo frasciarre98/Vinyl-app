@@ -199,54 +199,100 @@ export function DebugModal({ isOpen, onClose }) {
         }
     };
 
+    const cleanupUSD = async () => {
+        if (!confirm("Start DB Cleanup? This will convert 'USD' to '€' in all records.")) return;
+        setLoading(true);
+        log('Starting USD to EUR cleanup...', 'info');
+        try {
+            const result = await pb.collection('vinyls').getFullList();
+            let count = 0;
+            for (const r of result) {
+                if (!r.average_cost) continue;
+                let cost = String(r.average_cost);
+                if (cost.match(/USD|U\.S\.D|Dollar|\$/i)) {
+                    // Sanitize
+                    let newCost = cost.replace(/USD|U\.S\.D|Dollar|\$/gi, "").trim();
+                    newCost = newCost.replace(/\.+$/, "").trim();
+                    if (!newCost.includes("€") && !newCost.includes("EUR")) {
+                        if (/\d/.test(newCost)) newCost = "€" + newCost;
+                    }
+                    if (newCost.includes("EUR")) newCost = newCost.replace("EUR", "€").trim();
+
+                    if (newCost !== cost) {
+                        await pb.collection('vinyls').update(r.id, { average_cost: newCost });
+                        count++;
+                        log(`Fixed ${r.id}: ${cost} -> ${newCost}`, 'success');
+                    }
+                }
+            }
+            log(`Cleanup Complete. Fixed ${count} records.`, 'success');
+            // window.location.reload(); // Removed reload for better UX, user can close modal
+        } catch (e) {
+            log(`Cleanup failed: ${e.message}`, 'error');
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="glass-heavy rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[80vh]">
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                    <h2 className="text-lg font-semibold flex items-center gap-2 text-red-500">
-                        <Bug className="w-5 h-5" /> Debug Tools
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+                <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900 rounded-t-xl">
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                        <Bug className="w-6 h-6 text-red-500" /> Debug & Maintenance
                     </h2>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
+                    <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white">
+                        <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto space-y-6">
+                <div className="p-6 overflow-y-auto space-y-6 bg-zinc-950/50">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-black/10 p-4 rounded-lg border border-white/10">
-                            <h3 className="font-medium mb-2 flex items-center gap-2">
-                                <Wrench className="w-4 h-4 text-primary" /> Database Consistency
+                        <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-md">
+                            <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-white">
+                                <Wrench className="w-5 h-5 text-yellow-500" /> Database Consistency
                             </h3>
-                            <p className="text-sm text-secondary mb-4">
-                                Check for records with missing or invalid formats.
+                            <p className="text-sm text-zinc-400 mb-4">
+                                Fix data quality issues and missing fields.
                             </p>
+
+                            <button
+                                onClick={cleanupUSD}
+                                disabled={isLoading}
+                                className="w-full py-3 mb-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                            >
+                                <RefreshCw className="w-5 h-5" />
+                                {isLoading ? "Cleaning..." : "FIX CURRENCY (USD -> €)"}
+                            </button>
+
                             <button
                                 onClick={checkFormats}
                                 disabled={isLoading}
-                                className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 mb-2"
+                                className="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 mb-2"
                             >
                                 {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Check Formats'}
                             </button>
                             <button
                                 onClick={fixSchema}
                                 disabled={isLoading}
-                                className="w-full bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                                className="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-yellow-400 px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
                             >
-                                <Wrench className="w-4 h-4" /> Fix Missing Fields (Price/Year)
+                                <Wrench className="w-4 h-4" /> Fix Missing Fields
                             </button>
                         </div>
 
-                        <div className="bg-black/10 p-4 rounded-lg border border-white/10">
-                            <h3 className="font-medium mb-2 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-primary" /> Image Diagnostics
+                        <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-md">
+                            <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-white">
+                                <AlertTriangle className="w-4 h-4 text-orange-500" /> Image Diagnostics
                             </h3>
-                            <p className="text-sm text-secondary mb-4">
+                            <p className="text-sm text-zinc-400 mb-4">
                                 Test if the last image is accessible.
                             </p>
                             <button
                                 onClick={checkLastImage}
                                 disabled={isLoading}
-                                className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                                className="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
                             >
                                 {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Test Last Image'}
                             </button>
@@ -254,26 +300,26 @@ export function DebugModal({ isOpen, onClose }) {
                     </div>
 
                     {/* Auth Section */}
-                    <div className="bg-black/10 p-4 rounded-lg border border-white/10 flex items-center justify-between">
+                    <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 shadow-md flex items-center justify-between">
                         <div>
-                            <h3 className="font-medium flex items-center gap-2">
-                                <Lock className="w-4 h-4 text-primary" /> Admin Access
+                            <h3 className="font-bold flex items-center gap-2 text-white">
+                                <Lock className="w-4 h-4 text-emerald-500" /> Admin Access
                             </h3>
-                            <p className="text-sm text-secondary">
+                            <p className="text-sm text-zinc-400">
                                 {currentUser ? `Logged in as: ${currentUser.email}` : 'Log in to edit records.'}
                             </p>
                         </div>
                         {currentUser ? (
                             <button
                                 onClick={handleLogout}
-                                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                                className="bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 text-red-500 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 font-semibold"
                             >
                                 <LogOut className="w-4 h-4" /> Logout
                             </button>
                         ) : (
                             <button
                                 onClick={() => setIsLoginOpen(true)}
-                                className="bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 font-bold shadow-lg"
                             >
                                 <Lock className="w-4 h-4" /> Login
                             </button>
@@ -281,9 +327,9 @@ export function DebugModal({ isOpen, onClose }) {
                     </div>
 
 
-                    <div className="bg-black/10 rounded-lg p-4 font-mono text-xs border border-white/5 h-64 overflow-y-auto">
+                    <div className="bg-black rounded-lg p-4 font-mono text-xs border border-zinc-800 h-64 overflow-y-auto text-green-400">
                         {logs.length === 0 ? (
-                            <div className="text-secondary italic text-center mt-20">Logs will appear here...</div>
+                            <div className="text-zinc-600 italic text-center mt-20">Logs will appear here...</div>
                         ) : (
                             logs.map((l, i) => (
                                 <div key={i} className={`mb-1 ${l.type === 'error' ? 'text-red-400' :
