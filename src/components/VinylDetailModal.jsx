@@ -31,7 +31,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
         const fields = [];
         if (!vinyl.label || vinyl.label === 'Unknown') fields.push('Label');
         if (!vinyl.edition || vinyl.edition === 'Unknown') fields.push('Edition');
-        if (!vinyl.average_cost) fields.push('Estimated Value');
+        if (!vinyl.average_cost && !vinyl.avarege_cost) fields.push('Estimated Value');
         return fields;
     }, [vinyl]);
 
@@ -215,10 +215,10 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                                 <Disc className="w-4 h-4 text-secondary" />
                                 <span className="text-white">{vinyl.format || 'Vinyl'}</span>
                             </div>
-                            {vinyl.average_cost && (
+                            {(vinyl.average_cost || vinyl.avarege_cost) && (
                                 <div className="bg-green-900/20 px-4 py-2 rounded-full border border-green-500/20 flex items-center gap-2 text-green-400">
                                     <Euro className="w-4 h-4" />
-                                    {vinyl.average_cost}
+                                    {vinyl.average_cost || vinyl.avarege_cost}
                                 </div>
                             )}
                             {/* Rating Display */}

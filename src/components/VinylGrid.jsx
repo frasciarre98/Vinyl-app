@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown, RotateCcw } from 'lucide-react';
+import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown, RotateCcw, AlertTriangle } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { VinylCard } from './VinylCard';
 import { BatchAnalysisBanner } from './BatchAnalysisBanner';
@@ -186,7 +186,7 @@ export function VinylGrid({ refreshTrigger }) {
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, `${vinyl.artist} - ${vinyl.title}`);
                     if (analysis.average_cost) {
                         const updateData = {
-                            average_cost: analysis.average_cost,
+                            avarege_cost: analysis.average_cost, // DB Typo in PocketBase Schema
                             // Also save label, catalog_number, edition if returned
                             label: String(analysis.label || '').substring(0, 100),
                             catalog_number: String(analysis.catalog_number || '').substring(0, 50),
@@ -253,7 +253,7 @@ export function VinylGrid({ refreshTrigger }) {
                         notes: String(analysis.notes || '').substring(0, 4000),
                         group_members: analysis.group_members,
                         condition: analysis.condition,
-                        average_cost: String(analysis.average_cost || '').substring(0, 50),
+                        avarege_cost: String(analysis.average_cost || '').substring(0, 50), // DB Typo
                         tracks: analysis.tracks,
                         // CRITICAL: Save label, catalog_number, edition
                         label: String(analysis.label || '').substring(0, 100),
@@ -310,9 +310,9 @@ export function VinylGrid({ refreshTrigger }) {
             if (selectedRating === 'needs_attention') {
                 // Filter for Errors OR Missing key metadata (aligned with BatchAnalysisBanner)
                 const isErrorOrPending = vinyl.artist === 'Error' || vinyl.artist === 'Pending AI';
-                const isMissingDetails = !vinyl.label ||
-                    !vinyl.edition ||
-                    !vinyl.average_cost;
+                // User Request: Label and Edition are no longer considered critical errors
+                // Check both field names (typo and correct)
+                const isMissingDetails = !vinyl.average_cost && !vinyl.avarege_cost;
 
                 matchesRating = isErrorOrPending ||
                     !vinyl.artist ||
@@ -515,6 +515,16 @@ export function VinylGrid({ refreshTrigger }) {
                         <span className="text-secondary/50">records</span>
                         <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">{vinylCount} LP / {cdCount} CD</span>
                     </div>
+
+                    <button
+                        onClick={() => setSelectedRating(prev => prev === 'needs_attention' ? '0' : 'needs_attention')}
+                        className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium flex items-center gap-2 ${selectedRating === 'needs_attention' ? 'bg-amber-500/20 border-amber-500/50 text-amber-500' : 'bg-white/5 border-white/10 text-secondary hover:text-white hover:bg-white/10'}`}
+                        title="Show records missing metadata or with errors"
+                    >
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="hidden lg:inline">Needs Attention</span>
+                    </button>
+
                     <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>{sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}</button>
                     <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white"><Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
                     {!IS_STATIC && (
@@ -574,6 +584,7 @@ export function VinylGrid({ refreshTrigger }) {
                                 key={vinyl.id}
                                 vinyl={vinyl}
                                 onEdit={IS_STATIC ? null : setEditingVinyl}
+                                onUpdate={handleUpdateVinyl}
                                 onDelete={IS_STATIC ? null : handleSingleDelete}
                                 selectionMode={isSelectionMode}
                                 isSelected={selectedIds.includes(vinyl.id)}

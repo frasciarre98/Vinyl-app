@@ -270,24 +270,24 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
                             {
                                 text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork.'}
 Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
-**CRITICAL FOR ACCURACY:**
-- **VISUAL MATCHING:** Look at the back cover image. Read 2-3 unique track titles you see. Use these to find the **EXACT Edition** in your database that matches this specific tracklist.
-- If the image contains a tracklist, **TRUST THE IMAGE** over the standard album version.
-- If this is a Compilation, ensure the tracklist matches what is printed on the cover.
-Return JSON with these keys: 
-- artist
-- title
-- genre
-- year (original release)
-- tracks (full list, newline separated)
-- group_members (key members, comma separated)
-- average_cost (e.g. "€20-30" or "€150-200" if rare. STRICTLY in Euro. Differentiate between 1st Press (High Value) and Reissues (Low Value) based on cover clues. NEVER say "Varies". If unsure, default to "€15-25".)
-- condition (visual estimate: Good/Fair/Mint)
-- label (Record Label, e.g. "Blue Note", "Columbia")
-- catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
-- edition (e.g. "1st Press", "Reissue", "Red Vinyl", "Japanese Import")
-- notes (Detailed description including: history of the album/artist, interesting anecdotes, trivia, recording context, and musical influence. Make it engaging and comprehensive approx 300-500 words)
-Raw JSON only.` },
+273: **CRITICAL FOR ACCURACY:**
+274: - **VISUAL MATCHING:** Look at the back cover image. Read 2-3 unique track titles you see. Use these to find the **EXACT Edition** in your database that matches this specific tracklist.
+275: - If the image contains a tracklist, **TRUST THE IMAGE** over the standard album version.
+276: - If this is a Compilation, ensure the tracklist matches what is printed on the cover.
+277: Return JSON with these keys: 
+278: - artist
+279: - title
+280: - genre
+281: - year (original release)
+282: - tracks (full list, newline separated)
+283: - group_members (key members, comma separated)
+284: - average_cost (e.g. "€20-30" or "€150-200" if rare. STRICTLY in Euro. Differentiate between 1st Press (High Value) and Reissues (Low Value) based on cover clues. NEVER say "Varies". If unsure, default to "€15-25".)
+285: - condition (visual estimate: Good/Fair/Mint)
+286: - label (Record Label, e.g. "Blue Note", "Columbia")
+287: - catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
+288: - edition (e.g. "1st Press", "Reissue", "Red Vinyl", "Japanese Import")
+289: - notes (Detailed description including: history of the album/artist, interesting anecdotes, trivia, recording context, and musical influence. Make it engaging and comprehensive approx 300-500 words)
+290: Raw JSON only.` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
                     }],
@@ -370,19 +370,19 @@ async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'ima
                     {
                         role: "system",
                         content: `You are an expert musicologist and **Professional Vinyl Appraiser**.
-Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuation**.
+Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuation** for a serious collector.
 1. **Back Cover (Visual Truth):** If you see a tracklist, you are a SCANNER. Transcribe text EXACTLY as printed.
 2. **Edition Identification:** Look for Catalog Numbers, Barcodes (post-1980), Label Logos, and Copyright dates.
    - No Barcode? Likely pre-1980.
    - "Digitally Remastered"? Modern Reissue.
-3. **Valuation Logic (EURO):**
-   - **Modern Reissue / Common Used:** €15 - €25 (The "20 euro" standard).
-   - **Vintage VG+ (1970s/80s):** €30 - €60 (Pink Floyd, Zeppelin etc. in used condition).
-   - **Rare Collector Items (1st Press):** €100 - €500+ (CRITICAL: If you see specific indicators like "Harvest" label without EMI logo, "Swirl" Vertigo, or specific catalog numbers, VALUE ACCORDINGLY. Do not lowball rare items).
-   - *Logic:* Look for Catalog Number and Label on the cover. A 1st UK Pressing of Pink Floyd is worth €200+, a 2016 Reissue is worth €25. DISTINGUISH THEM based on visual clues.
+3. **Valuation Logic (EURO) - DO NOT LOWBALL:**
+   - **Common Used / Reissues:** €20 - €35 (Standard Record Store Price).
+   - **Vintage VG+ (1970s/80s):** €35 - €75 (Pink Floyd, Zeppelin etc. Use Discogs Median + 20% for physical store markup).
+   - **Rare Collector Items (1st Press):** €100 - €500+ (CRITICAL: If you see specific indicators like "Harvest" label without EMI logo, "Swirl" Vertigo, or specific catalog numbers, VALUE ACCORDINGLY. Do not hold back on high values).
+   - *Logic:* Assume the record is in **VG+ to Near Mint** condition unless you see obvious damage. Value it as if sold in a curated Record Store, not a flea market.
    - **STRICT FORBIDDEN:** Do NOT use output "Varies", "Unknown", or "$". 
    - **STRICT REQUIRED:** You MUST output a range in EURO (€) specific to the matched edition.
-   - **UNCERTAINTY FALLBACK:** If you cannot find the exact price, **ESTIMATE** based on similar albums. Use "€15-25" for common records, "€30-50" for vintage. **NEVER RETURN EMPTY OR UNKNOWN**.`
+   - **UNCERTAINTY FALLBACK:** If you cannot find the exact price, **ESTIMATE** based on similar albums. Use "€20-35" minimum for any playable LP. **NEVER RETURN EMPTY OR UNKNOWN**.`
                     },
                     {
                         role: "user",
@@ -396,7 +396,7 @@ Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuat
 - **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
 - **year**: Original release year.
 
-Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost (Value in EURO €, based on the Identified Edition in VG+ condition. e.g. "€40-60". JUSTIFY this in notes.), condition, label, catalog_number, edition, notes (Appraisal summary: Identify the pressing, mention Matrix/Label clues, and explain the price).` },
+Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost (Value in EURO €, based on VG+/NM Store Price. e.g. "€45-65". JUSTIFY this in notes.), condition, label, catalog_number, edition, notes (Appraisal summary: Identify the pressing, mention Matrix/Label clues, and explain the price).` },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
                         ]
                     }
@@ -578,15 +578,13 @@ function normalizeParsedData(parsed) {
 }
 
 function sanitizeCurrency(cost) {
-    if (!cost) return "";
+    // FORCE DEFAULT IF EMPTY
+    if (!cost) return "€20-35 (Est)";
     let str = String(cost);
 
-    // REJECT "Varies" or ambiguous terms to force re-analysis
+    // Filter out "Varies" or "Unknown" with a Forced Fallback
     if (str.match(/varies|unknown|tbd|check/i)) {
-        // FALLBACK: If AI fails, return a safe "Manual Check" or empty to trigger UI warning
-        // But user said "doesn't return ANY value". matching strict rules.
-        // Let's return empty to force the UI "Missing Details" but we need to ensure the AI *provides* a value next time.
-        return "";
+        return "€20-35 (Analyst Est)";
     }
 
     // Replace USD variants with €
@@ -595,7 +593,7 @@ function sanitizeCurrency(cost) {
         str = str.replace(/USD|U\.S\.D|Dollar|\$/gi, "").trim();
         // Remove trailing '.' if left by U.S.D.
         str = str.replace(/\.+$/, "").trim();
-        if (!str) return "€15-25"; // Fallback if it was just "$"
+        if (!str) return "€20-35 (Est)"; // Fallback if it was just "$"
         return "€" + str; // Force Euro prefix
     }
     // Ensure it has a Euro symbol if it's just numbers
@@ -607,6 +605,10 @@ function sanitizeCurrency(cost) {
     if (str.includes("EUR")) {
         str = str.replace("EUR", "€").trim();
     }
+
+    // Final sanity check: if string length is weirdly short (e.g. "€") -> Default
+    if (str.length < 2) return "€20-35 (Est)";
+
     return str;
 }
 

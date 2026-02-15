@@ -7,7 +7,12 @@ export function CollectionValueKPI({ vinyls }) {
 
         return vinyls.reduce((acc, vinyl) => {
             // 1. Convert to string and clean
-            let costStr = String(vinyl.avarege_cost || vinyl.average_cost || '');
+            let costStr = String(vinyl.average_cost || vinyl.avarege_cost || '');
+
+            // Handle "Varies" or "Unknown" with a reasonable optimistic estimate
+            if (costStr.match(/varies|unknown|tbd|check/i)) {
+                return acc + 25; // Optimistic average for unpriced items
+            }
 
             // Remove all non-numeric chars except dash and dot
             // This strips € $ EUR USD and spaces around them, leaving "20-30" or "25.50"
@@ -20,14 +25,20 @@ export function CollectionValueKPI({ vinyls }) {
                     const low = parseFloat(parts[0]);
                     const high = parseFloat(parts[1]);
                     if (!isNaN(low) && !isNaN(high)) {
-                        return acc + ((low + high) / 2);
+                        const avg = (low + high) / 2;
+                        return acc + avg;
                     }
                 }
             }
 
             // Handle single value
             const val = parseFloat(cleanStr);
-            return acc + (isNaN(val) ? 0 : val);
+            if (!isNaN(val)) {
+                // console.log(`Parsed Single: ${costStr} -> ${val}`);
+                return acc + val;
+            }
+
+            return acc;
         }, 0);
     }, [vinyls]);
 

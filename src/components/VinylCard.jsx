@@ -5,7 +5,7 @@ import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
 
-export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip, onViewDetail }) {
+export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, onUpdate, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip, onViewDetail }) {
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState(null);
     // Local state to show updates immediately without full grid refresh
@@ -22,9 +22,11 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
     const missingFields = useMemo(() => {
         const fields = [];
         // Only flag truly empty fields, not "Unknown" (which is a valid AI response)
-        if (!localVinyl.label || localVinyl.label.trim() === '') fields.push('Label');
-        if (!localVinyl.edition || localVinyl.edition.trim() === '') fields.push('Edition');
-        if (!localVinyl.average_cost) fields.push('Price');
+        // User Request: Label and Edition are no longer considered critical errors
+        // if (!localVinyl.label || localVinyl.label.trim() === '') fields.push('Label'); 
+        // if (!localVinyl.edition || localVinyl.edition.trim() === '') fields.push('Edition');
+        // Checks both correct field and legacy typo field from DB
+        if (!localVinyl.average_cost && !localVinyl.avarege_cost) fields.push('Price');
         return fields;
     }, [localVinyl]);
 
@@ -62,7 +64,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 // Sanitise cost to strict String(50)
-                average_cost: String(analysis.average_cost || '').substring(0, 50),
+                avarege_cost: String(analysis.average_cost || '').substring(0, 50), // DB Typo
                 tracks: String(analysis.tracks || '').substring(0, 4999),
                 // CRITICAL: Save label, catalog_number, edition to prevent "NEEDS INFO" false positives
                 label: String(analysis.label || '').substring(0, 100),
@@ -88,6 +90,8 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
             // Update local view
             setLocalVinyl(prev => ({ ...prev, ...analysis }));
+            // Notify parent to update global state (Total Value etc.)
+            if (onUpdate) onUpdate(localVinyl.id, fullUpdate);
             alert(hint ? "Guided Analysis Complete!" : "Analysis Complete!");
 
         } catch (err) {
@@ -313,7 +317,7 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 </div>
                                 <div>
                                     <span className="block text-[10px] text-gray-500 uppercase">Est. Value</span>
-                                    <span className="text-xs font-medium text-green-400">{localVinyl.average_cost || '-'}</span>
+                                    <span className="text-xs font-medium text-green-400">{localVinyl.average_cost || localVinyl.avarege_cost || '-'}</span>
                                 </div>
                                 <div className="col-span-1">
                                     <span className="block text-[10px] text-gray-500 uppercase">Rating</span>

@@ -13,7 +13,9 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
         vinyls.filter(v =>
             v.artist !== 'Pending AI' &&
             v.artist !== 'Error' &&
-            (!v.label || !v.edition || !v.average_cost)
+            // User Request: Label and Edition are no longer considered critical errors
+            // Check both field names (typo and correct)
+            (!v.average_cost && !v.avarege_cost)
         ),
         [vinyls]
     );
@@ -112,7 +114,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     group_members: analysis.group_members,
                     condition: analysis.condition,
                     // Sanitise cost to strict String(50)
-                    average_cost: String(analysis.average_cost || '').substring(0, 50),
+                    avarege_cost: String(analysis.average_cost || '').substring(0, 50), // DB Typo in PocketBase Schema
                     tracks: analysis.tracks,
                     label: String(analysis.label || '').substring(0, 100),
                     catalog_number: String(analysis.catalog_number || '').substring(0, 50),
@@ -286,7 +288,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                                 ? `Analyzing records... ${progress}% `
                                 : pendingItems.length > 0
                                     ? `${pendingItems.length} new records detected.`
-                                    : `${incompleteItems.length} records missing key release details (Label, Edition, or Price).`
+                                    : `${incompleteItems.length} records missing Estimated Value.`
                             }
                         </p>
                     </div>

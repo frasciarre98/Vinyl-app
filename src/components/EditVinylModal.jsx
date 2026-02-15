@@ -577,26 +577,39 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
                                                 try {
                                                     const hint = `${formData.artist} - ${formData.title}`;
-                                                    // Use toast or alert? Let's just update the field
                                                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
+                                                    const updates = {};
+
+                                                    // 1. Prepare Updates
                                                     if (analysis.average_cost) {
                                                         const cleanCost = String(analysis.average_cost).substring(0, 50);
-                                                        // 1. Update Local State
-                                                        setFormData(prev => ({ ...prev, average_cost: cleanCost }));
+                                                        updates.average_cost = cleanCost;
+                                                        updates.avarege_cost = cleanCost; // DB Typo
+                                                    }
+                                                    if (analysis.label) updates.label = String(analysis.label).substring(0, 100);
+                                                    if (analysis.catalog_number) updates.catalog_number = String(analysis.catalog_number).substring(0, 50);
+                                                    if (analysis.edition) updates.edition = String(analysis.edition).substring(0, 100);
 
-                                                        // 2. IMMEDIATE SAVE to Database
-                                                        await pb.collection('vinyls').update(vinyl.id, { avarege_cost: cleanCost });
-                                                        onUpdate(); // Refresh grid data in background
+                                                    if (Object.keys(updates).length > 0) {
+                                                        // 2. Update Local State
+                                                        setFormData(prev => ({ ...prev, ...updates }));
 
-                                                        // 3. Feedback
-                                                        // Maybe a small checkmark? For now, the input updates.
+                                                        // 3. IMMEDIATE SAVE
+                                                        // We must remove the mapped 'average_cost' key before sending to PB if PB only uses 'avarege_cost'
+                                                        // But setFormData uses average_cost. 
+                                                        // Let's create a clean payload for PB.
+                                                        const pbPayload = { ...updates };
+                                                        delete pbPayload.average_cost; // Remove the UI-key, keep 'avarege_cost'
+
+                                                        await pb.collection('vinyls').update(vinyl.id, pbPayload);
+                                                        onUpdate();
                                                     } else {
-                                                        alert("AI could not estimate a price. Try manually.");
+                                                        alert("AI could not extract any new details.");
                                                     }
                                                 } catch (e) {
                                                     console.error(e);
-                                                    alert("Price check failed: " + e.message);
+                                                    alert("Analysis failed: " + e.message);
                                                 } finally {
                                                     if (btn) btn.classList.remove('animate-spin');
                                                 }
