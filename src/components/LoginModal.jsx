@@ -66,7 +66,7 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-secondary">Password</label>
+                        <label className="text-sm font-medium text-secondary">passw di amministratore pocketbase</label>
                         <input
                             type="password"
                             value={password}
