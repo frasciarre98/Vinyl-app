@@ -12,8 +12,7 @@ import { analyzeImageUrl, getApiKey } from '../lib/openai';
 import { SearchableSelect } from './SearchableSelect';
 import staticData from '../data/vinyls-static.json';
 
-const IS_STATIC = false; // Always dynamic to see new uploads
-// const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export function VinylGrid({ refreshTrigger }) {
     const [user, setUser] = useState(pb.authStore.model);
