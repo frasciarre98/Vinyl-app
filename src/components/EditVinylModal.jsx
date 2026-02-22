@@ -33,6 +33,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
 
+    // Local Image State to handle immediate updates (since parent 'editingVinyl' is stale)
+    const [displayImageUrl, setDisplayImageUrl] = useState(null);
+
     // Crop State
     const [isCropping, setIsCropping] = useState(false);
     const [perspectiveMode, setPerspectiveMode] = useState(false);
@@ -44,6 +47,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
     useEffect(() => {
         if (vinyl) {
+            // Update local image display when vinyl prop opens/changes
+            // Append timestamp to valid URLs to ensure freshness if needed, or just trust the prop
+            setDisplayImageUrl(vinyl.image_url);
+
             let cost = vinyl.avarege_cost || vinyl.average_cost || '';
 
             // AUTO-FIX: Sanitize Currency on Load
@@ -109,7 +116,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         } catch (err) {
             console.error('Error updating vinyl:', err);
             console.error('Error updating vinyl:', err);
-            alert(`Errore nel salvataggio: ${err.message}\n\nProbabilmente mancano gli attributi 'is_tracks_validated' o 'is_price_locked' nel database Appwrite.`);
+            alert(`Errore nel salvataggio: ${err.message}\n\nProbabilmente mancano degli attributi obbligatori nel database PocketBase.`);
         } finally {
             setSaving(false);
         }
@@ -166,8 +173,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
     const handleStartPerspective = async () => {
         if (!vinyl.image_url) return;
-        // DIRECT URL MODE
-        setCropImageSrc(vinyl.image_url);
+        // DIRECT URL MODE - Append timestamp to avoid CORS cache issues
+        const url = new URL(vinyl.image_url);
+        url.searchParams.set('t', Date.now());
+        setCropImageSrc(url.toString());
         setIsCropping(true);
         setPerspectiveMode(true);
     };
@@ -192,13 +201,14 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             const publicUrl = pb.files.getUrl(record, record.image);
 
             onUpdate(); // Refresh grid
-            // Update local view manually if needed, or rely on onUpdate
-            // setVinyl(record) - but props are immutable, so onUpdate handles refetch
 
-            onUpdate();
             setIsCropping(false);
             setPerspectiveMode(false);
             setCropImageSrc(null);
+
+            // Immediate Local Update to prevent "Deleted Image" 404
+            setDisplayImageUrl(`${publicUrl}?t=${Date.now()}`); // Force new load
+
             alert('Perspective correction applied successfully!');
         } catch (err) {
             console.error(err);
@@ -368,8 +378,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                         {/* Cover Image Replacement Section */}
                         <div className="flex items-center gap-4 bg-black/40 border border-white/10 p-3 rounded-lg">
                             <div className="w-16 h-16 bg-black/40 rounded overflow-hidden flex-shrink-0 flex items-center justify-center border border-white/10">
-                                {vinyl.image_url ? (
-                                    <img src={vinyl.image_url} alt="Current Cover" className="w-full h-full object-cover" />
+                                {displayImageUrl ? (
+                                    <img src={displayImageUrl} alt="Current Cover" className="w-full h-full object-cover" />
                                 ) : (
                                     <ImageIcon className="w-6 h-6 text-white/20" />
                                 )}
@@ -395,7 +405,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                         <Camera className="w-3 h-3" /> Photo
                                     </button>
 
-                                    {vinyl.image_url && (
+                                    {displayImageUrl && (
                                         <>
                                             <button
                                                 type="button"
@@ -579,33 +589,38 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                     const hint = `${formData.artist} - ${formData.title}`;
                                                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
+                                                    // 1. Prepare Updates & Respect locks
                                                     const updates = {};
+                                                    const canUpdate = (field) => !lockedFields.includes(field);
 
-                                                    // 1. Prepare Updates
-                                                    if (analysis.average_cost) {
+                                                    if (analysis.average_cost && canUpdate('average_cost')) {
                                                         const cleanCost = String(analysis.average_cost).substring(0, 50);
                                                         updates.average_cost = cleanCost;
                                                         updates.avarege_cost = cleanCost; // DB Typo
                                                     }
-                                                    if (analysis.label) updates.label = String(analysis.label).substring(0, 100);
-                                                    if (analysis.catalog_number) updates.catalog_number = String(analysis.catalog_number).substring(0, 50);
-                                                    if (analysis.edition) updates.edition = String(analysis.edition).substring(0, 100);
+                                                    if (analysis.label && canUpdate('label')) updates.label = String(analysis.label).substring(0, 100);
+                                                    if (analysis.catalog_number && canUpdate('catalog_number')) updates.catalog_number = String(analysis.catalog_number).substring(0, 50);
+                                                    if (analysis.edition && canUpdate('edition')) updates.edition = String(analysis.edition).substring(0, 100);
+
+                                                    // Artist/Title/Genre/Year protection
+                                                    if (analysis.artist && canUpdate('artist')) updates.artist = String(analysis.artist).substring(0, 100);
+                                                    if (analysis.title && canUpdate('title')) updates.title = String(analysis.title).substring(0, 100);
+                                                    if (analysis.genre && canUpdate('genre')) updates.genre = String(analysis.genre).substring(0, 100);
+                                                    if (analysis.year && canUpdate('year')) updates.year = String(analysis.year).substring(0, 50);
+                                                    if (analysis.tracks && !formData.is_tracks_validated && canUpdate('tracks')) updates.tracks = analysis.tracks;
 
                                                     if (Object.keys(updates).length > 0) {
                                                         // 2. Update Local State
                                                         setFormData(prev => ({ ...prev, ...updates }));
 
                                                         // 3. IMMEDIATE SAVE
-                                                        // We must remove the mapped 'average_cost' key before sending to PB if PB only uses 'avarege_cost'
-                                                        // But setFormData uses average_cost. 
-                                                        // Let's create a clean payload for PB.
                                                         const pbPayload = { ...updates };
-                                                        delete pbPayload.average_cost; // Remove the UI-key, keep 'avarege_cost'
+                                                        delete pbPayload.average_cost; // Remove UI-key
 
                                                         await pb.collection('vinyls').update(vinyl.id, pbPayload);
                                                         onUpdate();
                                                     } else {
-                                                        alert("AI could not extract any new details.");
+                                                        alert("AI analysis skipped: All affected fields are locked.");
                                                     }
                                                 } catch (e) {
                                                     console.error(e);

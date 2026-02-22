@@ -1,0 +1,10 @@
+node_modules
+.DS_Store
+
+dist
+backend/pb_data/*
+backend/pocketbase
+*.zip
+*.log
+.gitignore
+.git

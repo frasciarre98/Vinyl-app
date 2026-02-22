@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, Euro, PlayCircle, Youtube, Wand2, Loader2 } from 'lucide-react';
+import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, Euro, PlayCircle, Youtube, Wand2, Loader2, Music } from 'lucide-react';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
 
 const icons = { PlayCircle, Youtube }; // Quick fix for previous replacement using icons.Namespace
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit, onDelete }) {
     // Local state to handle updates immediately
+    const [user, setUser] = useState(pb.authStore.model);
+    useEffect(() => {
+        return pb.authStore.onChange((token, model) => {
+            setUser(model);
+        });
+    }, []);
     const [vinyl, setVinyl] = useState(initialVinyl);
     const [analyzing, setAnalyzing] = useState(false);
+    const [generatingStory, setGeneratingStory] = useState(false);
 
     useEffect(() => {
         setVinyl(initialVinyl);
@@ -36,6 +43,33 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
     }, [vinyl]);
 
     if (!isOpen || !vinyl) return null;
+
+    const handleGenerateStory = async () => {
+        if (!vinyl.artist || !vinyl.title) {
+            alert("Artist and Title are required to generate a story.");
+            return;
+        }
+        setGeneratingStory(true);
+        try {
+            const res = await fetch('/api/ai/story', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ artist: vinyl.artist, title: vinyl.title })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to generate story');
+
+            const fullUpdate = { liner_notes: data.story };
+            await pb.collection('vinyls').update(vinyl.id, fullUpdate);
+
+            setVinyl(prev => ({ ...prev, liner_notes: data.story }));
+        } catch (err) {
+            console.error(err);
+            alert(`Story generation failed: ${err.message}`);
+        } finally {
+            setGeneratingStory(false);
+        }
+    };
 
     const handleAnalyze = async () => {
         // Guided AI: Ask for hint
@@ -102,7 +136,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                     <X className="w-8 h-8" />
                 </button>
                 <div className="flex gap-2">
-                    {!IS_STATIC && (
+                    {!IS_STATIC && user && (
                         <>
                             <button
                                 onClick={handleAnalyze}
@@ -126,18 +160,29 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 text-[#1DB954] hover:text-[#1ed760] hover:bg-white/10 rounded-full transition-colors"
+                        title="Listen on Spotify"
                     >
                         <icons.PlayCircle className="w-6 h-6" />
+                    </a>
+                    <a
+                        href={`https://music.apple.com/search?term=${encodeURIComponent((vinyl.artist || '') + ' ' + (vinyl.title || ''))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-[#FA243C] hover:text-[#fc475c] hover:bg-white/10 rounded-full transition-colors"
+                        title="Listen on Apple Music"
+                    >
+                        <Music className="w-6 h-6" />
                     </a>
                     <a
                         href={`https://www.youtube.com/results?search_query=${encodeURIComponent((vinyl.artist || '') + ' ' + (vinyl.title || ''))}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 text-red-500 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors"
+                        title="Listen on YouTube"
                     >
                         <icons.Youtube className="w-6 h-6" />
                     </a>
-                    {!IS_STATIC && (
+                    {!IS_STATIC && user && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -262,7 +307,40 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                                 </p>
                             </div>
                             <div>
-                                <h4 className="text-xs uppercase text-secondary mb-2">Notes</h4>
+                                <h4 className="text-xs uppercase text-secondary mb-2 flex items-center gap-2 justify-between">
+                                    <span>Liner Notes (AI Story)</span>
+                                    {!IS_STATIC && user && !vinyl.liner_notes && (
+                                        <button
+                                            onClick={handleGenerateStory}
+                                            disabled={generatingStory}
+                                            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold tracking-wider uppercase transition-colors ${generatingStory ? 'bg-purple-900/50 text-purple-400' : 'bg-purple-600 text-white hover:bg-purple-500'}`}
+                                        >
+                                            {generatingStory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                            {generatingStory ? 'Writing...' : 'Generate'}
+                                        </button>
+                                    )}
+                                </h4>
+                                {vinyl.liner_notes ? (
+                                    <div className="bg-purple-900/10 border border-purple-500/20 p-4 rounded-xl relative group">
+                                        <p className="text-purple-200/90 font-serif leading-relaxed text-sm">
+                                            {vinyl.liner_notes}
+                                        </p>
+                                        {!IS_STATIC && user && (
+                                            <button
+                                                onClick={handleGenerateStory}
+                                                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-purple-500/40 text-purple-300 rounded-lg opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md"
+                                                title="Regenerate Story"
+                                            >
+                                                <Wand2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-white/30 italic px-4 text-sm font-light">No story generated yet.</p>
+                                )}
+                            </div>
+                            <div>
+                                <h4 className="text-xs uppercase text-secondary mb-2">Notes & Appraisal</h4>
                                 <p className="text-gray-400 font-light italic leading-relaxed border-l-2 border-white/10 pl-4 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20">
                                     {vinyl.notes || '—'}
                                 </p>

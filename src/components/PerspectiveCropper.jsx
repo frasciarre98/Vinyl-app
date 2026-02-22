@@ -111,6 +111,10 @@ export function PerspectiveCropper({ imageSrc, onComplete, onCancel }) {
                     <img
                         src={imageSrc}
                         onLoad={onImgLoad}
+                        onError={(e) => {
+                            console.error("Perspective Image Load Error", e);
+                            alert("Failed to load image for perspective editing. Possible CORS issue or broken URL.");
+                        }}
                         crossOrigin="anonymous"
                         className="max-h-[50vh] max-w-[80vw] select-none pointer-events-none block"
                         alt="Perspective Target"

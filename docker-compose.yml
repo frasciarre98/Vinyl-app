@@ -1,0 +1,13 @@
+services:
+  vinyl-app:
+    build:
+      context: .
+      args:
+        PB_VERSION: 0.36.1
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./backend/pb_data:/pb/pb_data # Persist data on host
+    env_file:
+      - .env

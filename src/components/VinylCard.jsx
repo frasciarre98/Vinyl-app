@@ -3,7 +3,7 @@ import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles
 import { pb } from '../lib/pocketbase';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, onUpdate, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip, onViewDetail }) {
     const [analyzing, setAnalyzing] = useState(false);

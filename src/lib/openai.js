@@ -1,7 +1,7 @@
 /**
  * Service to analyze album covers using AI (Google Gemini or OpenAI).
  */
-// import { supabase } from './supabase'; // Removed
+import { pb } from './pocketbase';
 
 const DEFAULT_PROVIDER = 'gemini';
 const MODEL_COOLDOWNS = new Map();
@@ -351,90 +351,29 @@ Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in th
 
 // 2. OpenAI (GPT-4o - Expert & Precise)
 async function analyzeOpenAI(base64Content, apiKey, hint = null, mimeType = 'image/jpeg') {
-    if (!apiKey) throw new Error("Missing OpenAI API Key");
-
-    const cleanKey = apiKey.trim();
-
     try {
-        console.log(`[OpenAI] Sending request... (Hint: ${hint}, Mime: ${mimeType})`);
+        console.log(`[OpenAI via Backend] Sending request... (Hint: ${hint}, Mime: ${mimeType})`);
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await pb.send('/api/ai/analyze', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${cleanKey}`
-            },
-            body: JSON.stringify({
-                model: "gpt-4o",
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are an expert musicologist and **Professional Vinyl Appraiser**.
-Your goal is to provide **Forensic Level Metadata** and **Accurate Market Valuation** for a serious collector.
-1. **Back Cover (Visual Truth):** If you see a tracklist, you are a SCANNER. Transcribe text EXACTLY as printed.
-2. **Edition Identification:** Look for Catalog Numbers, Barcodes (post-1980), Label Logos, and Copyright dates.
-   - No Barcode? Likely pre-1980.
-   - "Digitally Remastered"? Modern Reissue.
-3. **Valuation Logic (EURO) - DO NOT LOWBALL:**
-   - **Common Used / Reissues:** €20 - €35 (Standard Record Store Price).
-   - **Vintage VG+ (1970s/80s):** €35 - €75 (Pink Floyd, Zeppelin etc. Use Discogs Median + 20% for physical store markup).
-   - **Rare Collector Items (1st Press):** €100 - €500+ (CRITICAL: If you see specific indicators like "Harvest" label without EMI logo, "Swirl" Vertigo, or specific catalog numbers, VALUE ACCORDINGLY. Do not hold back on high values).
-   - *Logic:* Assume the record is in **VG+ to Near Mint** condition unless you see obvious damage. Value it as if sold in a curated Record Store, not a flea market.
-   - **STRICT FORBIDDEN:** Do NOT use output "Varies", "Unknown", or "$". 
-   - **STRICT REQUIRED:** You MUST output a range in EURO (€) specific to the matched edition.
-   - **UNCERTAINTY FALLBACK:** If you cannot find the exact price, **ESTIMATE** based on similar albums. Use "€20-35" minimum for any playable LP. **NEVER RETURN EMPTY OR UNKNOWN**.`
-                    },
-                    {
-                        role: "user",
-                        content: [
-                            {
-                                type: "text", text: `Analyze this vinyl record image. ${hint ? `Hint: "${hint}"` : ''}
-
-**OUTPUT INSTRUCTIONS:**
-- Return a single JSON object.
-- **_visual_evidence**: Briefly list what text you can actually read on the image.
-- **tracks**: If visible, transcribe them. If not, list the standard Original LP tracks.
-- **year**: Original release year.
-
-Return JSON keys: artist, title, genre, year, tracks, group_members, average_cost (Value in EURO €, based on VG+/NM Store Price. e.g. "€45-65". JUSTIFY this in notes.), condition, label, catalog_number, edition, notes (Appraisal summary: Identify the pressing, mention Matrix/Label clues, and explain the price).` },
-                            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Content}`, detail: "high" } }
-                        ]
-                    }
-                ],
-
-                response_format: { type: "json_object" },
-                max_tokens: 3000,
-                temperature: 0.1
-            })
+            body: {
+                base64Content,
+                hint,
+                mimeType
+            }
         });
 
-        const data = await response.json();
-
-        if (data.error) {
-            console.error("[OpenAI] API Error:", data.error);
-            throw new Error(data.error.message);
+        if (!response || !response.success || !response.content) {
+            console.error("[OpenAI via Backend] Invalid Response:", response);
+            throw new Error(response?.error || "Unknown backend error");
         }
 
-        const choice = data.choices[0];
-        if (!choice.message.content) {
-            console.error("[OpenAI] Empty Response. Full Choice:", JSON.stringify(choice, null, 2));
-            if (choice.message.refusal) {
-                throw new Error(`OpenAI Refusal: ${choice.message.refusal}`);
-            }
-            throw new Error(`OpenAI returned empty content. Reason: ${choice.finish_reason}`);
-        }
-
-        // Check for truncation
-        if (choice.finish_reason === 'length') {
-            throw new Error("AI Response Truncated. Try reducing image complexity or prompt length.");
-        }
-
-        console.log("[OpenAI] Raw Response:", choice.message.content); // CRITICAL DEBUG LOG
-        return parseAIResponse(choice.message.content);
+        console.log("[OpenAI via Backend] Raw Response:", response.content); // CRITICAL DEBUG LOG
+        return parseAIResponse(response.content);
 
     } catch (error) {
-        console.error("[OpenAI] Exception:", error);
-        throw error;
+        console.error("[OpenAI via Backend] Exception:", error);
+        throw new Error(error.data?.error || error.message || "Failed to communicate with AI Backend");
     }
 }
 
@@ -623,9 +562,9 @@ export function resizeImage(fileOrBlob) {
 
             img.onload = () => {
                 try {
-                    // Reduced from 2048 to 1600 for better mobile compatibility
-                    const maxWidth = 1600;
-                    const maxHeight = 1600;
+                    // Reduced to 1024 for maximum mobile stability & speed
+                    const maxWidth = 1024;
+                    const maxHeight = 1024;
                     let width = img.width;
                     let height = img.height;
 
@@ -661,8 +600,8 @@ export function resizeImage(fileOrBlob) {
                     // Release source memory immediately
                     URL.revokeObjectURL(url);
 
-                    // Reduced quality from 0.7 to 0.6 for smaller file size
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    // Reduced quality to 0.5 for speed (approx 150-200KB)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
                     resolve(dataUrl);
                 } catch (e) {
                     URL.revokeObjectURL(url);

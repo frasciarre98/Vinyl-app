@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const pb = new PocketBase('http://127.0.0.1:8090');
+const PB_URL = process.env.VITE_PB_URL || 'http://127.0.0.1:8090';
+const pb = new PocketBase(PB_URL);
 const STORAGE_DIR = path.join(__dirname, '../public/storage');
 const DATA_FILE = path.join(__dirname, '../src/data/vinyls-static.json');
 
@@ -21,7 +22,7 @@ async function exportStaticData() {
 
     try {
         // 2. Fetch all vinyls
-        console.log("🌐 Connecting to PocketBase at http://127.0.0.1:8090...");
+        console.log(`🌐 Connecting to PocketBase at ${PB_URL}...`);
         const records = await pb.collection('vinyls').getFullList();
 
         console.log(`📦 Found ${records.length} records in PocketBase.`);

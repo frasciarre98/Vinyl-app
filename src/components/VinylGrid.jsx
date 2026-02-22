@@ -1,19 +1,28 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Trash2, CheckSquare, Sparkles, Filter, X, ArrowUpDown, ChevronDown, RotateCcw, AlertTriangle, BarChart2 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { VinylCard } from './VinylCard';
 import { BatchAnalysisBanner } from './BatchAnalysisBanner';
 import { CollectionValueKPI } from './CollectionValueKPI';
 import { VinylDetailModal } from './VinylDetailModal';
 import { EditVinylModal } from './EditVinylModal';
+import { StatsModal } from './StatsModal';
 import { UndoToast } from './UndoToast';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 import { SearchableSelect } from './SearchableSelect';
 import staticData from '../data/vinyls-static.json';
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
+const IS_STATIC = false; // Always dynamic to see new uploads
+// const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export function VinylGrid({ refreshTrigger }) {
+    const [user, setUser] = useState(pb.authStore.model);
+    useEffect(() => {
+        return pb.authStore.onChange((token, model) => {
+            setUser(model);
+        });
+    }, []);
+
     const [vinyls, setVinyls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -22,6 +31,7 @@ export function VinylGrid({ refreshTrigger }) {
     const [selectedArtist, setSelectedArtist] = useState('');
     const [selectedGenre, setSelectedGenre] = useState('');
     const [selectedRating, setSelectedRating] = useState('0');
+    const [showWantlist, setShowWantlist] = useState(false);
     // Sort Order: 'newest' (default) | 'artist_asc'
     const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('vinyl_sort_order') || 'newest');
 
@@ -40,6 +50,7 @@ export function VinylGrid({ refreshTrigger }) {
     // UI States
     const [flippedCardId, setFlippedCardId] = useState(null);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Controls Bottom Sheet on Mobile
+    const [isStatsOpen, setIsStatsOpen] = useState(false);
     const [selectedDetailVinyl, setSelectedDetailVinyl] = useState(null);
     const [editingVinyl, setEditingVinyl] = useState(null); // Local state for Edit Modal
     const [isSearchExpanded, setIsSearchExpanded] = useState(false); // For mobile compacted search
@@ -61,9 +72,10 @@ export function VinylGrid({ refreshTrigger }) {
     const uniqueArtists = [...new Set(vinyls.map(v => String(v.artist || '')).filter(Boolean).sort())];
     const uniqueGenres = [...new Set(vinyls.map(v => String(v.genre || '')).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
 
-    // Compute Format Counts
-    const vinylCount = vinyls.filter(v => !v.format || v.format === 'Vinyl').length;
-    const cdCount = vinyls.filter(v => v.format === 'CD').length;
+    // Compute Format Counts based on active mode
+    const activeVinyls = vinyls.filter(v => showWantlist ? v.is_wantlist === true : v.is_wantlist !== true);
+    const vinylCount = activeVinyls.filter(v => !v.format || v.format === 'Vinyl').length;
+    const cdCount = activeVinyls.filter(v => v.format === 'CD').length;
 
     const fetchVinyls = async () => {
         try {
@@ -84,10 +96,12 @@ export function VinylGrid({ refreshTrigger }) {
 
             const records = await pb.collection('vinyls').getFullList({
                 sort: '-created',
-                requestKey: null
+                requestKey: String(Date.now()) // Force fresh request every time
             });
 
-            console.log("🔍 Loaded", records.length, "records. Sample:", records[0]); // Debug Log
+            console.log("🔍 Loaded", records.length, "records from PocketBase. First Created:", records[0]?.created);
+            // ALERT DEBUG 2: Confirm Fetch
+            // alert(`Fetched ${records.length} records from DB. First: ${records[0]?.title} (${records[0]?.created})`);
 
             const allVinyls = records.map(doc => ({
                 ...doc,
@@ -327,8 +341,9 @@ export function VinylGrid({ refreshTrigger }) {
             }
 
             const matchesTrack = !trackSearch || (vinyl.tracks?.toLowerCase() || '').includes(trackSearch.toLowerCase());
+            const matchesWantlist = showWantlist ? vinyl.is_wantlist === true : vinyl.is_wantlist !== true;
 
-            return matchesSearch && matchesArtist && matchesGenre && matchesRating && matchesTrack;
+            return matchesSearch && matchesArtist && matchesGenre && matchesRating && matchesTrack && matchesWantlist;
         });
 
         // Sort
@@ -339,23 +354,39 @@ export function VinylGrid({ refreshTrigger }) {
             // Robust Date Sort with Image Timestamp & ID fallback
             // Simple, Robust Date Sort
             const getTimestamp = (record) => {
-                let dateStr = record.created || record.$createdAt;
-                // DEBUG LOG for the first few items to see what we are getting
-                // if (Math.random() < 0.01) console.log("Sort Date:", dateStr, record.id);
+                // Priority 0: "Pending AI" records always first (even if date is missing)
+                if (record.artist === 'Pending AI') return 9999999999999;
 
-                if (!dateStr) return 0;
-                // Ensure ISO format for Safari/Mobile compatibility
+                // 1. Try 'created' (standard)
+                // 2. Try '$createdAt' (internal PB)
+                // 3. Try 'updated' (if created is missing for some reason)
+                // 4. Try '$updatedAt'
+                let dateStr = record.created || record.updated;
+
+                // Checking for empty string explicitly or null/undefined
+                if (!dateStr) return Date.now();
+
+                // PocketBase uses "YYYY-MM-DD HH:mm:ss.123Z", Safari/iOS needs "T" separator
                 if (typeof dateStr === 'string' && dateStr.includes(" ") && !dateStr.includes("T")) {
                     dateStr = dateStr.replace(" ", "T");
                 }
+
+
                 const ts = new Date(dateStr).getTime();
-                return isNaN(ts) ? 0 : ts;
+                // DEBUG: specific check for recent or known IDs if needed
+                // if (record.title?.includes("Wall")) console.log("Sort Debug:", record.title, dateStr, ts);
+
+                // If date is invalid (e.g. broken upload), treat as NOW to show at top
+                return isNaN(ts) ? Date.now() : ts;
             };
 
             const dateA = getTimestamp(a);
             const dateB = getTimestamp(b);
 
-            // Console log if NaN found
+            // Critical Debug: Log the first comparison to see if we have valid dates
+            // if (Math.random() < 0.001) console.log("Comparing", dateA, dateB, a.title, b.title);
+
+            // Console log if NaN found (should be handled by getTimestamp 0 fallback but good to know)
             if (dateA === 0 && a.created) console.warn("Invalid Date A:", a.created);
             if (dateB === 0 && b.created) console.warn("Invalid Date B:", b.created);
 
@@ -363,9 +394,13 @@ export function VinylGrid({ refreshTrigger }) {
                 return dateB - dateA; // Newest first
             }
 
-            // Fallback to ID
+            // Fallback to ID (Newer IDs are higher)
             return (b.id || '').localeCompare(a.id || '');
         });
+
+        if (result.length > 0 && sortOrder === 'newest') {
+            // console.log("Top 3 Newest:", result.slice(0, 3).map(r => `${r.artist} - ${r.title} (${r.created})`));
+        }
 
         return result;
     }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch]);
@@ -404,12 +439,12 @@ export function VinylGrid({ refreshTrigger }) {
                 </div>
             )}
 
-            {!IS_STATIC && (
-                <BatchAnalysisBanner vinyls={vinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
+            {!IS_STATIC && !showWantlist && user && (
+                <BatchAnalysisBanner vinyls={activeVinyls} onUpdate={handleUpdateVinyl} onComplete={fetchVinyls} />
             )}
 
             {/* --- COLLECTION VALUE KPI --- */}
-            <CollectionValueKPI vinyls={vinyls} />
+            {!showWantlist && <CollectionValueKPI vinyls={activeVinyls} />}
 
             {/* --- MOBILE STICKY HEADER --- */}
             <div className={`
@@ -424,10 +459,10 @@ export function VinylGrid({ refreshTrigger }) {
                             <button onClick={() => { setSearch(''); setIsSearchExpanded(false); }} className="p-2 text-white/50"><X className="w-5 h-5" /></button>
                         </div>
                     ) : (
-                        <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl font-bold tracking-tight text-white">Collection</span>
-                                <span className="text-xs font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">{vinyls.length}</span>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/10 w-fit">
+                                <button onClick={() => setShowWantlist(false)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${!showWantlist ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Collection</button>
+                                <button onClick={() => setShowWantlist(true)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${showWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-secondary hover:text-white'}`}>Wantlist</button>
                             </div>
                             <span className="text-[10px] text-white/40 font-mono tracking-wider">{vinylCount} VINYL • {cdCount} CD</span>
                         </div>
@@ -435,12 +470,13 @@ export function VinylGrid({ refreshTrigger }) {
                 </div>
 
                 {!isSearchExpanded && (
-                    <div className="flex items-center gap-1">
-                        <button onClick={() => setIsSearchExpanded(true)} className="p-2 rounded-full text-white/70 hover:bg-white/10 active:scale-95 transition-all"><Search className="w-5 h-5" /></button>
-                        <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`p-2 rounded-full transition-all active:scale-95 ${sortOrder === 'artist_asc' ? 'text-accent' : 'text-white/70 hover:bg-white/10'}`}><ArrowUpDown className="w-5 h-5" /></button>
-                        <button onClick={() => setIsFiltersOpen(true)} className={`p-2 rounded-full transition-all active:scale-95 relative ${activeFiltersCount > 0 ? 'text-primary' : 'text-white/70 hover:bg-white/10'}`}><Filter className="w-5 h-5" />{activeFiltersCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-black" />}</button>
-                        {!IS_STATIC && (
-                            <button onClick={toggleSelectionMode} className={`p-2 rounded-full transition-all active:scale-95 ${isSelectionMode ? 'bg-white text-black' : 'text-white/70 hover:bg-white/10'}`}><CheckSquare className="w-5 h-5" /></button>
+                    <div className="flex items-center gap-0 sm:gap-1 shrink-0">
+                        <button onClick={() => setIsSearchExpanded(true)} className="p-1.5 sm:p-2 rounded-full text-white/70 hover:bg-white/10 active:scale-95 transition-all"><Search className="w-5 h-5" /></button>
+                        <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`p-1.5 sm:p-2 rounded-full transition-all active:scale-95 ${sortOrder === 'artist_asc' ? 'text-accent' : 'text-white/70 hover:bg-white/10'}`}><ArrowUpDown className="w-5 h-5" /></button>
+                        <button onClick={() => setIsStatsOpen(true)} className="p-1.5 sm:p-2 rounded-full text-white/70 hover:bg-white/10 active:scale-95 transition-all" title="View Statistics"><BarChart2 className="w-5 h-5" /></button>
+                        <button onClick={() => setIsFiltersOpen(true)} className={`p-1.5 sm:p-2 rounded-full transition-all active:scale-95 relative ${activeFiltersCount > 0 ? 'text-primary' : 'text-white/70 hover:bg-white/10'}`}><Filter className="w-5 h-5" />{activeFiltersCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-black" />}</button>
+                        {!IS_STATIC && user && (
+                            <button onClick={toggleSelectionMode} className={`p-1.5 sm:p-2 rounded-full transition-all active:scale-95 ${isSelectionMode ? 'bg-white text-black' : 'text-white/70 hover:bg-white/10'}`}><CheckSquare className="w-5 h-5" /></button>
                         )}
                     </div>
                 )}
@@ -482,22 +518,26 @@ export function VinylGrid({ refreshTrigger }) {
             </div>
 
             {/* --- DESKTOP FILTERS --- */}
-            <div className="hidden md:flex sticky top-20 z-20 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 flex-row gap-4 justify-between items-center shadow-lg">
-                <div className="relative flex-1 w-full gap-4 flex flex-row">
-                    <div className="relative flex-1">
+            <div className="hidden md:flex sticky top-20 z-20 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 flex-row flex-wrap gap-4 justify-between items-center shadow-lg">
+                <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 shrink-0">
+                    <button onClick={() => setShowWantlist(false)} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${!showWantlist ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Collection</button>
+                    <button onClick={() => setShowWantlist(true)} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${showWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-secondary hover:text-white'}`}>Wantlist</button>
+                </div>
+                <div className="relative flex-1 w-full gap-4 flex flex-row flex-wrap items-center">
+                    <div className="relative flex-1 min-w-[150px]">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-secondary" /></div>
                         <input type="text" name="main_search" autoComplete="off" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm" />
                     </div>
-                    <input type="text" name="track_search_query" autoComplete="off" placeholder="Track Name..." value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} className="bg-surface border border-border text-primary rounded-full px-4 py-3 max-w-[200px] text-sm placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50" />
+                    <input type="text" name="track_search_query" autoComplete="off" placeholder="Track Name..." value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} className="bg-surface border border-border text-primary rounded-full px-4 py-3 w-full sm:max-w-[200px] text-sm placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 shrink-0" />
                     <SearchableSelect
                         options={uniqueArtists}
                         value={selectedArtist}
                         onChange={setSelectedArtist}
                         placeholder="All Artists"
-                        className="w-[200px]"
+                        className="w-full sm:w-[200px] shrink-0"
                     />
-                    <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px]"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select>
-                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 max-w-[200px] font-medium">
+                    <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 w-full sm:max-w-[180px] shrink-0"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select>
+                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 w-full sm:max-w-[180px] font-medium shrink-0">
                         <option value="0">All Ratings</option>
                         <option value="needs_attention">⚠ Needs Attention</option>
                         <option value="5">5 Stars Only</option>
@@ -509,9 +549,9 @@ export function VinylGrid({ refreshTrigger }) {
                     </select>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
                     <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm flex items-center gap-2">
-                        <span className="font-bold text-primary">{vinyls.length}</span>
+                        <span className="font-bold text-primary">{activeVinyls.length}</span>
                         <span className="text-secondary/50">records</span>
                         <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">{vinylCount} LP / {cdCount} CD</span>
                     </div>
@@ -525,24 +565,26 @@ export function VinylGrid({ refreshTrigger }) {
                         <span className="hidden lg:inline">Needs Attention</span>
                     </button>
 
-                    <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>{sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}</button>
+                    <button onClick={() => setIsStatsOpen(true)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors" title="View Statistics"><BarChart2 className="w-4 h-4" /></button>
+
+                    <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium whitespace-nowrap ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>{sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}</button>
                     <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white"><Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-                    {!IS_STATIC && (
+                    {!IS_STATIC && user && (
                         isSelectionMode ? (
                             <>
-                                <button onClick={() => setSelectedIds(selectedIds.length === filteredVinyls.length ? [] : filteredVinyls.map(v => v.id))} className="px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-full">{selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}</button>
-                                <div className="flex bg-white/5 rounded-full border border-white/10 p-1">
-                                    <button onClick={() => handleBatchFormatChange('Vinyl')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors">to Vinyl</button>
-                                    <div className="w-px bg-white/10 my-1"></div>
-                                    <button onClick={() => handleBatchFormatChange('CD')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors">to CD</button>
+                                <button onClick={() => setSelectedIds(selectedIds.length === filteredVinyls.length ? [] : filteredVinyls.map(v => v.id))} className="px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-full whitespace-nowrap">{selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}</button>
+                                <div className="flex items-center bg-white/5 rounded-full border border-white/10 p-1">
+                                    <button onClick={() => handleBatchFormatChange('Vinyl')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors whitespace-nowrap">to Vinyl</button>
+                                    <div className="w-px bg-white/10 my-1 h-4"></div>
+                                    <button onClick={() => handleBatchFormatChange('CD')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors whitespace-nowrap">to CD</button>
                                 </div>
-                                <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm"><CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})</button>
-                                <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors"><Sparkles className="w-4 h-4" /> Magic Refresh ({selectedIds.length})</button>
-                                <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
-                                <button onClick={toggleSelectionMode} className="px-4 py-2 text-sm text-secondary hover:text-primary">Cancel</button>
+                                <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap"><CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})</button>
+                                <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors whitespace-nowrap"><Sparkles className="w-4 h-4" /> Magic Refresh ({selectedIds.length})</button>
+                                <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
+                                <button onClick={toggleSelectionMode} className="px-4 py-2 text-sm text-secondary hover:text-primary whitespace-nowrap">Cancel</button>
                             </>
                         ) : (
-                            <button onClick={toggleSelectionMode} className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 border border-border text-sm"><CheckSquare className="w-4 h-4" /> Select</button>
+                            <button onClick={toggleSelectionMode} className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 border border-border text-sm whitespace-nowrap"><CheckSquare className="w-4 h-4" /> Select</button>
                         )
                     )}
                 </div>
@@ -583,9 +625,9 @@ export function VinylGrid({ refreshTrigger }) {
                             <VinylCard
                                 key={vinyl.id}
                                 vinyl={vinyl}
-                                onEdit={IS_STATIC ? null : setEditingVinyl}
+                                onEdit={IS_STATIC || !user ? null : setEditingVinyl}
                                 onUpdate={handleUpdateVinyl}
-                                onDelete={IS_STATIC ? null : handleSingleDelete}
+                                onDelete={IS_STATIC || !user ? null : handleSingleDelete}
                                 selectionMode={isSelectionMode}
                                 isSelected={selectedIds.includes(vinyl.id)}
                                 onToggleSelect={handleToggleSelect}
@@ -710,6 +752,12 @@ export function VinylGrid({ refreshTrigger }) {
                 onClose={() => setEditingVinyl(null)}
                 onUpdate={fetchVinyls}
                 onDelete={(id) => { handleSingleDelete(id); setEditingVinyl(null); }}
+            />
+
+            <StatsModal
+                isOpen={isStatsOpen}
+                onClose={() => setIsStatsOpen(false)}
+                vinyls={activeVinyls}
             />
         </div >
     );

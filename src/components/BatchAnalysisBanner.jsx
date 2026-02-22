@@ -123,6 +123,10 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
 
                 // CRITICAL: Respect locked_fields array (Field Protection System)
                 const lockedFields = Array.isArray(item.locked_fields) ? item.locked_fields : [];
+
+                // Unify locked field check for price (both typo and correct)
+                const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost');
+
                 let protectedCount = 0;
 
                 lockedFields.forEach(field => {
@@ -131,6 +135,11 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                         protectedCount++;
                     }
                 });
+
+                if (isPriceLocked && fullUpdate.avarege_cost) {
+                    delete fullUpdate.avarege_cost;
+                    protectedCount++;
+                }
 
                 // Legacy support: is_tracks_validated (backwards compatibility)
                 if (item.is_tracks_validated && !lockedFields.includes('tracks')) {

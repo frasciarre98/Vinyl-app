@@ -9,16 +9,19 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "export:static": "node scripts/export-static.js",
-    "backend": "cd backend && ./pocketbase serve --http=0.0.0.0:8090"
+    "backend": "set -a; source .env || true; set +a; cd backend && ./pocketbase serve --http=0.0.0.0:8090",
+    "magic-publish": "VITE_PB_URL=http://192.168.0.250:8090 npm run export:static && git add src/data public/storage && git commit -m '🚀 Auto-publish NAS Collection' || true && git config http.postBuffer 524288000 && git push"
   },
   "dependencies": {
     "clsx": "^2.1.0",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.344.0",
     "node-fetch": "^3.3.2",
     "pocketbase": "^0.26.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-easy-crop": "^5.5.6",
+    "recharts": "^3.7.0",
     "tailwind-merge": "^2.2.1"
   },
   "devDependencies": {

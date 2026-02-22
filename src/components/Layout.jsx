@@ -4,7 +4,7 @@ import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
 import { ImportModal } from './ImportModal';
 
-const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || import.meta.env.PROD;
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
 export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) {
     const [isExporting, setIsExporting] = useState(false);
@@ -93,9 +93,22 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
     const handlePublish = async () => {
         if (!confirm("🚀 MAGIC PUBLISH\n\nThis will export your current collection (data + images) and push it to GitHub/Vercel.\n\nContinue?")) return;
 
+        // Check if we are running on the NAS (or any non-localhost production environment)
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            alert("⚠️ MAGIC PUBLISH LIMITATION\n\nSince the app is now running on your NAS, it doesn't have access to your Mac's 'Git' commands or GitHub credentials to upload the site.\n\nTo publish the NAS data to Vercel, open the terminal on your MAC (inside the ionized-hubble folder) and run:\n\nVITE_PB_URL=http://192.168.0.250:8090 npm run export:static && git add . && git commit -m 'Auto-publish' && git push");
+            return;
+        }
+
         setIsPublishing(true);
         try {
             const res = await fetch('/api/publish');
+
+            // Catch HTML fallback responses immediately
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") === -1) {
+                throw new Error("Server did not return JSON. The publish endpoint is not running.");
+            }
+
             const data = await res.json();
             if (data.success) {
                 alert("✨ PUBLISHED!\n\nYour collection has been sent to GitHub. Vercel will update the site in 1-2 minutes.");
@@ -136,61 +149,38 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     <nav className="flex items-center gap-2 md:gap-4">
                         {!IS_STATIC && (
                             <>
-                                {/* Desktop: Full button with text */}
-                                <button
-                                    onClick={handlePublish}
-                                    disabled={isPublishing}
-                                    className={`
-                                            hidden md:flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all
-                                            ${isPublishing ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-600 text-white hover:bg-purple-500 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] active:scale-95'}
-                                        `}
-                                    title="Publish Static Mirror to Vercel"
-                                >
-                                    {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                                    <span>{isPublishing ? 'Publishing...' : 'Magic Publish'}</span>
-                                </button>
-
-                                {/* Mobile: Icon-only button */}
-                                <button
-                                    onClick={handlePublish}
-                                    disabled={isPublishing}
-                                    className={`
-                                            md:hidden p-2 rounded-full transition-all
-                                            ${isPublishing ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-600 text-white hover:bg-purple-500 active:scale-95'}
-                                        `}
-                                    title="Publish to Vercel"
-                                >
-                                    {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5" />}
-                                </button>
-
-                                <button
-                                    onClick={handleExport}
-                                    disabled={isExporting}
-                                    className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
-                                    title="Export to Excel/CSV"
-                                >
-                                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                    <span className="hidden sm:inline">Export</span>
-                                </button>
-                                <button
-                                    onClick={() => setIsImportOpen(true)}
-                                    className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
-                                    title="Import CSV"
-                                >
-                                    <Upload className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Import</span>
-                                </button>
-                                <button
-                                    onClick={onOpenUpload}
-                                    className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Add Vinyls</span>
-                                </button>
+                                {user ? (
+                                    <>
+                                        <button
+                                            onClick={handleExport}
+                                            disabled={isExporting}
+                                            className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                            title="Export to Excel/CSV"
+                                        >
+                                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                            <span className="hidden sm:inline">Export</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setIsImportOpen(true)}
+                                            className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                            title="Import CSV"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            <span className="hidden sm:inline">Import</span>
+                                        </button>
+                                        <button
+                                            onClick={onOpenUpload}
+                                            className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            <span>Add Vinyls</span>
+                                        </button>
+                                    </>
+                                ) : null}
                                 <button
                                     onClick={onOpenDebug}
                                     className="p-2 text-secondary hover:text-red-400 transition-colors hover:bg-white/5 rounded-full"
-                                    title="Debug / Admin"
+                                    title="Admin / Login"
                                 >
                                     <Bug className="w-5 h-5" />
                                 </button>
@@ -205,23 +195,25 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                         )}
                     </nav>
                 </div>
-            </header>
+            </header >
 
             <main className="flex-1 container mx-auto px-4 py-0 md:py-8">
                 {children}
             </main>
 
             {/* Floating Action Button for Mobile */}
-            {!IS_STATIC && (
-                <button
-                    onClick={onOpenUpload}
-                    className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center"
-                    title="Add Vinyls"
-                    aria-label="Add Vinyls"
-                >
-                    <Plus className="w-6 h-6" />
-                </button>
-            )}
+            {
+                !IS_STATIC && user && (
+                    <button
+                        onClick={onOpenUpload}
+                        className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center"
+                        title="Add Vinyls"
+                        aria-label="Add Vinyls"
+                    >
+                        <Plus className="w-6 h-6" />
+                    </button>
+                )
+            }
 
             <ImportModal
                 isOpen={isImportOpen}
@@ -238,6 +230,6 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v2.2</span></p>
                 </div>
             </footer>
-        </div>
+        </div >
     );
 }
