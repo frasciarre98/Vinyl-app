@@ -90,39 +90,6 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
         }
     };
 
-    const handlePublish = async () => {
-        if (!confirm("🚀 MAGIC PUBLISH\n\nThis will export your current collection (data + images) and push it to GitHub/Vercel.\n\nContinue?")) return;
-
-        // Check if we are running on the NAS (or any non-localhost production environment)
-        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            alert("⚠️ MAGIC PUBLISH LIMITATION\n\nSince the app is now running on your NAS, it doesn't have access to your Mac's 'Git' commands or GitHub credentials to upload the site.\n\nTo publish the NAS data to Vercel, open the terminal on your MAC (inside the ionized-hubble folder) and run:\n\nVITE_PB_URL=http://192.168.0.250:8090 npm run export:static && git add . && git commit -m 'Auto-publish' && git push");
-            return;
-        }
-
-        setIsPublishing(true);
-        try {
-            const res = await fetch('/api/publish');
-
-            // Catch HTML fallback responses immediately
-            const contentType = res.headers.get("content-type");
-            if (contentType && contentType.indexOf("application/json") === -1) {
-                throw new Error("Server did not return JSON. The publish endpoint is not running.");
-            }
-
-            const data = await res.json();
-            if (data.success) {
-                alert("✨ PUBLISHED!\n\nYour collection has been sent to GitHub. Vercel will update the site in 1-2 minutes.");
-            } else {
-                throw new Error(data.error || 'Unknown error');
-            }
-        } catch (err) {
-            console.error('Publish failed:', err);
-            alert(`❌ PUBLISH FAILED\n\n${err.message}\n\nCheck the terminal for details.`);
-        } finally {
-            setIsPublishing(false);
-        }
-    };
-
     return (
         <div className="min-h-[100dvh] flex flex-col w-full overflow-x-hidden relative">
 
@@ -168,6 +135,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                             <Upload className="w-4 h-4" />
                                             <span className="hidden sm:inline">Import</span>
                                         </button>
+
                                         <button
                                             onClick={onOpenUpload}
                                             className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
