@@ -1,0 +1,6 @@
+{
+    "buildCommand": "VITE_STATIC_MODE=true npm run build",
+    "env": {
+        "VITE_STATIC_MODE": "true"
+    }
+}
