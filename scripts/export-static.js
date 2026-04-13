@@ -13,15 +13,13 @@ const STORAGE_DIR = path.join(__dirname, '../public/storage');
 const DATA_FILE = path.join(__dirname, '../src/data/vinyls-static.json');
 
 async function exportStaticData() {
-    console.log("🚀 Starting STATIC EXPORT...");
+    console.log("🚀 Starting STATIC EXPORT V37.1 (Full Metadata Sync)...");
 
-    // 1. Ensure storage directory exists
     if (!fs.existsSync(STORAGE_DIR)) {
         fs.mkdirSync(STORAGE_DIR, { recursive: true });
     }
 
     try {
-        // 2. Fetch all vinyls
         console.log(`🌐 Connecting to PocketBase at ${PB_URL}...`);
         const records = await pb.collection('vinyls').getFullList({
             sort: '-sort_priority,-id'
@@ -40,9 +38,8 @@ async function exportStaticData() {
                 const localFileName = `${record.id}-${fileName}`;
                 const destPath = path.join(STORAGE_DIR, localFileName);
 
-                // Download image if it doesn't exist already (optional optimization)
                 if (!fs.existsSync(destPath)) {
-                    process.stdout.write(`  🖼️  Downloading image for ${record.title}... `);
+                    process.stdout.write(`  🖼️  Downloading image for ${record.title || record.id}... `);
                     try {
                         const response = await fetch(fileUrl);
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -53,27 +50,51 @@ async function exportStaticData() {
                         console.log(`FAILED: ${err.message}`);
                     }
                 }
-
                 localImagePath = `/storage/${localFileName}`;
             }
 
-            // Create a clean object for the static JSON
-            staticData.push({
-                ...record,
-                image_url: localImagePath // Override with relative path
-            });
+            // --- DEEP FIELD MAPPING (V37.1) ---
+            // Ensure every possible field is captured and sanitized
+            const cleanRecord = {
+                id: record.id,
+                artist: record.artist || 'Unknown Artist',
+                title: record.title || 'Unknown Album',
+                genre: record.genre || '',
+                year: record.year || '',
+                format: record.format || 'Vinyl',
+                label: record.label || '',
+                catalog_number: record.catalog_number || '',
+                edition: record.edition || '',
+                tracks: record.tracks || '', // Crucial for Vercel
+                group_members: record.group_members || '',
+                notes: record.notes || '',
+                condition: record.condition || 'N/A',
+                liner_notes: record.liner_notes || '',
+                rating: record.rating || 0,
+                sort_priority: record.sort_priority || 0,
+                purchase_price: record.purchase_price || '',
+                purchase_year: record.purchase_year || '',
+                average_cost: record.average_cost || record.avarege_cost || '', // Handle typo fallback
+                is_tracks_validated: !!record.is_tracks_validated,
+                is_price_locked: !!record.is_price_locked,
+                image_url: localImagePath,
+                created: record.created || '',
+                updated: record.updated || ''
+            };
+
+            staticData.push(cleanRecord);
         }
 
-        // 3. Save JSON
-        fs.writeFileSync(DATA_FILE, JSON.stringify(staticData, null, 2));
+        // 3. Save JSON with explicit UTF-8 and formatting
+        const jsonContent = JSON.stringify(staticData, null, 2);
+        fs.writeFileSync(DATA_FILE, jsonContent, 'utf8');
+        
         console.log(`✅ Exported ${staticData.length} records to ${DATA_FILE}`);
-        console.log(`✨ DONE! You can now run the app with VITE_STATIC_MODE=true`);
+        console.log(`✨ DONE! UTF-8 Encoding confirmed.`);
 
     } catch (err) {
         console.error("❌ Export failed!");
         console.error("Error Message:", err.message);
-        console.error("Error Details:", JSON.stringify(err.data || {}, null, 2));
-        if (err.status) console.error("Status Code:", err.status);
         process.exit(1);
     }
 }
