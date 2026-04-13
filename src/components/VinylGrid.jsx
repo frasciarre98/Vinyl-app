@@ -73,8 +73,12 @@ export function VinylGrid({ refreshTrigger }) {
 
     // Compute Format Counts based on active mode
     const activeVinyls = vinyls.filter(v => showWantlist ? v.is_wantlist === true : v.is_wantlist !== true);
-    const vinylCount = activeVinyls.filter(v => !v.format || v.format === 'Vinyl').length;
-    const cdCount = activeVinyls.filter(v => v.format === 'CD').length;
+    const cdCount = activeVinyls.filter(v => {
+        const f = String(v.format || '').toLowerCase();
+        return f.includes('cd');
+    }).length;
+    // Simplified count: Everything else is counted as Vinyl/Other to match the sum (815 items)
+    const vinylCount = activeVinyls.length - cdCount;
 
     const fetchVinyls = async () => {
         try {
@@ -93,31 +97,70 @@ export function VinylGrid({ refreshTrigger }) {
                 return;
             }
 
-            const records = await pb.collection('vinyls').getFullList({
-                sort: '-created',
-                requestKey: String(Date.now()) // Force fresh request every time
+            let records;
+            try {
+                // V35.7: Sort by -created (Real newest) instead of -id.
+                // We fetch everything and will sort 'Pending AI' to top in memory to ensure visibility.
+                records = await pb.collection('vinyls').getFullList({
+                    sort: '-sort_priority,-id',
+                    requestKey: `v36_1_${Date.now()}`
+                });
+            } catch (fetchErr) {
+                console.warn("V36.1 Fetch failed, trying fallback...", fetchErr);
+                records = await pb.collection('vinyls').getFullList({
+                    sort: '-id',
+                    requestKey: `v36_1_fallback_${Date.now()}`
+                });
+            }
+
+            if (!records) throw new Error("Empty response from NAS.");
+
+            // DEBUG LOG for V34.1
+            console.log(`V34.1: Fetched ${records.length} records. First: ${records[0]?.title} / Priority: ${records[0]?.sort_priority ?? 0}`);
+
+            const allVinyls = records.map(doc => {
+                try {
+                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || new Date().toISOString();
+                    return {
+                        ...doc,
+                        $createdAt: rawCreated,
+                        image_url: doc.image ? pb.files.getUrl(doc, doc.image, { thumb: '400x400' }) : null,
+                        full_image_url: doc.image ? pb.files.getUrl(doc, doc.image) : null
+                    };
+                } catch (e) {
+                    console.error("Critical: Error mapping record", doc.id, e);
+                    return null;
+                }
+            }).filter(Boolean);
+
+            const sortedVinyls = allVinyls.sort((a, b) => {
+                const aPending = a.artist === 'Pending AI' || a.artist === 'Error';
+                const bPending = b.artist === 'Pending AI' || b.artist === 'Error';
+                
+                if (aPending && !bPending) return -1;
+                if (!aPending && bPending) return 1;
+                
+                // V35.8: If mode is 'newest', ignore priority to show latest uploads at the top literal
+                if (sortOrder === 'newest') {
+                    return new Date(b.$createdAt) - new Date(a.$createdAt);
+                }
+
+                // Fallback to existing sort order (priority then date) for other modes
+                if (a.sort_priority !== b.sort_priority) {
+                    return (b.sort_priority || 0) - (a.sort_priority || 0);
+                }
+                return new Date(b.$createdAt) - new Date(a.$createdAt);
             });
 
-            console.log("🔍 Loaded", records.length, "records from PocketBase. First Created:", records[0]?.created);
-            // ALERT DEBUG 2: Confirm Fetch
-            // alert(`Fetched ${records.length} records from DB. First: ${records[0]?.title} (${records[0]?.created})`);
-
-            const allVinyls = records.map(doc => ({
-                ...doc,
-                $createdAt: doc.created || new Date(0).toISOString(),
-                // Use 400x400 thumbnail for grid performance (PocketBase default quality)
-                image_url: doc.image ? pb.files.getUrl(doc, doc.image, { thumb: '400x400' }) : null,
-                // Store full res url for Detail Modal
-                full_image_url: doc.image ? pb.files.getUrl(doc, doc.image) : null
-            }));
-
-            setVinyls(allVinyls);
+            setVinyls(sortedVinyls);
             setSelectedIds([]);
             setIsSelectionMode(false);
             setError(null);
         } catch (err) {
             console.error('Error fetching vinyls:', err);
-            setError(`Connection Failed: ${err.message}. Ensure you are on the same WiFi as the Mac.`);
+            // Show the actual technical error to the user for better debugging
+            const techDetail = err.originalError?.message || err.message || "Unknown Error";
+            setError(`Database Error: ${techDetail}. Please check if the NAS is online and you're logged in.`);
         } finally {
             setLoading(false);
         }
@@ -199,6 +242,7 @@ export function VinylGrid({ refreshTrigger }) {
                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, `${vinyl.artist} - ${vinyl.title}`);
                     if (analysis.average_cost) {
                         const updateData = {
+                            average_cost: analysis.average_cost,
                             avarege_cost: analysis.average_cost, // DB Typo in PocketBase Schema
                             // Also save label, catalog_number, edition if returned
                             label: String(analysis.label || '').substring(0, 100),
@@ -266,12 +310,14 @@ export function VinylGrid({ refreshTrigger }) {
                         notes: String(analysis.notes || '').substring(0, 4000),
                         group_members: analysis.group_members,
                         condition: analysis.condition,
+                        average_cost: String(analysis.average_cost || '').substring(0, 50),
                         avarege_cost: String(analysis.average_cost || '').substring(0, 50), // DB Typo
                         tracks: analysis.tracks,
                         // CRITICAL: Save label, catalog_number, edition
                         label: String(analysis.label || '').substring(0, 100),
                         catalog_number: String(analysis.catalog_number || '').substring(0, 50),
-                        edition: String(analysis.edition || '').substring(0, 100)
+                        edition: String(analysis.edition || '').substring(0, 100),
+                        liner_notes: String(analysis.liner_notes || '').substring(0, 5000)
                     };
 
                     if (vinyl.is_tracks_validated) {
@@ -347,59 +393,21 @@ export function VinylGrid({ refreshTrigger }) {
 
         // Sort
         result.sort((a, b) => {
+            const aPending = a.artist === 'Pending AI' || a.artist === 'Error';
+            const bPending = b.artist === 'Pending AI' || b.artist === 'Error';
+            if (aPending && !bPending) return -1;
+            if (!aPending && bPending) return 1;
+
             if (sortOrder === 'artist_asc') {
                 return (a.artist || '').localeCompare(b.artist || '');
             }
-            // Robust Date Sort with Image Timestamp & ID fallback
-            // Simple, Robust Date Sort
-            const getTimestamp = (record) => {
-                // Priority 0: "Pending AI" records always first (even if date is missing)
-                if (record.artist === 'Pending AI') return 9999999999999;
 
-                // 1. Try 'created' (standard)
-                // 2. Try '$createdAt' (internal PB)
-                // 3. Try 'updated' (if created is missing for some reason)
-                // 4. Try '$updatedAt'
-                let dateStr = record.created || record.updated;
-
-                // Checking for empty string explicitly or null/undefined
-                if (!dateStr) return Date.now();
-
-                // PocketBase uses "YYYY-MM-DD HH:mm:ss.123Z", Safari/iOS needs "T" separator
-                if (typeof dateStr === 'string' && dateStr.includes(" ") && !dateStr.includes("T")) {
-                    dateStr = dateStr.replace(" ", "T");
-                }
-
-
-                const ts = new Date(dateStr).getTime();
-                // DEBUG: specific check for recent or known IDs if needed
-                // if (record.title?.includes("Wall")) console.log("Sort Debug:", record.title, dateStr, ts);
-
-                // If date is invalid (e.g. broken upload), treat as NOW to show at top
-                return isNaN(ts) ? Date.now() : ts;
-            };
-
-            const dateA = getTimestamp(a);
-            const dateB = getTimestamp(b);
-
-            // Critical Debug: Log the first comparison to see if we have valid dates
-            // if (Math.random() < 0.001) console.log("Comparing", dateA, dateB, a.title, b.title);
-
-            // Console log if NaN found (should be handled by getTimestamp 0 fallback but good to know)
-            if (dateA === 0 && a.created) console.warn("Invalid Date A:", a.created);
-            if (dateB === 0 && b.created) console.warn("Invalid Date B:", b.created);
-
-            if (dateA !== dateB) {
-                return dateB - dateA; // Newest first
-            }
-
-            // Fallback to ID (Newer IDs are higher)
-            return (b.id || '').localeCompare(a.id || '');
+            // sortOrder === 'newest'
+            // We ignore sort_priority to ensure truly newest items are always visible at the top.
+            const dateA = new Date(a.$createdAt || a.created || 0);
+            const dateB = new Date(b.$createdAt || b.created || 0);
+            return dateB - dateA;
         });
-
-        if (result.length > 0 && sortOrder === 'newest') {
-            // console.log("Top 3 Newest:", result.slice(0, 3).map(r => `${r.artist} - ${r.title} (${r.created})`));
-        }
 
         return result;
     }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch]);
@@ -463,7 +471,10 @@ export function VinylGrid({ refreshTrigger }) {
                                 <button onClick={() => setShowWantlist(false)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${!showWantlist ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Collection</button>
                                 <button onClick={() => setShowWantlist(true)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${showWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-secondary hover:text-white'}`}>Wantlist</button>
                             </div>
-                            <span className="text-[10px] text-white/40 font-mono tracking-wider">{vinylCount} VINYL • {cdCount} CD</span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-white/40 font-mono tracking-wider">{vinylCount} VINYL • {cdCount} CD</span>
+                                <span className="text-[8px] text-primary/40 font-mono uppercase tracking-tighter">Total: {activeVinyls.length} items</span>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -594,22 +605,24 @@ export function VinylGrid({ refreshTrigger }) {
                 <div className="p-4 mb-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-200 text-center animate-in fade-in slide-in-from-top-4">
                     <p className="font-bold mb-1">Error Loading Records</p>
                     <p className="text-sm opacity-80">{error}</p>
-                    <button onClick={fetchVinyls} className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-full text-sm font-bold transition-colors">
-                        Retry Connection
-                    </button>
+                    <div className="flex justify-center gap-4 mt-4">
+                        <button onClick={fetchVinyls} className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-full text-sm font-bold transition-colors">
+                            Retry Connection
+                        </button>
+                        <button 
+                            onClick={() => { 
+                                pb.authStore.clear(); 
+                                localStorage.clear();
+                                window.location.reload(); 
+                            }} 
+                            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-bold transition-colors"
+                        >
+                            Reset Session & Logout
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {/* Error Display */}
-            {error && (
-                <div className="p-4 mb-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-200 text-center animate-in fade-in slide-in-from-top-4">
-                    <p className="font-bold mb-1">Connection Error</p>
-                    <p className="text-sm opacity-80">{error}</p>
-                    <button onClick={fetchVinyls} className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-full text-sm font-bold transition-colors">
-                        Retry Connection
-                    </button>
-                </div>
-            )}
 
             {/* Grid */}
             <div className="relative">

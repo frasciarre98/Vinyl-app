@@ -30,6 +30,14 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
     const forcedSafeModeRef = useRef(false);
     const shouldSkipRef = useRef(false);
     const [isRetrying, setIsRetrying] = useState(false);
+    const [isDismissed, setIsDismissed] = useState(false);
+
+    // Reset dismissal when new pending items arrive
+    useEffect(() => {
+        if (pendingItems.length > 0) {
+            setIsDismissed(false);
+        }
+    }, [pendingItems.length]);
 
     // Update activity on every log (CAPPED at 50 to prevent crash)
     const addLog = (msg, type = 'info') => {
@@ -47,6 +55,13 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
             logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [logs]);
+
+    useEffect(() => {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const now = new Date().toLocaleTimeString();
+        addLog(`[${now}] Sistema Pronto [${isLocal ? 'Local' : 'Proxy'} Mode]`, "success");
+        console.log(">>> Frontend V35.5 ZENITH Loaded at " + now + " <<<");
+    }, []);
 
     const startBatch = async (items = null, quiet = false) => {
         // Filter out already failed items to prevent infinite loops (unless forced manually by user click)
@@ -93,10 +108,23 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
             setProgress(percent);
 
             addLog(`Analyzing[${i + 1}/${itemsToProcess.length}]: ${item.title || 'Untitled'}...`);
+            const isHeic = item.image?.toLowerCase().endsWith('.heic') || item.image?.toLowerCase().endsWith('.heif');
+            if (isHeic) addLog(`[HEIC Detect] iPhone format detected. Automatic JPEG conversion enabled.`, "warning");
+            
+            addLog(`[Proxy V36.1] Preparazione analisi...`, "info");
+            addLog(`[Proxy V36.1] Debug: { ID: ${item.id.substring(0, 5)}..., File: ${item.image}, Key: ${apiKey ? 'OK' : 'MISSING'} }`, "info");
 
             try {
-                // Strict 120s Timeout Race
-                const analyzePromise = analyzeImageUrl(item.image_url, apiKey);
+                // CRITICAL FIX: Ensure we have a full absolute URL. 
+                // Sometimes the mapped 'image_url' is missing or relative.
+                const absoluteUrl = item.image ? pb.files.getUrl(item, item.image) : (item.full_image_url || item.image_url);
+                
+                if (!absoluteUrl) {
+                    throw new Error("No image file found for this record.");
+                }
+
+                addLog(`Fetching: ${absoluteUrl}`, "info");
+                const analyzePromise = analyzeImageUrl(absoluteUrl, apiKey, null, addLog);
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout 120s")), 120000));
 
                 // Allow UI to breathe before heavy async
@@ -114,11 +142,14 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     group_members: analysis.group_members,
                     condition: analysis.condition,
                     // Sanitise cost to strict String(50)
+                    average_cost: String(analysis.average_cost || '').substring(0, 50),
                     avarege_cost: String(analysis.average_cost || '').substring(0, 50), // DB Typo in PocketBase Schema
                     tracks: analysis.tracks,
                     label: String(analysis.label || '').substring(0, 100),
                     catalog_number: String(analysis.catalog_number || '').substring(0, 50),
-                    edition: String(analysis.edition || '').substring(0, 100)
+                    edition: String(analysis.edition || '').substring(0, 100),
+                    liner_notes: analysis.liner_notes,
+                    sort_priority: 100 // Bring newly analyzed items to top (V34.1)
                 };
 
                 // CRITICAL: Respect locked_fields array (Field Protection System)
@@ -136,8 +167,9 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     }
                 });
 
-                if (isPriceLocked && fullUpdate.avarege_cost) {
-                    delete fullUpdate.avarege_cost;
+                if (isPriceLocked) {
+                    if (fullUpdate.avarege_cost !== undefined) delete fullUpdate.avarege_cost;
+                    if (fullUpdate.average_cost !== undefined) delete fullUpdate.average_cost;
                     protectedCount++;
                 }
 
@@ -161,7 +193,8 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                         artist: analysis.artist,
                         title: analysis.title,
                         genre: analysis.genre,
-                        year: analysis.year
+                        year: analysis.year,
+                        sort_priority: 100
                     };
                     await pb.collection('vinyls').update(item.id, basicUpdate);
                 }
@@ -243,9 +276,17 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     }
 
                 } else {
-                    addLog(`✗ Error: ${err.message} `, "error");
+                    // --- ROBUST ERROR EXTRACTION V35.4 ---
+                    let detail = "Possible network or internal error.";
+                    if (typeof err === 'string') detail = err;
+                    else if (err.data && err.data.error) detail = err.data.error;
+                    else if (err.data && err.data.message) detail = err.data.message;
+                    else if (err.message) detail = err.message;
+                    else if (err.originalError) detail = String(err.originalError);
+
+                    addLog(`✗ Error: ${detail}`, "error");
                     failedIdsRef.current.add(item.id);
-                    await pb.collection('vinyls').update(item.id, { artist: 'Error', notes: err.message });
+                    await pb.collection('vinyls').update(item.id, { artist: 'Error', notes: detail });
                     consecutiveRetries = 0; // Reset for next
                 }
             }
@@ -284,6 +325,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
 
 
     // VISIBILITY LOGIC:
+    if (isDismissed && !isProcessing && !isExpanded) return null;
     if (pendingItems.length === 0 && incompleteItems.length === 0 && !isProcessing && !isExpanded) return null;
 
     if (!isExpanded) {
@@ -320,6 +362,9 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     <button onClick={() => setIsExpanded(true)} className="px-3 py-1 bg-white/10 text-white text-xs rounded hover:bg-white/20 transition-colors">
                         Show Logs
                     </button>
+                    <button onClick={() => setIsDismissed(true)} className="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors" title="Dismiss">
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
         );
@@ -334,7 +379,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                 <div className="bg-black/40 p-4 border-b border-border flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <Terminal className="w-5 h-5 text-primary" />
-                        <h3 className="font-mono font-medium text-primary">AI Processing Console</h3>
+                        <h3 className="font-mono font-medium text-primary">AI Processing Console (V36.1)</h3>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="text-right">
@@ -412,7 +457,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                                 </button>
                             )}
                             <button
-                                onClick={() => setIsExpanded(false)}
+                                onClick={() => { setIsExpanded(false); setIsDismissed(true); }}
                                 className="px-4 py-2 text-secondary hover:text-primary transition-colors"
                             >
                                 Close

@@ -5,41 +5,47 @@ export function CollectionValueKPI({ vinyls }) {
     const totalValue = useMemo(() => {
         if (!vinyls || vinyls.length === 0) return 0;
 
-        return vinyls.reduce((acc, vinyl) => {
-            // 1. Convert to string and clean
-            let costStr = String(vinyl.average_cost || vinyl.avarege_cost || '');
+        try {
+            return vinyls.reduce((acc, vinyl) => {
+                // 1. Convert to string and clean
+                let costStr = String(vinyl.average_cost || vinyl.avarege_cost || '');
+                if (!costStr) return acc;
 
-            // Handle "Varies" or "Unknown" with a reasonable optimistic estimate
-            if (costStr.match(/varies|unknown|tbd|check/i)) {
-                return acc + 25; // Optimistic average for unpriced items
-            }
+                // Handle "Varies" or "Unknown" with a reasonable optimistic estimate
+                if (costStr.match(/varies|unknown|tbd|check/i)) {
+                    return acc + 25; // Optimistic average for unpriced items
+                }
 
-            // Remove all non-numeric chars except dash and dot
-            // This strips € $ EUR USD and spaces around them, leaving "20-30" or "25.50"
-            let cleanStr = costStr.replace(/[^0-9.\-]/g, '');
+                // Remove all non-numeric chars except dash and dot
+                // This strips € $ EUR USD and spaces around them, leaving "20-30" or "25.50"
+                let cleanStr = costStr.replace(/[^0-9.\-]/g, '');
+                if (!cleanStr) return acc;
 
-            // Handle range "20-30"
-            if (cleanStr.includes('-')) {
-                const parts = cleanStr.split('-').filter(p => p.trim() !== '');
-                if (parts.length >= 2) {
-                    const low = parseFloat(parts[0]);
-                    const high = parseFloat(parts[1]);
-                    if (!isNaN(low) && !isNaN(high)) {
-                        const avg = (low + high) / 2;
-                        return acc + avg;
+                // Handle range "20-30"
+                if (cleanStr.includes('-')) {
+                    const parts = cleanStr.split('-').filter(p => p.trim() !== '');
+                    if (parts.length >= 2) {
+                        const low = parseFloat(parts[0]);
+                        const high = parseFloat(parts[1]);
+                        if (!isNaN(low) && !isNaN(high)) {
+                            const avg = (low + high) / 2;
+                            return acc + avg;
+                        }
                     }
                 }
-            }
 
-            // Handle single value
-            const val = parseFloat(cleanStr);
-            if (!isNaN(val)) {
-                // console.log(`Parsed Single: ${costStr} -> ${val}`);
-                return acc + val;
-            }
+                // Handle single value
+                const val = parseFloat(cleanStr);
+                if (!isNaN(val)) {
+                    return acc + val;
+                }
 
-            return acc;
-        }, 0);
+                return acc;
+            }, 0);
+        } catch (e) {
+            console.error("Error calculating collection value:", e);
+            return 0; // Fallback to 0 to prevent UI crash
+        }
     }, [vinyls]);
 
     // Format with Euro symbol and thousand separators

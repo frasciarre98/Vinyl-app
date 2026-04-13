@@ -191,8 +191,16 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                     try {
                         const compressedDataUrl = await resizeImage(file);
                         const compressedBlob = await (await fetch(compressedDataUrl)).blob();
-                        // Create a manageable file object (e.g. < 1MB)
-                        optimizedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+                        
+                        // V36.1: CRITICAL - Ensure filename reflects the new JPEG content
+                        // Replace .heic/.heif extensions with .jpg to unblock OpenAI
+                        let newName = file.name;
+                        if (newName.toLowerCase().endsWith('.heic') || newName.toLowerCase().endsWith('.heif')) {
+                            newName = newName.replace(/\.(heic|heif)$/i, '.jpg');
+                            console.log(`[V36.1] Renaming ${file.name} to ${newName} for OpenAI compatibility`);
+                        }
+                        
+                        optimizedFile = new File([compressedBlob], newName, { type: 'image/jpeg' });
                         console.log(`Resized ${file.name} to ${(optimizedFile.size / 1024 / 1024).toFixed(2)}MB`);
                         // DEBUG ALERT
                         // alert(`Resized successfully: ${(optimizedFile.size / 1024 / 1024).toFixed(2)}MB`);
@@ -534,8 +542,9 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                             </div>
                         )
                     )}
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
-                    <input type="file" ref={cameraInputRef} onChange={handleFileSelect} accept="image/*" capture="environment" className="hidden" />
+                    {/* V35.6: STRETTA SUI FORMATI PER FORZARE LA TRANSCODIFICA DI IOS - BYPASS DI SAFARI */}
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/jpeg, image/png, image/webp" className="hidden" />
+                    <input type="file" ref={cameraInputRef} onChange={handleFileSelect} accept="image/jpeg, image/png, image/webp" capture="environment" className="hidden" />
                 </div>
 
                 <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 rounded-b-xl">

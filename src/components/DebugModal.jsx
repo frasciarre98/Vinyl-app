@@ -74,7 +74,7 @@ export function DebugModal({ isOpen, onClose }) {
         setIsLoading(true);
         log('Checking last image...', 'info');
         try {
-            const list = await pb.collection('vinyls').getList(1, 1, { sort: '-created' });
+            const list = await pb.collection('vinyls').getList(1, 1, { sort: '-id' });
             if (list.items.length === 0) {
                 log('No records found.', 'warning');
                 return;
@@ -157,7 +157,8 @@ export function DebugModal({ isOpen, onClose }) {
             // 2. Define fields to add
             const fieldsToAdd = [
                 { name: 'purchase_price', type: 'text', required: false, options: { pattern: "" } },
-                { name: 'purchase_year', type: 'text', required: false, options: { pattern: "" } }
+                { name: 'purchase_year', type: 'text', required: false, options: { pattern: "" } },
+                { name: 'liner_notes', type: 'text', required: false, options: { pattern: "" } }
             ];
 
             fieldsToAdd.forEach(field => {

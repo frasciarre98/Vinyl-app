@@ -64,12 +64,14 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 // Sanitise cost to strict String(50)
+                average_cost: String(analysis.average_cost || '').substring(0, 50),
                 avarege_cost: String(analysis.average_cost || '').substring(0, 50), // DB Typo
                 tracks: String(analysis.tracks || '').substring(0, 4999),
                 // CRITICAL: Save label, catalog_number, edition to prevent "NEEDS INFO" false positives
                 label: String(analysis.label || '').substring(0, 100),
                 catalog_number: String(analysis.catalog_number || '').substring(0, 50),
-                edition: String(analysis.edition || '').substring(0, 100)
+                edition: String(analysis.edition || '').substring(0, 100),
+                liner_notes: String(analysis.liner_notes || '').substring(0, 5000)
             };
 
             // CRITICAL: Respect User Validation

@@ -100,13 +100,35 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                 group_members: String(analysis.group_members || '').substring(0, 999),
                 condition: analysis.condition,
                 average_cost: String(analysis.average_cost || '').substring(0, 50),
+                avarege_cost: String(analysis.average_cost || '').substring(0, 50),
                 tracks: String(analysis.tracks || '').substring(0, 4999),
                 label: analysis.label || vinyl.label || '', // Preserve existing if not returned
                 catalog_number: analysis.catalog_number || vinyl.catalog_number || '',
-                edition: analysis.edition || vinyl.edition || ''
+                edition: analysis.edition || vinyl.edition || '',
+                liner_notes: String(analysis.liner_notes || '').substring(0, 5000)
             };
 
-            // Respect User Validation
+            // Respect User Validation & Property Locks
+            const lockedFields = Array.isArray(vinyl.locked_fields) ? vinyl.locked_fields : [];
+            
+            // Log for debugging
+            if (lockedFields.length > 0) {
+                console.log(">> Record has locked fields:", lockedFields);
+            }
+
+            // Remove locked fields from the update payload
+            for (const field of lockedFields) {
+                if (fullUpdate.hasOwnProperty(field)) {
+                    delete fullUpdate[field];
+                }
+            }
+
+            // Unify price lock logic for both schema typos
+            if ((lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost'))) {
+                if (fullUpdate.avarege_cost !== undefined) delete fullUpdate.avarege_cost;
+                if (fullUpdate.average_cost !== undefined) delete fullUpdate.average_cost;
+            }
+
             if (vinyl.is_tracks_validated) {
                 delete fullUpdate.tracks;
             }
@@ -142,12 +164,22 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                                 onClick={handleAnalyze}
                                 disabled={analyzing}
                                 className={`p-2 rounded-full transition-all ${analyzing ? 'bg-yellow-500/20 text-yellow-400' : 'text-purple-400 hover:text-purple-300 bg-purple-500/10'}`}
+                                title="Full AI Analysis"
                             >
                                 {analyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wand2 className="w-6 h-6" />}
                             </button>
                             <button
+                                onClick={handleGenerateStory}
+                                disabled={generatingStory}
+                                className={`p-2 rounded-full transition-all ${generatingStory ? 'bg-purple-900/50 text-purple-400' : 'text-pink-400 hover:text-pink-300 bg-pink-500/10'}`}
+                                title="Generate Story / Liner Notes"
+                            >
+                                {generatingStory ? <Loader2 className="w-6 h-6 animate-spin" /> : <span className="text-xl leading-none">📖</span>}
+                            </button>
+                            <button
                                 onClick={() => onEdit(vinyl)}
                                 className="p-2 text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-full"
+                                title="Edit Record"
                             >
                                 <Edit2 className="w-6 h-6" />
                             </button>
@@ -279,6 +311,25 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                             )}
                         </div>
 
+                        {/* Editorial Story / Liner Notes */}
+                        {vinyl.liner_notes && vinyl.liner_notes.length > 50 && vinyl.liner_notes !== 'Analyzed by AI' && (
+                            <div className="relative group p-6 sm:p-8 mt-8 mb-8 rounded-2xl overflow-hidden bg-gradient-to-br from-purple-900/20 via-black to-[#1a1a1a] border border-purple-500/20 shadow-2xl">
+                                {/* Decorative elements */}
+                                <div className="absolute top-0 left-0 w-40 h-40 bg-purple-500/10 rounded-br-full blur-3xl pointer-events-none" />
+                                <h3 className="text-[10px] uppercase tracking-[0.3em] text-purple-400/80 font-bold mb-6 flex items-center gap-4">
+                                    <span className="w-12 h-[1px] bg-purple-500/50" />
+                                    Storia & Aneddoti
+                                </h3>
+                                <div className="text-gray-200 font-serif leading-relaxed text-base sm:text-lg opacity-90 relative z-10 space-y-4">
+                                    {vinyl.liner_notes.split('\n\n').map((paragraph, idx) => (
+                                        <p key={idx} className={idx === 0 ? "first-letter:text-6xl first-letter:font-black first-letter:text-purple-400 first-letter:mr-3 first-letter:float-left first-line:uppercase first-line:tracking-widest" : ""}>
+                                            {paragraph}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Tracks */}
                         <div className="space-y-4">
                             <h3 className="text-sm uppercase tracking-widest text-secondary font-bold flex items-center gap-2 border-b border-white/10 pb-2">
@@ -305,39 +356,6 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                                 <p className="text-gray-400 font-light leading-relaxed">
                                     {vinyl.group_members || '—'}
                                 </p>
-                            </div>
-                            <div>
-                                <h4 className="text-xs uppercase text-secondary mb-2 flex items-center gap-2 justify-between">
-                                    <span>Liner Notes (AI Story)</span>
-                                    {!IS_STATIC && user && !vinyl.liner_notes && (
-                                        <button
-                                            onClick={handleGenerateStory}
-                                            disabled={generatingStory}
-                                            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold tracking-wider uppercase transition-colors ${generatingStory ? 'bg-purple-900/50 text-purple-400' : 'bg-purple-600 text-white hover:bg-purple-500'}`}
-                                        >
-                                            {generatingStory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                                            {generatingStory ? 'Writing...' : 'Generate'}
-                                        </button>
-                                    )}
-                                </h4>
-                                {vinyl.liner_notes ? (
-                                    <div className="bg-purple-900/10 border border-purple-500/20 p-4 rounded-xl relative group">
-                                        <p className="text-purple-200/90 font-serif leading-relaxed text-sm">
-                                            {vinyl.liner_notes}
-                                        </p>
-                                        {!IS_STATIC && user && (
-                                            <button
-                                                onClick={handleGenerateStory}
-                                                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-purple-500/40 text-purple-300 rounded-lg opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md"
-                                                title="Regenerate Story"
-                                            >
-                                                <Wand2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <p className="text-white/30 italic px-4 text-sm font-light">No story generated yet.</p>
-                                )}
                             </div>
                             <div>
                                 <h4 className="text-xs uppercase text-secondary mb-2">Notes & Appraisal</h4>

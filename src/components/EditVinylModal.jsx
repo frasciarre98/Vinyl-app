@@ -107,8 +107,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
             const cleanCost = String(formData.average_cost || '').substring(0, 50);
 
             // PocketBase update
-            const payload = { ...formData, avarege_cost: cleanCost, locked_fields: lockedFields };
-            delete payload.average_cost;
+            const payload = { ...formData, average_cost: cleanCost, avarege_cost: cleanCost, locked_fields: lockedFields };
 
             await pb.collection('vinyls').update(vinyl.id, payload);
             onUpdate();
@@ -615,7 +614,6 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
 
                                                         // 3. IMMEDIATE SAVE
                                                         const pbPayload = { ...updates };
-                                                        delete pbPayload.average_cost; // Remove UI-key
 
                                                         await pb.collection('vinyls').update(vinyl.id, pbPayload);
                                                         onUpdate();

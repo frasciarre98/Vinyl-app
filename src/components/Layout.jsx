@@ -105,11 +105,12 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             }} />
 
             <header className="glass-panel sticky top-0 z-50 border-b-0">
+
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <VinylLogo className="w-14 h-14 drop-shadow-lg" />
                         <h1 className="text-2xl font-black tracking-wider text-slate-900 uppercase italic">
-                            Vinyl <span className="text-slate-600 font-bold">Catalog</span>
+                            Vinyl <span className="text-slate-600 font-bold">Catalog V36.1</span>
                         </h1>
                     </div>
 
@@ -195,7 +196,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-white/40 text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v2.2</span></p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v36.1-ZENITH</span></p>
                 </div>
             </footer>
         </div >

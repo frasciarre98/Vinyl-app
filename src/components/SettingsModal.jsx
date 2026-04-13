@@ -561,6 +561,63 @@ export function SettingsModal({ onClose, onSave }) {
                             </p>
 
                             <button
+                                onClick={async () => {
+                                    if (!confirm("Start generating missing liner notes? This process will query the AI for each missing item. Expected time: 5-10 seconds per item.")) return;
+                                    setCleaning(true);
+                                    try {
+                                        const records = await pb.collection('vinyls').getFullList({
+                                            filter: "liner_notes = '' || liner_notes = null"
+                                        });
+
+                                        if (records.length === 0) {
+                                            alert("All vinyls already have liner notes!");
+                                            setCleaning(false);
+                                            return;
+                                        }
+
+                                        if (!confirm(`Found ${records.length} vinyls missing liner notes. Start the batch update?`)) {
+                                            setCleaning(false);
+                                            return;
+                                        }
+
+                                        let updatedCount = 0;
+                                        for (const r of records) {
+                                            if (!r.artist || r.artist === 'Unknown' || !r.title || r.title === 'Unknown') continue;
+
+                                            try {
+                                                console.log(`Generating liner notes for ${r.artist} - ${r.title}...`);
+                                                const res = await pb.send('/api/ai/story', {
+                                                    method: 'POST',
+                                                    body: { artist: r.artist, title: r.title }
+                                                });
+                                                
+                                                if (res && res.success && res.story) {
+                                                    await pb.collection('vinyls').update(r.id, { liner_notes: "🤖 AI Story: " + res.story });
+                                                    updatedCount++;
+                                                }
+                                            } catch (err) {
+                                                console.error(`Failed to generate story for ${r.id}:`, err);
+                                            }
+                                            // Sleep 1 second to avoid rate limits
+                                            await new Promise(resolve => setTimeout(resolve, 1000));
+                                        }
+                                        alert(`Batch update complete. ${updatedCount} vinyl(s) updated.`);
+                                        window.location.reload();
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert("Batch Update failed: " + e.message);
+                                    } finally {
+                                        setCleaning(false);
+                                    }
+                                }}
+                                disabled={cleaning}
+                                className="w-full p-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl text-white transition-all flex justify-center items-center gap-3 text-base font-bold mt-4 shadow-[0_0_20px_rgba(147,51,234,0.3)] transform hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                {cleaning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                                Generate Missing Liner Notes
+                            </button>
+
+                            <button
                                 onClick={refreshMetadata}
                                 disabled={cleaning}
                                 className="w-full p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 hover:bg-blue-500/20 transition-colors flex justify-center items-center gap-2 text-sm font-medium mt-4"
@@ -625,6 +682,7 @@ export function SettingsModal({ onClose, onSave }) {
                                 {cleaning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                                 Fix Currency (USD to €)
                             </button>
+
 
                             <button
                                 onClick={async () => {

@@ -107,40 +107,61 @@ export async function analyzeImage(file, hint = null) {
     return analyzeGemini(base64Content, mimeType, apiKey, hint);
 }
 
-// Wrapper for URLs (Batch Analysis)
-export async function analyzeImageUrl(publicUrl, apiKey, hint = null) {
+/// Wrapper for URLs (Batch Analysis)
+export async function analyzeImageUrl(publicUrl, apiKey, hint = null, consoleLog = null) {
     try {
-        console.log(`[Analysis] Fetching image: ${publicUrl}`);
-        // Append timestamp to bypass browser cache (fixes CORS issues if cached without headers)
-        const fetchUrl = publicUrl + (publicUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-
-        let blob;
-        try {
-            const response = await fetch(fetchUrl, { mode: 'cors' });
-            if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
-            blob = await response.blob();
-        } catch (imgErr) {
-            console.error("Image Fetch Error:", imgErr);
-            throw new Error(`Failed to download image from local server. Ensure you are on the same Wi-Fi. Details: ${imgErr.message}`);
-        }
-
-        // Resize image to prevent massive payload/memory freeze (CRITICAL)
-        const resizedBase64 = await resizeImage(blob);
-        const base64Content = resizedBase64.split(',')[1];
-
+        console.log(`[Analysis V36.1] Processing: ${publicUrl}`);
+        if (consoleLog) consoleLog(`[Analysis V36.1] File system interlock...`, "info");
         const provider = getProvider();
-        // If apiKey is passed, use it, otherwise fetch based on provider
         const keyToUse = apiKey || getApiKey(provider);
 
-        try {
-            if (provider === 'openai') return await analyzeOpenAI(base64Content, keyToUse, hint, 'image/jpeg');
-            return await analyzeGemini(base64Content, 'image/jpeg', keyToUse, hint);
-        } catch (aiErr) {
-            console.error("AI Provider Error:", aiErr);
-            throw new Error(`AI Provider Connection Failed: ${aiErr.message}`);
+        // --- DYNAMIC PATH EXTRACTION (V35.4) ---
+        // Image URL format is: http://.../api/files/[COLLECTION_ID]/[RECORD_ID]/[FILENAME]
+        const urlParts = publicUrl.split('/');
+        const filename = urlParts.pop();
+        const recordId = urlParts.pop();
+        const collectionId = urlParts.pop(); // This extracts "pbc_..."
+
+        console.log(`[V36.1] Extracted - Coll: ${collectionId}, Rec: ${recordId}, File: ${filename}`);
+
+        // --- iPhone/HEIC COMPATIBILITY & SAFARI LIMIT BYPASS (V36.1) ---
+        const isHeic = filename.toLowerCase().includes('.heic') || filename.toLowerCase().includes('.heif');
+        
+        if (isHeic) {
+            const warnLog = "[HEIC V36.1] Attenzione: formato Apple HEIC puro rilevato associato a questo vinile.";
+            console.warn(warnLog);
+            if (consoleLog) consoleLog(warnLog, "warning");
+            
+            // If provider is NOT gemini, we physically cannot process this file because OpenAI refuses HEIC
+            // and Safari on iOS instantly crashes running manual HEIC parsers (OOM limits).
+            if (provider !== "gemini") {
+                const fatalErr = `🚨 Safari iOS blocca la decodifica HEIC (Ram Crash). Devi ELIMINARE questo vinile e RICARICARLO (il sistema forzerà l'iPhone a produrre JPEG). In alternativa, inserisci una chiave Google Gemini (100% gratuita) nelle Impostazioni: Google Gemini decodifica HEIC nativamente senza usare il telefono!`;
+                if (consoleLog) consoleLog(fatalErr, "error");
+                throw new Error(fatalErr);
+            } else {
+                if (consoleLog) consoleLog("✅ Google Gemini attivo. Esecuzione pass-through nativo HEIC al Cloud...", "success");
+            }
         }
 
+        // --- STANDARD PATH (FAST NAS DIRECT) ---
+        const dirLog = `[Proxy V35.7] Sending direct metadata to NAS...`;
+        console.log(dirLog);
+        if (consoleLog) consoleLog(dirLog, "info");
+        
+        return await pb.send('/api/custom-ai-analyze', {
+            method: 'POST',
+            body: {
+                collectionId, // DYNAMIC COLLECTION!
+                recordId,
+                filename,
+                apiKey: keyToUse,
+                provider,
+                hint
+            }
+        });
+
     } catch (error) {
+        console.error("Analysis Pipeline Exception:", error);
         throw error;
     }
 }
@@ -555,20 +576,22 @@ function sanitizeCurrency(cost) {
 export function resizeImage(fileOrBlob) {
     return new Promise((resolve, reject) => {
         try {
-            const url = URL.createObjectURL(fileOrBlob);
+            const isUrl = typeof fileOrBlob === 'string';
+            const url = isUrl ? fileOrBlob : URL.createObjectURL(fileOrBlob);
             const img = new Image();
 
-            img.crossOrigin = 'Anonymous'; // Check for CORS
+            console.log(`[Resize V35.4] Initializing load for: ${isUrl ? 'URL' : 'Blob'}`);
+
+            // img.crossOrigin = 'Anonymous'; // REMOVED V35.4: Causes issues on same-origin Safari HEIC loads
 
             img.onload = () => {
                 try {
-                    // Reduced to 1024 for maximum mobile stability & speed
+                    console.log(`[Resize V35.4] Image load success: ${img.width}x${img.height}`);
+                    
                     const maxWidth = 1024;
                     const maxHeight = 1024;
                     let width = img.width;
                     let height = img.height;
-
-                    console.log(`Original image size: ${width}x${height}`);
 
                     if (width > height) {
                         if (width > maxWidth) {
@@ -582,45 +605,42 @@ export function resizeImage(fileOrBlob) {
                         }
                     }
 
-                    console.log(`Resized to: ${Math.round(width)}x${Math.round(height)}`);
-
                     const canvas = document.createElement('canvas');
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
 
                     if (!ctx) {
-                        URL.revokeObjectURL(url);
-                        reject(new Error("Failed to get canvas context"));
+                        if (!isUrl) URL.revokeObjectURL(url);
+                        reject(new Error("Canvas context failure"));
                         return;
                     }
 
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // Release source memory immediately
-                    URL.revokeObjectURL(url);
+                    if (!isUrl) URL.revokeObjectURL(url);
 
-                    // Reduced quality to 0.5 for speed (approx 150-200KB)
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    console.log(`[Resize V35.4] Canvas conversion success: ${Math.round(dataUrl.length / 1024)} KB`);
                     resolve(dataUrl);
                 } catch (e) {
-                    URL.revokeObjectURL(url);
-                    console.error("Canvas processing error:", e);
-                    reject(new Error("Image processing failed: " + e.message));
+                    if (!isUrl) URL.revokeObjectURL(url);
+                    console.error("[Resize V35.4] Canvas error:", e);
+                    reject(new Error("Processing error: " + e.message));
                 }
             };
 
             img.onerror = (e) => {
-                URL.revokeObjectURL(url);
-                console.error("Image load error:", e);
-                reject(new Error("Image load failed. File may be corrupted or unsupported format."));
+                if (!isUrl) URL.revokeObjectURL(url);
+                console.error("[Resize V35.4] Native Image Load Error:", e);
+                reject(new Error("Browser refused to load image. If on iPhone, ensure the photo is valid and visible."));
             };
 
             img.src = url;
 
         } catch (e) {
-            console.error("ResizeImage setup error:", e);
-            reject(new Error("Failed to initialize image resize: " + e.message));
+            console.error("[Resize V35.4] Setup error:", e);
+            reject(new Error("Resize setup failed: " + e.message));
         }
     });
 }
