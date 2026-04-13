@@ -29346,5 +29346,43 @@
     "tracks": "Black Dog,Rock and Roll,The Battle of Evermore,Stairway to Heaven,Misty Mountain Hop,Four Sticks,Going to California,When the Levee Breaks",
     "year": "1971",
     "image_url": "/storage/2gw5pwzai1ednmb-image_1g5ba980nd.jpg"
+  },
+  {
+    "artist": "The Youngbloods",
+    "average_cost": "",
+    "catalog_number": "LSP-3724",
+    "collectionId": "pbc_1326837967",
+    "collectionName": "vinyls",
+    "condition": "Used",
+    "description": "",
+    "edition": "Original",
+    "format": "Vinyl",
+    "genre": "Beat",
+    "group_members": "Jesse Colin Young,Jerry Corbitt,Joe Bauer,Lowell 'Banana' Levinger",
+    "id": "7ngclybvrcznbrn",
+    "image": "image_efmt98oevb.jpg",
+    "is_price_locked": true,
+    "is_tracks_validated": false,
+    "label": "RCA Victor",
+    "liner_notes": "Contains the hit single 'Get Together'.",
+    "locked_fields": [
+      "artist",
+      "title",
+      "label",
+      "catalog_number",
+      "edition",
+      "year",
+      "average_cost"
+    ],
+    "notes": "Debut album by The Youngbloods.",
+    "original_filename": "image.jpg",
+    "purchase_price": "43",
+    "purchase_year": "2026",
+    "rating": 5,
+    "sort_priority": 100,
+    "title": "The Youngbloods",
+    "tracks": "Grizzly Bear,All Over the World (La-La),Statesboro Blues,Get Together,One Note Man,The Other Side of This Life,Tears Are Falling,Four in the Morning,Foolin' Around (The Waltz),Ain't That Lovin' You, Baby,C.C. Rider",
+    "year": "1967",
+    "image_url": "/storage/7ngclybvrcznbrn-image_efmt98oevb.jpg"
   }
 ]
