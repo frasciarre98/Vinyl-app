@@ -1,8 +1,7 @@
-console.log(">>> MAGIC HOOK LOADED (Universal V37.0): " + new Date().toISOString());
+console.log(">>> MAGIC HOOK LOADED (Universal V37.2): " + new Date().toISOString());
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
     try {
-        // --- LOCAL HELPERS (DUPLICATED FOR SCOPE STABILITY) ---
         const bytesToString = function(bytes) {
             if (!bytes) return "";
             if (typeof bytes === 'string') return bytes;
@@ -11,6 +10,21 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
                 str += String.fromCharCode(bytes[i]);
             }
             return str;
+        };
+
+        const sanitizeText = function(text) {
+            if (!text) return "";
+            // Fix common UTF-8 mangling (double encoded or incorrectly interpreted)
+            return text
+                .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
+                .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
+                .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
+                .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
+                .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
+                .replace(/Ã¹/g, 'ù')
+                .replace(/â€™/g, "'").replace(/â€/g, '"')
+                .replace(/â€œ/g, '"').replace(/â€/g, '"')
+                .replace(/Ã /g, 'à'); // Handle uppercase or variations
         };
 
         const optimizedBase64Encode = function(bytes) {
@@ -46,7 +60,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
         const hint = data.hint || "";
         const base64Override = data.base64Override;
 
-        console.log("[AI Proxy V36.9] Analisi Full Metadata per: " + filename);
+        console.log("[AI Proxy V37.2] Analisi Full Metadata per: " + filename);
 
         if (!filename || !apiKey) {
             return e.json(400, { error: "Missing required data (Filename or API Key)" });
@@ -61,7 +75,6 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             
             let filePath = "/pb/pb_data/storage/" + collectionId + "/" + recordId + "/" + filename;
             let fileBytes;
-            
             try {
                 fileBytes = $os.readFile(filePath);
             } catch (pathErr) {
@@ -72,10 +85,8 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             try {
                 if (typeof $security !== 'undefined' && $security.base64Encode) {
                     base64Content = $security.base64Encode(fileBytes);
-                } else if (typeof $security !== 'undefined' && $security.base64_encode) {
-                    base64Content = $security.base64_encode(fileBytes);
                 } else {
-                    throw new Error("Native helper missing");
+                    base64Content = optimizedBase64Encode(fileBytes);
                 }
             } catch (f) {
                 base64Content = optimizedBase64Encode(fileBytes);
@@ -85,15 +96,13 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
         const ext = filename.split('.').pop().toLowerCase();
         let mimeType = "image/jpeg";
         if (ext === "png") mimeType = "image/png";
-        else if (ext === "webp") mimeType = "image/webp";
-        else if (ext === "heic" || ext === "heif") mimeType = "image/heic";
 
         const headers = { "Content-Type": "application/json" };
         if (provider !== "gemini") {
             headers["Authorization"] = "Bearer " + apiKey;
         }
 
-        const promptSystem = "Identify this vinyl album. Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Clean output only.";
+        const promptSystem = "Identify this vinyl album. Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Use standard Italian for liner_notes.";
 
         const aiRes = $http.send({
             url: provider === "gemini" ? 
@@ -132,7 +141,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             result = parsed;
         }
 
-        const sanitize = (val, max) => String(val || '').substring(0, max);
+        const sanitize = (val, max) => sanitizeText(String(val || '').substring(0, max));
         
         return e.json(200, {
             artist: sanitize(result.artist || 'Unknown Artist', 100),
@@ -151,7 +160,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
         });
 
     } catch (err) {
-        return e.json(500, { error: "Backend Proxy Crash V36.9: " + err.message });
+        return e.json(500, { error: "Backend Proxy Crash V37.2: " + err.message });
     }
 });
 
@@ -167,17 +176,29 @@ routerAdd("POST", "/api/ai/story", (e) => {
             return str;
         };
 
+        const sanitizeText = function(text) {
+            if (!text) return "";
+            return text
+                .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
+                .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
+                .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
+                .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
+                .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
+                .replace(/â€™/g, "'").replace(/â€/g, '"')
+                .replace(/â€œ/g, '"').replace(/â€/g, '"');
+        };
+
         let data = {};
         try { data = e.requestInfo().body || {}; } catch(err) {}
         
         const artist = data.artist;
         const title = data.title;
-        const apiKey = data.apiKey || $os.getenv("OPENAI_API_KEY") || ""; 
+        const apiKey = data.apiKey || ""; 
 
-        console.log("[AI Story V36.9] Story for: " + artist + " - " + title);
+        console.log("[AI Story V37.2] Story for: " + artist + " - " + title);
 
-        if (!artist || !title) {
-            return e.json(400, { error: "Missing Artist or Title" });
+        if (!artist || !title || !apiKey) {
+            return e.json(400, { error: "Missing Artist, Title or API Key" });
         }
 
         const res = $http.send({
@@ -187,7 +208,7 @@ routerAdd("POST", "/api/ai/story", (e) => {
                 model: "gpt-4o-mini",
                 messages: [{
                     role: "system",
-                    content: "Sei un esperto critico musicale. Scrivi una storia appassionante per questo album in ITALIANO (300-500 parole)."
+                    content: "Sei un esperto critico musicale. Scrivi una storia appassionante per questo album in ITALIANO (300-500 parole). Evita simboli strani di encoding."
                 }, {
                     role: "user",
                     content: "Liner notes per '" + title + "' - '" + artist + "'."
@@ -206,9 +227,9 @@ routerAdd("POST", "/api/ai/story", (e) => {
             return e.json(res.statusCode, { error: "OpenAI Error: " + (body.error?.message || "Unknown") });
         }
 
-        return e.json(200, { story: body.choices[0].message.content });
+        return e.json(200, { story: sanitizeText(body.choices[0].message.content) });
 
     } catch (err) {
-        return e.json(500, { error: "Story Proxy Crash V36.9: " + err.message });
+        return e.json(500, { error: "Story Proxy Crash V37.2: " + err.message });
     }
 });
