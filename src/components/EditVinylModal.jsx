@@ -553,18 +553,75 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-white/90 mb-1">Condition</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-semibold text-white/90">Condition</label>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const dialog = document.getElementById('grading-info');
+                                                if (dialog) dialog.classList.toggle('hidden');
+                                            }}
+                                            className="text-[10px] bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded text-blue-300 border border-blue-500/20 transition-colors"
+                                        >
+                                            Grading Guide
+                                        </button>
+                                        <FieldLock field="condition" />
+                                    </div>
+                                </div>
                                 <select
                                     value={formData.condition}
                                     onChange={e => setFormData({ ...formData, condition: e.target.value })}
                                     className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900"
                                 >
-                                    <option value="Mint">Mint</option>
-                                    <option value="Near Mint">Near Mint</option>
-                                    <option value="Very Good Plus">Very Good Plus</option>
-                                    <option value="Good">Good</option>
-                                    <option value="Fair">Fair</option>
+                                    <option value="">Select Condition...</option>
+                                    <option value="Mint (M)">Mint (M)</option>
+                                    <option value="Near Mint (NM)">Near Mint (NM)</option>
+                                    <option value="Excellent (EX)">Excellent (EX)</option>
+                                    <option value="Very Good Plus (VG+)">Very Good Plus (VG+)</option>
+                                    <option value="Very Good (VG)">Very Good (VG)</option>
+                                    <option value="Good (G)">Good (G)</option>
+                                    <option value="Fair (F)">Fair (F)</option>
+                                    <option value="Poor (P)">Poor (P)</option>
                                 </select>
+
+                                {/* Grading Definition Table (Hidden by default) */}
+                                <div id="grading-info" className="hidden mt-3 p-3 bg-black/60 rounded-lg border border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <h4 className="text-[10px] font-bold text-blue-300 uppercase mb-2 tracking-widest text-center">Standard Grading Reference</h4>
+                                    <div className="space-y-2 text-[10px] leading-snug">
+                                        <div className="flex gap-2 border-b border-white/5 pb-1">
+                                            <span className="font-bold text-white w-8 flex-shrink-0">M</span>
+                                            <span className="text-white/60">Sealed or unplayed. Perfect in every way.</span>
+                                        </div>
+                                        <div className="flex gap-2 border-b border-white/5 pb-1">
+                                            <span className="font-bold text-white w-8 flex-shrink-0">NM</span>
+                                            <span className="text-white/60">Nearly perfect. No visible defects or noise.</span>
+                                        </div>
+                                        <div className="flex gap-2 border-b border-white/5 pb-1">
+                                            <span className="font-bold text-white w-8 flex-shrink-0">EX</span>
+                                            <span className="text-white/60">Extremely clean, very light signs of use only.</span>
+                                        </div>
+                                        <div className="flex gap-2 border-b border-white/5 pb-1">
+                                            <span className="font-bold text-white w-8 flex-shrink-0">VG+</span>
+                                            <span className="text-white/60">Great player. Slight surface wear, minimal noise.</span>
+                                        </div>
+                                        <div className="flex gap-2 border-b border-white/5 pb-1">
+                                            <span className="font-bold text-white w-8 flex-shrink-0">VG</span>
+                                            <span className="text-white/60">Visible marks. Some crackle but doesn't overpower music.</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <span className="font-bold text-white w-8 flex-shrink-0">G/F/P</span>
+                                            <span className="text-white/60">Heavy use. Significant noise/scratches. Collectible only.</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => document.getElementById('grading-info').classList.add('hidden')}
+                                        className="w-full mt-3 text-[9px] text-white/40 hover:text-white transition-colors py-1"
+                                    >
+                                        Close Guide
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
@@ -769,11 +826,15 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                 />
                             </div>
                             <div className="col-span-2">
-                                <label className="block text-sm font-semibold text-white/90 mb-1">Notes</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-semibold text-white/90">Notes & Appraisal</label>
+                                    <FieldLock field="notes" />
+                                </div>
                                 <textarea
                                     value={formData.notes}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                    rows={3}
+                                    rows={4}
+                                    placeholder="Add personal notes or grading details..."
                                     className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent resize-none text-slate-900 placeholder-slate-400"
                                 />
                             </div>

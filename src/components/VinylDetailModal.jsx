@@ -54,7 +54,11 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
             const res = await fetch('/api/ai/story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ artist: vinyl.artist, title: vinyl.title })
+                body: JSON.stringify({ 
+                    artist: vinyl.artist, 
+                    title: vinyl.title,
+                    apiKey: getApiKey()
+                })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to generate story');

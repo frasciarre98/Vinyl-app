@@ -31,8 +31,8 @@ export function VinylGrid({ refreshTrigger }) {
     const [selectedGenre, setSelectedGenre] = useState('');
     const [selectedRating, setSelectedRating] = useState('0');
     const [showWantlist, setShowWantlist] = useState(false);
-    // Sort Order: 'newest' (default) | 'artist_asc'
-    const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('vinyl_sort_order') || 'newest');
+    // Sort Order: 'artist_asc' (Default for stability) | 'newest'
+    const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('vinyl_sort_order') || 'artist_asc');
 
     useEffect(() => {
         localStorage.setItem('vinyl_sort_order', sortOrder);
@@ -120,7 +120,7 @@ export function VinylGrid({ refreshTrigger }) {
 
             const allVinyls = records.map(doc => {
                 try {
-                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || new Date().toISOString();
+                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || '1970-01-01T00:00:00.000Z';
                     return {
                         ...doc,
                         $createdAt: rawCreated,
@@ -142,7 +142,10 @@ export function VinylGrid({ refreshTrigger }) {
                 
                 // V35.8: If mode is 'newest', ignore priority to show latest uploads at the top literal
                 if (sortOrder === 'newest') {
-                    return new Date(b.$createdAt) - new Date(a.$createdAt);
+                    const dateDiff = new Date(b.$createdAt) - new Date(a.$createdAt);
+                    if (dateDiff !== 0) return dateDiff;
+                    // Emergency fallback: If dates match (or both missing), use ID to ensure determinism
+                    return (b.id || "").localeCompare(a.id || "");
                 }
 
                 // Fallback to existing sort order (priority then date) for other modes

@@ -110,8 +110,8 @@ export async function analyzeImage(file, hint = null) {
 /// Wrapper for URLs (Batch Analysis)
 export async function analyzeImageUrl(publicUrl, apiKey, hint = null, consoleLog = null) {
     try {
-        console.log(`[Analysis V36.1] Processing: ${publicUrl}`);
-        if (consoleLog) consoleLog(`[Analysis V36.1] File system interlock...`, "info");
+        console.log(`[Analysis V36.5] Processing: ${publicUrl}`);
+        if (consoleLog) consoleLog(`[Analysis V36.5] File system interlock...`, "info");
         const provider = getProvider();
         const keyToUse = apiKey || getApiKey(provider);
 
@@ -162,7 +162,10 @@ export async function analyzeImageUrl(publicUrl, apiKey, hint = null, consoleLog
 
     } catch (error) {
         console.error("Analysis Pipeline Exception:", error);
-        throw error;
+        // Extract PocketBase detailed error if available
+        const detail = error.data?.error || error.data?.message || (typeof error.data === 'string' ? error.data : '');
+        const finalMsg = detail ? `Server Error: ${detail}` : error.message;
+        throw new Error(finalMsg);
     }
 }
 

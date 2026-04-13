@@ -60,7 +60,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const now = new Date().toLocaleTimeString();
         addLog(`[${now}] Sistema Pronto [${isLocal ? 'Local' : 'Proxy'} Mode]`, "success");
-        console.log(">>> Frontend V35.5 ZENITH Loaded at " + now + " <<<");
+        console.log(">>> Frontend V36.1 ZENITH Loaded at " + now + " <<<");
     }, []);
 
     const startBatch = async (items = null, quiet = false) => {
