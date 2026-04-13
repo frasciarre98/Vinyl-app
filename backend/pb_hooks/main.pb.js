@@ -1,4 +1,4 @@
-console.log(">>> MAGIC HOOK LOADED (Universal V37.2): " + new Date().toISOString());
+console.log(">>> MAGIC HOOK LOADED (Universal V37.3): " + new Date().toISOString());
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
     try {
@@ -14,17 +14,20 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
 
         const sanitizeText = function(text) {
             if (!text) return "";
-            // Fix common UTF-8 mangling (double encoded or incorrectly interpreted)
-            return text
+            // 1. Fix UTF-8 mangling
+            let clean = text
                 .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
                 .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
                 .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
                 .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
                 .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
-                .replace(/Ã¹/g, 'ù')
                 .replace(/â€™/g, "'").replace(/â€/g, '"')
-                .replace(/â€œ/g, '"').replace(/â€/g, '"')
-                .replace(/Ã /g, 'à'); // Handle uppercase or variations
+                .replace(/â€œ/g, '"').replace(/â€ /g, '"');
+            
+            // 2. Strip Markdown (Bold, Headers) for clean UI
+            clean = clean.replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '').replace(/# /g, '');
+            
+            return clean.trim();
         };
 
         const optimizedBase64Encode = function(bytes) {
@@ -60,7 +63,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
         const hint = data.hint || "";
         const base64Override = data.base64Override;
 
-        console.log("[AI Proxy V37.2] Analisi Full Metadata per: " + filename);
+        console.log("[AI Proxy V37.3] Analisi Full Metadata per: " + filename);
 
         if (!filename || !apiKey) {
             return e.json(400, { error: "Missing required data (Filename or API Key)" });
@@ -102,7 +105,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             headers["Authorization"] = "Bearer " + apiKey;
         }
 
-        const promptSystem = "Identify this vinyl album. Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Use standard Italian for liner_notes.";
+        const promptSystem = "Identify this vinyl album. Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Clean Italian only (no markdown).";
 
         const aiRes = $http.send({
             url: provider === "gemini" ? 
@@ -160,7 +163,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
         });
 
     } catch (err) {
-        return e.json(500, { error: "Backend Proxy Crash V37.2: " + err.message });
+        return e.json(500, { error: "Backend Proxy Crash V37.3: " + err.message });
     }
 });
 
@@ -178,14 +181,17 @@ routerAdd("POST", "/api/ai/story", (e) => {
 
         const sanitizeText = function(text) {
             if (!text) return "";
-            return text
+            let clean = text
                 .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
                 .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
                 .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
                 .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
                 .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
                 .replace(/â€™/g, "'").replace(/â€/g, '"')
-                .replace(/â€œ/g, '"').replace(/â€/g, '"');
+                .replace(/â€œ/g, '"').replace(/â€ /g, '"');
+            
+            clean = clean.replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '').replace(/# /g, '');
+            return clean.trim();
         };
 
         let data = {};
@@ -193,9 +199,9 @@ routerAdd("POST", "/api/ai/story", (e) => {
         
         const artist = data.artist;
         const title = data.title;
-        const apiKey = data.apiKey || ""; 
+        const apiKey = data.apiKey;
 
-        console.log("[AI Story V37.2] Story for: " + artist + " - " + title);
+        console.log("[AI Story V37.3] Story for: " + artist + " - " + title);
 
         if (!artist || !title || !apiKey) {
             return e.json(400, { error: "Missing Artist, Title or API Key" });
@@ -208,7 +214,7 @@ routerAdd("POST", "/api/ai/story", (e) => {
                 model: "gpt-4o-mini",
                 messages: [{
                     role: "system",
-                    content: "Sei un esperto critico musicale. Scrivi una storia appassionante per questo album in ITALIANO (300-500 parole). Evita simboli strani di encoding."
+                    content: "Sei un esperto critico musicale. Scrivi una storia appassionante per questo album in ITALIANO. No markdown, solo testo pulito."
                 }, {
                     role: "user",
                     content: "Liner notes per '" + title + "' - '" + artist + "'."
@@ -230,6 +236,6 @@ routerAdd("POST", "/api/ai/story", (e) => {
         return e.json(200, { story: sanitizeText(body.choices[0].message.content) });
 
     } catch (err) {
-        return e.json(500, { error: "Story Proxy Crash V37.2: " + err.message });
+        return e.json(500, { error: "Story Proxy Crash V37.3: " + err.message });
     }
 });

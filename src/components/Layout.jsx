@@ -110,7 +110,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     <div className="flex items-center gap-3">
                         <VinylLogo className="w-14 h-14 drop-shadow-lg" />
                         <h1 className="text-2xl font-black tracking-wider text-slate-900 uppercase italic">
-                            Vinyl <span className="text-slate-600 font-bold">Catalog V37.2</span>
+                            Vinyl <span className="text-slate-600 font-bold">Catalog V37.3</span>
                         </h1>
                     </div>
 
@@ -196,7 +196,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-white/40 text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v37.2-ULTIMATE</span></p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v37.3-ULTIMATE</span></p>
                 </div>
             </footer>
         </div >
