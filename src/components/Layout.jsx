@@ -170,16 +170,15 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 {children}
             </main>
 
-            {/* Floating Action Button for Mobile */}
             {
-                !IS_STATIC && user && (
+                !IS_STATIC && (
                     <button
                         onClick={onOpenUpload}
-                        className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center"
+                        className="md:hidden fixed bottom-6 right-6 z-50 w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center border-4 border-white/20"
                         title="Add Vinyls"
                         aria-label="Add Vinyls"
                     >
-                        <Plus className="w-6 h-6" />
+                        <Plus className="w-8 h-8" />
                     </button>
                 )
             }
