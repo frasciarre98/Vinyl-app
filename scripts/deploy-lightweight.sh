@@ -7,13 +7,13 @@ NAS_IP="192.168.0.250"
 # Auto-fix: Zsh-native way to find the script's directory and move to project root
 cd "${0:A:h}/.."
 
-echo "🚀 1. Avvio deploy lightweight V38.9 da: $(pwd)"
+echo "🚀 1. Avvio deploy lightweight V38.10 da: $(pwd)"
 npx vite build --emptyOutDir
 
-echo "🔍 Verifica build V38.9..."
-if ! grep -r "V38.9" dist/assets/ > /dev/null 2>&1; then
-    echo "❌ ERROR: La build prodotta non contiene la versione V38.9!"
-    echo "   Attesa: V38.9 nel codice sorgente."
+echo "🔍 Verifica build V38.10..."
+if ! grep -r "V38.10" dist/assets/ > /dev/null 2>&1; then
+    echo "❌ ERROR: La build prodotta non contiene la versione V38.10!"
+    echo "   Attesa: V38.10 nel codice sorgente."
     exit 1
 fi
 echo "✅ Build verificata."

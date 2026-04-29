@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Gem, TrendingUp } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Gem, TrendingUp, Cloud, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export function CollectionValueKPI({ vinyls }) {
     const totalValue = useMemo(() => {
@@ -55,6 +55,27 @@ export function CollectionValueKPI({ vinyls }) {
         maximumFractionDigits: 0
     }).format(totalValue);
 
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error
+
+    const handleSync = async () => {
+        setIsSyncing(true);
+        setSyncStatus('syncing');
+        try {
+            const res = await fetch('/api/publish');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Sync failed');
+            setSyncStatus('success');
+            setTimeout(() => setSyncStatus('idle'), 3000);
+        } catch (err) {
+            console.error(err);
+            setSyncStatus('error');
+            setTimeout(() => setSyncStatus('idle'), 3000);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <div className="relative overflow-hidden mb-4 group">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/40 via-emerald-900/20 to-transparent border border-emerald-500/20 rounded-xl" />
@@ -74,11 +95,34 @@ export function CollectionValueKPI({ vinyls }) {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-800/80 backdrop-blur border border-emerald-700/50 rounded-full shadow-sm">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-100" />
-                    <span className="text-xs font-bold text-emerald-50 whitespace-nowrap">
-                        {vinyls.length} items
-                    </span>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all shadow-sm ${
+                            syncStatus === 'success' ? 'bg-green-600 border-green-500 text-white' :
+                            syncStatus === 'error' ? 'bg-red-600 border-red-500 text-white' :
+                            'bg-emerald-800/80 backdrop-blur border-emerald-700/50 text-emerald-100 hover:bg-emerald-700'
+                        }`}
+                        title="Sync Collection to Cloud (Vercel)"
+                    >
+                        {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 
+                         syncStatus === 'success' ? <CheckCircle2 className="w-3.5 h-3.5" /> :
+                         syncStatus === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> :
+                         <Cloud className="w-3.5 h-3.5" />}
+                        <span className="text-[10px] font-bold whitespace-nowrap">
+                            {syncStatus === 'syncing' ? 'Syncing...' : 
+                             syncStatus === 'success' ? 'Synced!' : 
+                             syncStatus === 'error' ? 'Error' : 'Sync Cloud'}
+                        </span>
+                    </button>
+
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur border border-white/10 rounded-full">
+                        <TrendingUp className="w-3.5 h-3.5 text-white/60" />
+                        <span className="text-xs font-bold text-white whitespace-nowrap">
+                            {vinyls.length} items
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

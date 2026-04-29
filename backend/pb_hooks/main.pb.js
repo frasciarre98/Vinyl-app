@@ -1,55 +1,68 @@
-console.log(">>> MAGIC HOOK LOADED (Universal V37.4): " + new Date().toISOString());
+console.log(">>> MAGIC HOOK LOADED (Universal V38.10): " + new Date().toISOString());
+
+const bytesToString = function(bytes) {
+    if (!bytes) return "";
+    if (typeof bytes === 'string') return bytes;
+    let str = "";
+    for (let i = 0; i < bytes.length; i++) {
+        str += String.fromCharCode(bytes[i]);
+    }
+    return str;
+};
+
+const stringToBytes = function(str) {
+    let bytes = [];
+    for (let i = 0; i < str.length; i++) {
+        let charCode = str.charCodeAt(i);
+        if (charCode < 0x80) bytes.push(charCode);
+        else if (charCode < 0x800) {
+            bytes.push(0xc0 | (charCode >> 6), 0x80 | (charCode & 0x3f));
+        } else if (charCode < 0xd800 || charCode >= 0xe000) {
+            bytes.push(0xe0 | (charCode >> 12), 0x80 | ((charCode >> 6) & 0x3f), 0x80 | (charCode & 0x3f));
+        }
+    }
+    return bytes;
+};
+
+const optimizedBase64Encode = function(bytes) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const chunks = [];
+    const l = bytes.length;
+    for (let i = 0; i < l; i += 3) {
+        const b0 = bytes[i];
+        const b1 = i + 1 < l ? bytes[i + 1] : 0;
+        const b2 = i + 2 < l ? bytes[i + 2] : 0;
+        chunks.push(chars[b0 >> 2]);
+        chunks.push(chars[((b0 & 3) << 4) | (b1 >> 4)]);
+        if (i + 1 < l) chunks.push(chars[((b1 & 15) << 2) | (b2 >> 6)]); else chunks.push('=');
+        if (i + 2 < l) chunks.push(chars[b2 & 63]); else chunks.push('=');
+    }
+    return chunks.join('');
+};
+
+const sanitizeText = function(text) {
+    if (!text) return "";
+    let clean = text
+        .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
+        .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
+        .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
+        .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
+        .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
+        .replace(/â€™/g, "'").replace(/â€/g, '"')
+        .replace(/â€œ/g, '"').replace(/â€ /g, '"')
+        .replace(/lâ€™/g, "l'").replace(/dâ€™/g, "d'")
+        .replace(/unâ€™/g, "un'").replace(/dellâ€™/g, "dell'")
+        .replace(/â€“/g, '-').replace(/â€”/g, '-')
+        .replace(/Ã/g, 'à')
+        .replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '').replace(/# /g, '');
+    
+    return clean.trim();
+};
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
     try {
-        const bytesToString = function(bytes) {
-            if (!bytes) return "";
-            if (typeof bytes === 'string') return bytes;
-            let str = "";
-            for (let i = 0; i < bytes.length; i++) {
-                str += String.fromCharCode(bytes[i]);
-            }
-            return str;
-        };
-
-        const sanitizeText = function(text) {
-            if (!text) return "";
-            let clean = text
-                // --- UNIVERSAL UTF-8 REPAIR MAP ---
-                .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
-                .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
-                .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
-                .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
-                .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
-                .replace(/â€™/g, "'").replace(/â€/g, '"')
-                .replace(/â€œ/g, '"').replace(/â€ /g, '"')
-                .replace(/lâ€™/g, "l'").replace(/dâ€™/g, "d'")
-                .replace(/unâ€™/g, "un'").replace(/dellâ€™/g, "dell'")
-                .replace(/â€“/g, '-').replace(/â€”/g, '-')
-                .replace(/Ã/g, 'à') // Final fallback for trailing corruption
-                // --- MARKDOWN STRIPPING ---
-                .replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '').replace(/# /g, '');
-            
-            return clean.trim();
-        };
-
-        const optimizedBase64Encode = function(bytes) {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-            const chunks = [];
-            const l = bytes.length;
-            for (let i = 0; i < l; i += 3) {
-                const b0 = bytes[i];
-                const b1 = i + 1 < l ? bytes[i + 1] : 0;
-                const b2 = i + 2 < l ? bytes[i + 2] : 0;
-                chunks.push(chars[b0 >> 2]);
-                chunks.push(chars[((b0 & 3) << 4) | (b1 >> 4)]);
-                if (i + 1 < l) chunks.push(chars[((b1 & 15) << 2) | (b2 >> 6)]); else chunks.push('=');
-                if (i + 2 < l) chunks.push(chars[b2 & 63]); else chunks.push('=');
-            }
-            return chunks.join('');
-        };
-
         let data = {};
+
         try { data = e.requestInfo().body || {}; } catch(err) {}
         if (!data || Object.keys(data).length === 0) {
             try {
@@ -305,5 +318,168 @@ routerAdd("GET", "/api/music/search", (e) => {
         return e.json(200, { results: mappedResults });
     } catch (err) {
         return e.json(500, { error: "Music Proxy Crash: " + err.message, stack: err.stack, name: err.name });
+    }
+});
+
+routerAdd("GET", "/api/test-app", (e) => {
+    const keys = Object.keys($app);
+    const eKeys = Object.keys(e.app);
+    return e.json(200, { appKeys: keys, eAppKeys: eKeys });
+});
+
+routerAdd("GET", "/api/publish", (e) => {
+    try {
+        console.log("[Publish] Starting GitHub Sync...");
+        const GITHUB_TOKEN = "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";
+        const REPO = "frasciarre98/Vinyl-app";
+        const FILE_PATH = "src/data/vinyls-static.json";
+
+        // Inline helpers (global scope not reliable in PocketBase JS VM)
+        const _bytesToString = function(bytes) {
+            if (!bytes) return "";
+            if (typeof bytes === 'string') return bytes;
+            let str = "";
+            for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+            return str;
+        };
+        const _stringToBytes = function(str) {
+            let bytes = [];
+            for (let i = 0; i < str.length; i++) {
+                const c = str.charCodeAt(i);
+                if (c < 0x80) bytes.push(c);
+                else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+                else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+            }
+            return bytes;
+        };
+        const _b64 = function(bytes) {
+            const ch = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            const out = []; const l = bytes.length;
+            for (let i = 0; i < l; i += 3) {
+                const b0 = bytes[i], b1 = i+1<l?bytes[i+1]:0, b2 = i+2<l?bytes[i+2]:0;
+                out.push(ch[b0>>2], ch[((b0&3)<<4)|(b1>>4)]);
+                out.push(i+1<l ? ch[((b1&15)<<2)|(b2>>6)] : '=');
+                out.push(i+2<l ? ch[b2&63] : '=');
+            }
+            return out.join('');
+        };
+
+        // 1. Get all records - Trial and error for Dao access
+        let records = [];
+        let dao = null;
+
+        // Try different ways to find the Dao/App instance
+        if (typeof $app !== 'undefined') {
+            if (typeof $app.dao === 'function') dao = $app.dao();
+            else if (typeof $app.Dao === 'function') dao = $app.Dao();
+            else if ($app.dao) dao = $app.dao;
+        }
+        
+        if (!dao && e.app) {
+            if (typeof e.app.dao === 'function') dao = e.app.dao();
+            else if (typeof e.app.Dao === 'function') dao = e.app.Dao();
+            else if (e.app.dao) dao = e.app.dao;
+        }
+
+        if (!dao) {
+            // Last resort: standard global $app search if the above failed
+            try { records = $app.findRecordsByFilter("vinyls", "1=1", "", 1500); }
+            catch(err) { throw new Error("Could not access database Dao: " + err.message); }
+        } else {
+            records = dao.findRecordsByFilter("vinyls", "1=1", "", 1500);
+        }
+
+        console.log("[Publish] Found " + records.length + " records.");
+        
+        const staticData = records.map(record => {
+            // Get ID reliably
+            const rid = record.id || (typeof record.getId === 'function' ? record.getId() : record.get("id"));
+            const imageFile = record.getString("image") || "";
+            // Match the naming convention used by export-static.js: /storage/{id}-{filename}
+            const image_url = imageFile ? ("/storage/" + rid + "-" + imageFile) : null;
+            
+            return {
+                id: rid,
+                artist: record.getString("artist") || 'Unknown Artist',
+                title: record.getString("title") || 'Unknown Album',
+                genre: record.getString("genre") || '',
+                year: record.getString("year") || '',
+                format: record.getString("format") || 'Vinyl',
+                label: record.getString("label") || '',
+                catalog_number: record.getString("catalog_number") || '',
+                edition: record.getString("edition") || '',
+                tracks: record.getString("tracks") || '',
+                group_members: record.getString("group_members") || '',
+                notes: record.getString("notes") || '',
+                condition: record.getString("condition") || 'N/A',
+                liner_notes: record.getString("liner_notes") || '',
+                rating: record.getInt("rating") || 0,
+                purchase_price: record.getString("purchase_price") || '',
+                purchase_year: record.getString("purchase_year") || '',
+                average_cost: record.getString("average_cost") || record.getString("avarege_cost") || '',
+                is_tracks_validated: record.getBool("is_tracks_validated"),
+                is_price_locked: record.getBool("is_price_locked"),
+                image_url: image_url,
+                created: record.getString("created") || record.created,
+                updated: record.getString("updated") || record.updated
+            };
+        });
+
+        const jsonContent = JSON.stringify(staticData, null, 2);
+        const base64Content = _b64(_stringToBytes(jsonContent));
+
+        // 2. Get current SHA
+        console.log("[Publish] Fetching current SHA from GitHub...");
+        const getRes = $http.send({
+            url: "https://api.github.com/repos/" + REPO + "/contents/" + FILE_PATH,
+            method: "GET",
+            headers: {
+                "Authorization": "token " + GITHUB_TOKEN,
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "VinylCatalog-Sync"
+            }
+        });
+
+        let sha = "";
+        if (getRes.statusCode === 200) {
+            const bodyStr = _bytesToString(getRes.body);
+            const body = JSON.parse(bodyStr);
+            sha = body.sha;
+            console.log("[Publish] Current SHA: " + sha);
+        } else {
+            console.log("[Publish] File not found or error (Status: " + getRes.statusCode + "). Proceeding without SHA.");
+        }
+
+        // 3. Push to GitHub
+        console.log("[Publish] Pushing update to GitHub...");
+        const putRes = $http.send({
+            url: "https://api.github.com/repos/" + REPO + "/contents/" + FILE_PATH,
+            method: "PUT",
+            headers: {
+                "Authorization": "token " + GITHUB_TOKEN,
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "VinylCatalog-Sync",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: "🚀 Magic Sync from App (" + new Date().toISOString() + ")",
+                content: base64Content,
+                sha: sha,
+                branch: "main"
+            })
+        });
+
+        const putBody = _bytesToString(putRes.body);
+        console.log("[Publish] GitHub Response: " + putRes.statusCode);
+
+        if (putRes.statusCode >= 200 && putRes.statusCode < 300) {
+            return e.json(200, { success: true, message: "Sync complete! GitHub updated." });
+        } else {
+            return e.json(putRes.statusCode, { error: "GitHub Sync Failed", details: putBody });
+        }
+
+    } catch (err) {
+        console.log("[Publish] CRASH: " + err.message);
+        return e.json(500, { error: "Sync Crash: " + err.message });
     }
 });

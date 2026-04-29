@@ -139,10 +139,10 @@ export function VinylGrid({ refreshTrigger }) {
             const sortedVinyls = allVinyls.sort((a, b) => {
                 const aPending = a.artist === 'Pending AI' || a.artist === 'Error';
                 const bPending = b.artist === 'Pending AI' || b.artist === 'Error';
-                
+
                 if (aPending && !bPending) return -1;
                 if (!aPending && bPending) return 1;
-                
+
                 // Sort simply by date (newest first)
                 return new Date(b.$createdAt) - new Date(a.$createdAt);
             });
@@ -529,7 +529,7 @@ export function VinylGrid({ refreshTrigger }) {
 
             {/* --- DESKTOP FILTERS --- */}
             <div className="hidden md:flex sticky top-20 z-20 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 flex-col gap-4 shadow-lg">
-                
+
                 {/* Row 1: Toggles, Search, Actions */}
                 <div className="flex flex-row flex-wrap items-center justify-between gap-4 w-full">
                     <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 shrink-0">
@@ -586,7 +586,7 @@ export function VinylGrid({ refreshTrigger }) {
                 {/* Row 2: Detailed Filters */}
                 <div className="flex flex-row flex-wrap items-center gap-3 w-full">
                     <input type="text" name="track_search_query" autoComplete="off" placeholder="Track Name..." value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} className="flex-1 min-w-[150px] bg-surface border border-border text-primary rounded-full px-4 py-2.5 text-sm placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50" />
-                    
+
                     <div className="flex-1 min-w-[150px]">
                         <SearchableSelect
                             options={uniqueArtists}
@@ -596,12 +596,12 @@ export function VinylGrid({ refreshTrigger }) {
                             className="w-full"
                         />
                     </div>
-                    
+
                     <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="flex-1 min-w-[140px] max-w-[250px] bg-surface border border-border text-primary rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50">
                         <option value="">All Genres</option>
                         {uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}
                     </select>
-                    
+
                     <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="flex-1 min-w-[140px] max-w-[250px] bg-surface border border-border text-primary rounded-full px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50">
                         <option value="0">All Ratings</option>
                         <option value="needs_attention">⚠ Needs Attention</option>
@@ -624,12 +624,12 @@ export function VinylGrid({ refreshTrigger }) {
                         <button onClick={fetchVinyls} className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-full text-sm font-bold transition-colors">
                             Retry Connection
                         </button>
-                        <button 
-                            onClick={() => { 
-                                pb.authStore.clear(); 
+                        <button
+                            onClick={() => {
+                                pb.authStore.clear();
                                 localStorage.clear();
-                                window.location.reload(); 
-                            }} 
+                                window.location.reload();
+                            }}
                             className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-bold transition-colors"
                         >
                             Reset Session & Logout
