@@ -107,10 +107,10 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
             <header className="glass-panel sticky top-0 z-50 border-b-0">
 
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <VinylLogo className="w-14 h-14 drop-shadow-lg" />
-                        <h1 className="text-2xl font-black tracking-wider text-slate-900 uppercase italic">
-                            Vinyl <span className="text-slate-600 font-bold">Catalog V37.5</span>
+                    <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                        <VinylLogo className="w-14 h-14 md:w-20 md:h-20 drop-shadow-xl" />
+                        <h1 className="text-2xl md:text-4xl font-serif italic tracking-wide text-emerald-800 whitespace-nowrap" style={{ textShadow: '0 0 12px rgba(16, 185, 129, 0.35), 0 0 4px rgba(16, 185, 129, 0.2)' }}>
+                            Vinyl <span className="text-emerald-700/90 font-light">Catalog</span>
                         </h1>
                     </div>
 
@@ -122,7 +122,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                         <button
                                             onClick={handleExport}
                                             disabled={isExporting}
-                                            className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                            className="hidden lg:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
                                             title="Export to Excel/CSV"
                                         >
                                             {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -130,7 +130,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                         </button>
                                         <button
                                             onClick={() => setIsImportOpen(true)}
-                                            className="hidden md:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
+                                            className="hidden lg:flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 hover:text-primary transition-colors font-medium text-sm border border-border"
                                             title="Import CSV"
                                         >
                                             <Upload className="w-4 h-4" />
@@ -139,7 +139,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
                                         <button
                                             onClick={onOpenUpload}
-                                            className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
+                                            className="hidden lg:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
                                         >
                                             <Plus className="w-4 h-4" />
                                             <span>Add Vinyls</span>
@@ -174,7 +174,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 !IS_STATIC && (
                     <button
                         onClick={onOpenUpload}
-                        className="md:hidden fixed bottom-6 right-6 z-50 w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center border-4 border-white/20"
+                        className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center border-4 border-white/20"
                         title="Add Vinyls"
                         aria-label="Add Vinyls"
                     >
@@ -195,7 +195,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
             <footer className="border-t border-border py-6 mt-4">
                 <div className="container mx-auto px-4 text-center text-white/40 text-sm">
-                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">v37.5-ZENITH</span></p>
+                    <p>© {new Date().getFullYear()} Vinyl Catalog. Audiophile Grade. <span className="opacity-90 font-bold text-white/60 text-xs">V38.9</span></p>
                 </div>
             </footer>
         </div >

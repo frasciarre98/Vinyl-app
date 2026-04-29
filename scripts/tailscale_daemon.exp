@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+spawn ssh -t fraadmin@192.168.0.250 "sudo nohup /share/CACHEDEV1_DATA/.qpkg/Tailscale/Tailscale.sh start > /dev/null 2>&1 &"
+
+expect {
+    -re "(.*)assword:" {
+        send "Lormar96!2026@\r"
+        exp_continue
+    }
+    eof {
+        exit 0
+    }
+}

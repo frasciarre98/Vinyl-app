@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "export:static": "node scripts/export-static.js",
     "backend": "set -a; source .env || true; set +a; cd backend && ./pocketbase serve --http=0.0.0.0:8090",
-    "magic-publish": "VITE_PB_URL=http://192.168.0.250:8090 npm run export:static && git add src/data public/storage && git commit -m '🚀 Auto-publish NAS Collection' || true && git config http.postBuffer 524288000 && git push"
+    "magic-publish": "./scripts/magic-publish.sh"
   },
   "dependencies": {
     "clsx": "^2.1.0",

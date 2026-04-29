@@ -70,10 +70,10 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
     const [existingFilenames, setExistingFilenames] = useState(new Set());
     const [format, setFormat] = useState('Vinyl'); // Default format
     const [isWantlist, setIsWantlist] = useState(false);
-    const [tab, setTab] = useState('upload'); // 'upload' or 'discogs'
-    const [discogsQuery, setDiscogsQuery] = useState('');
-    const [discogsResults, setDiscogsResults] = useState([]);
-    const [searchingDiscogs, setSearchingDiscogs] = useState(false);
+    const [tab, setTab] = useState('upload'); // 'upload' or 'music'
+    const [musicQuery, setMusicQuery] = useState('');
+    const [musicResults, setMusicResults] = useState([]);
+    const [searchingMusic, setSearchingMusic] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const formatRef = useRef('Vinyl');
     const isWantlistRef = useRef(false);
@@ -315,56 +315,50 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
         }
     };
 
-    const handleSearchDiscogs = async (e, explicitQuery = null) => {
+    const handleSearchMusic = async (e, explicitQuery = null) => {
         if (e && e.preventDefault) e.preventDefault();
-        const queryToUse = explicitQuery || discogsQuery;
+        const queryToUse = explicitQuery || musicQuery;
         if (!queryToUse.trim()) return;
 
-        setSearchingDiscogs(true);
-        setDiscogsResults([]);
+        setSearchingMusic(true);
+        setMusicResults([]);
         try {
-            const res = await fetch(`/api/discogs/search?q=${encodeURIComponent(queryToUse)}`);
+            const res = await fetch(`/api/music/search?q=${encodeURIComponent(queryToUse)}`);
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Search failed');
 
-            setDiscogsResults(data.results || []);
+            setMusicResults(data.results || []);
         } catch (err) {
-            console.error("Discogs search error:", err);
+            console.error("Music search error:", err);
             alert(`Search error: ${err.message}`);
         } finally {
-            setSearchingDiscogs(false);
+            setSearchingMusic(false);
         }
     };
 
-    const handleAddFromDiscogs = async (release) => {
+    const handleAddFromMusic = async (release) => {
         setUploading(true);
         try {
             const formData = new FormData();
 
-            // Discogs title is often "Artist - Title"
-            const parts = String(release.title || '').split(' - ');
-            let artist = parts[0] || 'Unknown Artist';
-            let title = parts.slice(1).join(' - ') || parts[0] || 'Unknown Title';
-            if (parts.length === 1) title = parts[0];
-
-            formData.append('title', title.substring(0, 100));
-            formData.append('artist', artist.substring(0, 100));
+            formData.append('title', String(release.title || 'Unknown Title').substring(0, 100));
+            formData.append('artist', String(release.artist || 'Unknown Artist').substring(0, 100));
             formData.append('year', String(release.year || '').substring(0, 50));
             formData.append('genre', Array.isArray(release.genre) ? release.genre.join(', ').substring(0, 50) : '');
             formData.append('label', Array.isArray(release.label) ? String(release.label[0]).substring(0, 100) : '');
-            formData.append('catalog_number', Array.isArray(release.catno) ? String(release.catno[0]).substring(0, 50) : String(release.catno || '').substring(0, 50));
+            formData.append('catalog_number', '');
 
             formData.append('format', formatRef.current);
             formData.append('is_wantlist', isWantlistRef.current);
-            formData.append('notes', 'Imported from Discogs');
+            formData.append('notes', 'Imported from Apple Music');
 
-            if (release.cover_image && !release.cover_image.endsWith('spacer.gif')) {
+            if (release.thumb && !release.thumb.endsWith('spacer.gif')) {
                 try {
-                    const imgRes = await fetch(release.cover_image);
+                    const imgRes = await fetch(release.thumb);
                     const blob = await imgRes.blob();
-                    formData.append('image', new File([blob], 'discogs_cover.jpg', { type: 'image/jpeg' }));
+                    formData.append('image', new File([blob], 'music_cover.jpg', { type: 'image/jpeg' }));
                 } catch (imgErr) {
-                    console.warn("Failed to download Discogs cover", imgErr);
+                    console.warn("Failed to download cover", imgErr);
                 }
             }
 
@@ -376,7 +370,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
             }, 500);
 
         } catch (err) {
-            console.error("Failed to add from Discogs", err);
+            console.error("Failed to add from Music DB", err);
             alert("Error adding record: " + err.message);
             setUploading(false);
         }
@@ -406,7 +400,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                         {/* Tab Switcher */}
                         <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 shrink-0 w-full md:w-auto">
                             <button onClick={() => setTab('upload')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'upload' ? 'bg-white/10 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><UploadIcon className="w-4 h-4" /> Upload</button>
-                            <button onClick={() => setTab('discogs')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'discogs' ? 'bg-white/10 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><Globe className="w-4 h-4" /> Discogs</button>
+                            <button onClick={() => setTab('music')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'music' ? 'bg-white/10 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><Globe className="w-4 h-4" /> Apple Music</button>
                         </div>
 
                         <div className="flex items-center gap-3 w-full md:w-auto md:ml-auto">
@@ -423,23 +417,23 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                 </div>
 
                 <div className="p-6 flex-1 overflow-y-auto">
-                    {tab === 'discogs' ? (
+                    {tab === 'music' ? (
                         <div className="space-y-6">
-                            <form onSubmit={(e) => handleSearchDiscogs(e)} className="relative">
+                            <form onSubmit={(e) => handleSearchMusic(e)} className="relative">
                                 <input
                                     type="text"
-                                    value={discogsQuery}
-                                    onChange={(e) => setDiscogsQuery(e.target.value)}
-                                    placeholder="Search Discogs by artist, album, barcode..."
+                                    value={musicQuery}
+                                    onChange={(e) => setMusicQuery(e.target.value)}
+                                    placeholder="Search Apple Music by artist, album..."
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-11 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                 />
                                 <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                                 <button
                                     type="submit"
-                                    disabled={searchingDiscogs || !discogsQuery.trim()}
+                                    disabled={searchingMusic || !musicQuery.trim()}
                                     className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-black px-4 py-1.5 rounded-lg font-bold text-sm disabled:opacity-50"
                                 >
-                                    {searchingDiscogs ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                                    {searchingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
                                 </button>
                             </form>
 
@@ -452,27 +446,25 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                                 Scan Barcode using Camera
                             </button>
 
-                            {discogsResults.length > 0 && (
+                            {musicResults.length > 0 && (
                                 <div className="space-y-3">
-                                    {discogsResults.map((release, i) => (
-                                        <div key={i} className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/10 hover:border-primary/50 transition-colors">
-                                            <div className="w-16 h-16 bg-black/50 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-                                                {release.thumb && !release.thumb.endsWith('spacer.gif') ? (
+                                    {musicResults.map((release, i) => (
+                                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10 hover:border-primary/50 transition-colors">
+                                            {release.thumb && !release.thumb.endsWith('spacer.gif') && (
+                                                <div className="w-16 h-16 bg-black/50 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
                                                     <img src={release.thumb} alt="cover" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <ImageIcon className="w-8 h-8 text-white/20" />
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
                                             <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-white truncate">{release.title}</h4>
-                                                <p className="text-sm text-secondary truncate">
-                                                    {release.year && <span className="mr-2">{release.year}</span>}
-                                                    {Array.isArray(release.label) && <span className="mr-2">• {release.label[0]}</span>}
-                                                    {Array.isArray(release.format) && <span className="text-white/40 border border-white/10 px-1 rounded text-xs">{release.format[0]}</span>}
+                                                <h4 className="font-bold text-white text-lg leading-tight">{release.title}</h4>
+                                                <p className="text-primary font-medium mb-1">{release.artist}</p>
+                                                <p className="text-sm text-secondary flex flex-wrap gap-2 mt-2">
+                                                    {release.year && <span className="bg-white/10 px-2 py-0.5 rounded">{release.year}</span>}
+                                                    {Array.isArray(release.label) && <span className="bg-white/10 px-2 py-0.5 rounded">{release.label[0]}</span>}
                                                 </p>
                                             </div>
                                             <button
-                                                onClick={() => handleAddFromDiscogs(release)}
+                                                onClick={() => handleAddFromMusic(release)}
                                                 disabled={uploading}
                                                 className="shrink-0 p-3 bg-white/10 hover:bg-primary hover:text-black text-white rounded-xl transition-all"
                                                 title="Import"
@@ -484,8 +476,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                                 </div>
                             )}
 
-                            {!searchingDiscogs && discogsResults.length === 0 && discogsQuery && (
-                                <p className="text-center text-white/40 mt-8 mb-8">No results found on Discogs.</p>
+                            {!searchingMusic && musicResults.length === 0 && musicQuery && (
+                                <p className="text-center text-white/40 mt-8 mb-8">No results found on Apple Music.</p>
                             )}
                         </div>
                     ) : (
@@ -577,8 +569,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                     <BarcodeScanner
                         onScan={(decodedText) => {
                             setIsScanning(false);
-                            setDiscogsQuery(decodedText);
-                            handleSearchDiscogs(null, decodedText); // Auto search!
+                            setMusicQuery(decodedText);
+                            handleSearchMusic(null, decodedText); // Auto search!
                         }}
                         onClose={() => setIsScanning(false)}
                     />

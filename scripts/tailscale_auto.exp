@@ -1,0 +1,24 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+# Disabilita i log a schermo per pulizia
+log_user 1
+
+spawn ssh -t fraadmin@192.168.0.250 "sudo /sbin/setcfg Tailscale Enable TRUE -f /etc/config/qpkg.conf && sudo /share/CACHEDEV1_DATA/.qpkg/Tailscale/Tailscale.sh start && sudo /share/CACHEDEV1_DATA/.qpkg/Tailscale/tailscale up"
+
+expect {
+    -re "(.*)assword:" {
+        send "Lormar96!2026@\r"
+        exp_continue
+    }
+    -re "To authenticate, visit: (https://login.tailscale.com/a/\[a-zA-Z0-9]+)" {
+        puts "\n\nTAILSCALE_LINK_FOUND: $expect_out(1,string)\n\n"
+        # Non chiudiamo subito, diamo tempo a tailscale di stampare tutto
+        sleep 2
+        exit 0
+    }
+    eof {
+        puts "Connessione terminata."
+        exit 1
+    }
+}

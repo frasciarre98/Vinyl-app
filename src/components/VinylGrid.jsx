@@ -31,11 +31,11 @@ export function VinylGrid({ refreshTrigger }) {
     const [selectedGenre, setSelectedGenre] = useState('');
     const [selectedRating, setSelectedRating] = useState('0');
     const [showWantlist, setShowWantlist] = useState(false);
-    // Sort Order: 'artist_asc' (Default for stability) | 'newest'
-    const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('vinyl_sort_order') || 'artist_asc');
+    // Sort Order: 'artist_asc' | 'newest'
+    const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('vinyl_sort_order_v2') || 'newest');
 
     useEffect(() => {
-        localStorage.setItem('vinyl_sort_order', sortOrder);
+        localStorage.setItem('vinyl_sort_order_v2', sortOrder);
     }, [sortOrder]);
 
     // Pagination State (Local Performance Optimization)
@@ -72,7 +72,10 @@ export function VinylGrid({ refreshTrigger }) {
     const uniqueGenres = [...new Set(vinyls.map(v => String(v.genre || '')).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
 
     // Compute Format Counts based on active mode
-    const activeVinyls = vinyls.filter(v => showWantlist ? v.is_wantlist === true : v.is_wantlist !== true);
+    const activeVinyls = vinyls.filter(v => {
+        const isWant = v.is_wantlist === true || String(v.is_wantlist).toLowerCase() === 'true';
+        return showWantlist ? isWant : !isWant;
+    });
     const cdCount = activeVinyls.filter(v => {
         const f = String(v.format || '').toLowerCase();
         return f.includes('cd');
@@ -140,18 +143,7 @@ export function VinylGrid({ refreshTrigger }) {
                 if (aPending && !bPending) return -1;
                 if (!aPending && bPending) return 1;
                 
-                // V35.8: If mode is 'newest', ignore priority to show latest uploads at the top literal
-                if (sortOrder === 'newest') {
-                    const dateDiff = new Date(b.$createdAt) - new Date(a.$createdAt);
-                    if (dateDiff !== 0) return dateDiff;
-                    // Emergency fallback: If dates match (or both missing), use ID to ensure determinism
-                    return (b.id || "").localeCompare(a.id || "");
-                }
-
-                // Fallback to existing sort order (priority then date) for other modes
-                if (a.sort_priority !== b.sort_priority) {
-                    return (b.sort_priority || 0) - (a.sort_priority || 0);
-                }
+                // Sort simply by date (newest first)
                 return new Date(b.$createdAt) - new Date(a.$createdAt);
             });
 
@@ -389,7 +381,8 @@ export function VinylGrid({ refreshTrigger }) {
             }
 
             const matchesTrack = !trackSearch || (vinyl.tracks?.toLowerCase() || '').includes(trackSearch.toLowerCase());
-            const matchesWantlist = showWantlist ? vinyl.is_wantlist === true : vinyl.is_wantlist !== true;
+            const isWant = vinyl.is_wantlist === true || String(vinyl.is_wantlist).toLowerCase() === 'true';
+            const matchesWantlist = showWantlist ? isWant : !isWant;
 
             return matchesSearch && matchesArtist && matchesGenre && matchesRating && matchesTrack && matchesWantlist;
         });
@@ -401,19 +394,23 @@ export function VinylGrid({ refreshTrigger }) {
             if (aPending && !bPending) return -1;
             if (!aPending && bPending) return 1;
 
-            if (sortOrder === 'artist_asc') {
-                return (a.artist || '').localeCompare(b.artist || '');
+            if (sortOrder === 'newest') {
+                const dateA = new Date(a.$createdAt || a.created || 0);
+                const dateB = new Date(b.$createdAt || b.created || 0);
+                return dateB - dateA;
             }
 
-            // sortOrder === 'newest'
-            // We ignore sort_priority to ensure truly newest items are always visible at the top.
-            const dateA = new Date(a.$createdAt || a.created || 0);
-            const dateB = new Date(b.$createdAt || b.created || 0);
-            return dateB - dateA;
+            // sortOrder === 'artist_asc'
+            // Alphabetical by Artist
+            const artistCompare = (a.artist || '').localeCompare(b.artist || '');
+            if (artistCompare !== 0) return artistCompare;
+
+            // Then alphabetical by Title
+            return (a.title || '').localeCompare(b.title || '');
         });
 
         return result;
-    }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch]);
+    }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch, showWantlist]);
 
     const totalPages = Math.ceil(filteredVinyls.length / pageSize);
     const visibleVinyls = filteredVinyls.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -531,26 +528,81 @@ export function VinylGrid({ refreshTrigger }) {
             </div>
 
             {/* --- DESKTOP FILTERS --- */}
-            <div className="hidden md:flex sticky top-20 z-20 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 flex-row flex-wrap gap-4 justify-between items-center shadow-lg">
-                <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 shrink-0">
-                    <button onClick={() => setShowWantlist(false)} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${!showWantlist ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Collection</button>
-                    <button onClick={() => setShowWantlist(true)} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${showWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-secondary hover:text-white'}`}>Wantlist</button>
-                </div>
-                <div className="relative flex-1 w-full gap-4 flex flex-row flex-wrap items-center">
-                    <div className="relative flex-1 min-w-[150px]">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-secondary" /></div>
-                        <input type="text" name="main_search" autoComplete="off" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm" />
+            <div className="hidden md:flex sticky top-20 z-20 bg-background/95 backdrop-blur-xl py-4 -mx-4 px-4 border-b border-white/5 flex-col gap-4 shadow-lg">
+                
+                {/* Row 1: Toggles, Search, Actions */}
+                <div className="flex flex-row flex-wrap items-center justify-between gap-4 w-full">
+                    <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 shrink-0">
+                        <button onClick={() => setShowWantlist(false)} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${!showWantlist ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Collection</button>
+                        <button onClick={() => setShowWantlist(true)} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${showWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-secondary hover:text-white'}`}>Wantlist</button>
                     </div>
-                    <input type="text" name="track_search_query" autoComplete="off" placeholder="Track Name..." value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} className="bg-surface border border-border text-primary rounded-full px-4 py-3 w-full sm:max-w-[200px] text-sm placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 shrink-0" />
-                    <SearchableSelect
-                        options={uniqueArtists}
-                        value={selectedArtist}
-                        onChange={setSelectedArtist}
-                        placeholder="All Artists"
-                        className="w-full sm:w-[200px] shrink-0"
-                    />
-                    <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 w-full sm:max-w-[180px] shrink-0"><option value="">All Genres</option>{uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}</select>
-                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="bg-surface border border-border text-primary rounded-full p-3 w-full sm:max-w-[180px] font-medium shrink-0">
+
+                    <div className="relative flex-1 min-w-[200px] max-w-2xl">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-secondary" /></div>
+                        <input type="text" name="main_search" autoComplete="off" placeholder="Search records..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm shadow-inner" />
+                    </div>
+
+                    <div className="flex items-center flex-wrap gap-2 shrink-0">
+                        <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm flex items-center gap-2">
+                            <span className="font-bold text-primary">{activeVinyls.length}</span>
+                            <span className="text-secondary/50">records</span>
+                            <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">{vinylCount} LP / {cdCount} CD</span>
+                        </div>
+
+                        <button
+                            onClick={() => setSelectedRating(prev => prev === 'needs_attention' ? '0' : 'needs_attention')}
+                            className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium flex items-center gap-2 ${selectedRating === 'needs_attention' ? 'bg-amber-500/20 border-amber-500/50 text-amber-500' : 'bg-white/5 border-white/10 text-secondary hover:text-white hover:bg-white/10'}`}
+                            title="Show records missing metadata or with errors"
+                        >
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="hidden lg:inline">Needs Attention</span>
+                        </button>
+
+                        <button onClick={() => setIsStatsOpen(true)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors" title="View Statistics"><BarChart2 className="w-4 h-4" /></button>
+
+                        <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium whitespace-nowrap ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>{sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}</button>
+                        <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white"><Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+                        {!IS_STATIC && user && (
+                            isSelectionMode ? (
+                                <>
+                                    <button onClick={() => setSelectedIds(selectedIds.length === filteredVinyls.length ? [] : filteredVinyls.map(v => v.id))} className="px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-full whitespace-nowrap">{selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}</button>
+                                    <div className="hidden lg:flex items-center bg-white/5 rounded-full border border-white/10 p-1">
+                                        <button onClick={() => handleBatchFormatChange('Vinyl')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors whitespace-nowrap">to Vinyl</button>
+                                        <div className="w-px bg-white/10 my-1 h-4"></div>
+                                        <button onClick={() => handleBatchFormatChange('CD')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors whitespace-nowrap">to CD</button>
+                                    </div>
+                                    <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap"><CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})</button>
+                                    <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors whitespace-nowrap"><Sparkles className="w-4 h-4" /> Magic ({selectedIds.length})</button>
+                                    <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
+                                    <button onClick={toggleSelectionMode} className="px-4 py-2 text-sm text-secondary hover:text-primary whitespace-nowrap">Cancel</button>
+                                </>
+                            ) : (
+                                <button onClick={toggleSelectionMode} className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 border border-border text-sm whitespace-nowrap"><CheckSquare className="w-4 h-4" /> Select</button>
+                            )
+                        )}
+                    </div>
+                </div>
+
+                {/* Row 2: Detailed Filters */}
+                <div className="flex flex-row flex-wrap items-center gap-3 w-full">
+                    <input type="text" name="track_search_query" autoComplete="off" placeholder="Track Name..." value={trackSearch} onChange={(e) => setTrackSearch(e.target.value)} className="flex-1 min-w-[150px] bg-surface border border-border text-primary rounded-full px-4 py-2.5 text-sm placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50" />
+                    
+                    <div className="flex-1 min-w-[150px]">
+                        <SearchableSelect
+                            options={uniqueArtists}
+                            value={selectedArtist}
+                            onChange={setSelectedArtist}
+                            placeholder="All Artists"
+                            className="w-full"
+                        />
+                    </div>
+                    
+                    <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)} className="flex-1 min-w-[140px] max-w-[250px] bg-surface border border-border text-primary rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50">
+                        <option value="">All Genres</option>
+                        {uniqueGenres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}
+                    </select>
+                    
+                    <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)} className="flex-1 min-w-[140px] max-w-[250px] bg-surface border border-border text-primary rounded-full px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50">
                         <option value="0">All Ratings</option>
                         <option value="needs_attention">⚠ Needs Attention</option>
                         <option value="5">5 Stars Only</option>
@@ -560,46 +612,6 @@ export function VinylGrid({ refreshTrigger }) {
                         <option value="1">1+ Star</option>
                         <option value="unrated">Unrated</option>
                     </select>
-                </div>
-
-                <div className="flex items-center flex-wrap gap-2 shrink-0">
-                    <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-secondary text-sm font-mono whitespace-nowrap shadow-sm flex items-center gap-2">
-                        <span className="font-bold text-primary">{activeVinyls.length}</span>
-                        <span className="text-secondary/50">records</span>
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-secondary">{vinylCount} LP / {cdCount} CD</span>
-                    </div>
-
-                    <button
-                        onClick={() => setSelectedRating(prev => prev === 'needs_attention' ? '0' : 'needs_attention')}
-                        className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium flex items-center gap-2 ${selectedRating === 'needs_attention' ? 'bg-amber-500/20 border-amber-500/50 text-amber-500' : 'bg-white/5 border-white/10 text-secondary hover:text-white hover:bg-white/10'}`}
-                        title="Show records missing metadata or with errors"
-                    >
-                        <AlertTriangle className="w-4 h-4" />
-                        <span className="hidden lg:inline">Needs Attention</span>
-                    </button>
-
-                    <button onClick={() => setIsStatsOpen(true)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors" title="View Statistics"><BarChart2 className="w-4 h-4" /></button>
-
-                    <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'artist_asc' : 'newest')} className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium whitespace-nowrap ${sortOrder === 'artist_asc' ? 'bg-accent text-black border-accent' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>{sortOrder === 'artist_asc' ? "Sort: A-Z" : "Sort: Newest"}</button>
-                    <button onClick={fetchVinyls} disabled={loading} className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white"><Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-                    {!IS_STATIC && user && (
-                        isSelectionMode ? (
-                            <>
-                                <button onClick={() => setSelectedIds(selectedIds.length === filteredVinyls.length ? [] : filteredVinyls.map(v => v.id))} className="px-4 py-2 text-sm text-secondary hover:text-primary border border-border rounded-full whitespace-nowrap">{selectedIds.length === filteredVinyls.length ? 'Deselect All' : 'Select All'}</button>
-                                <div className="flex items-center bg-white/5 rounded-full border border-white/10 p-1">
-                                    <button onClick={() => handleBatchFormatChange('Vinyl')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors whitespace-nowrap">to Vinyl</button>
-                                    <div className="w-px bg-white/10 my-1 h-4"></div>
-                                    <button onClick={() => handleBatchFormatChange('CD')} className="px-3 py-1 text-sm text-secondary hover:text-white hover:bg-white/10 rounded-full transition-colors whitespace-nowrap">to CD</button>
-                                </div>
-                                <button onClick={handleBatchPriceEstimate} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap"><CheckSquare className="w-4 h-4" /> Avg Price ({selectedIds.length})</button>
-                                <button onClick={handleBatchFullAnalysis} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-500 transition-colors whitespace-nowrap"><Sparkles className="w-4 h-4" /> Magic Refresh ({selectedIds.length})</button>
-                                <button onClick={handleBulkDelete} disabled={selectedIds.length === 0} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm whitespace-nowrap"><Trash2 className="w-4 h-4" /> Delete ({selectedIds.length})</button>
-                                <button onClick={toggleSelectionMode} className="px-4 py-2 text-sm text-secondary hover:text-primary whitespace-nowrap">Cancel</button>
-                            </>
-                        ) : (
-                            <button onClick={toggleSelectionMode} className="flex items-center gap-2 bg-surface text-secondary px-4 py-2 rounded-full hover:bg-white/5 border border-border text-sm whitespace-nowrap"><CheckSquare className="w-4 h-4" /> Select</button>
-                        )
-                    )}
                 </div>
             </div>
 

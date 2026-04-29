@@ -1,0 +1,15 @@
+#!/usr/bin/expect -f
+set timeout 15
+log_user 1
+
+spawn ssh -t fraadmin@192.168.0.250 "sudo /share/CACHEDEV1_DATA/.qpkg/Tailscale/Tailscale.sh start && sudo /share/CACHEDEV1_DATA/.qpkg/Tailscale/tailscale status"
+
+expect {
+    -re "(.*)assword:" {
+        send "Lormar96!2026@\r"
+        exp_continue
+    }
+    eof {
+        exit 0
+    }
+}

@@ -21,9 +21,7 @@ async function exportStaticData() {
 
     try {
         console.log(`🌐 Connecting to PocketBase at ${PB_URL}...`);
-        const records = await pb.collection('vinyls').getFullList({
-            sort: '-sort_priority,-id'
-        });
+        const records = await pb.collection('vinyls').getFullList();
 
         console.log(`📦 Found ${records.length} records in PocketBase.`);
 

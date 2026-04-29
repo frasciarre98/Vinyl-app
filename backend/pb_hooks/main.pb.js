@@ -245,3 +245,65 @@ routerAdd("POST", "/api/ai/story", (e) => {
         return e.json(500, { error: "Story Proxy Crash V37.4: " + err.message });
     }
 });
+
+routerAdd("GET", "/api/music/search", (e) => {
+    try {
+        let query = "";
+        try { query = e.requestInfo().query?.q; } catch(err) {}
+        if (!query && typeof e.queryParam === "function") query = e.queryParam("q");
+
+        if (!query) return e.json(400, { error: "Missing query parameter" });
+
+        console.log("[Music Proxy] Searching iTunes for: " + query);
+        // We use entity=album to get full album data instead of individual tracks
+        const res = $http.send({
+            url: "https://itunes.apple.com/search?term=" + encodeURIComponent(query) + "&entity=album&limit=15",
+            method: "GET",
+            headers: {
+                "User-Agent": "VinylCatalog/1.0 +http://localhost"
+            }
+        });
+
+        const bytesToString = function(bytes) {
+            if (!bytes) return "";
+            if (typeof bytes === 'string') return bytes;
+            let str = "";
+            for (let i = 0; i < bytes.length; i++) {
+                str += String.fromCharCode(bytes[i]);
+            }
+            return str;
+        };
+
+        const bodyStr = bytesToString(res.body);
+        let body = {};
+        try { body = JSON.parse(bodyStr); } catch (p) {}
+
+        if (res.statusCode !== 200) {
+            return e.json(res.statusCode, { error: "iTunes API Error", details: body });
+        }
+
+        // Map iTunes schema to a standard format for the frontend
+        const mappedResults = (body.results || []).map(item => {
+            // Upgrade artwork resolution from 100x100 to 600x600 for high quality
+            let hiResImage = item.artworkUrl100 || "";
+            if (hiResImage) {
+                hiResImage = hiResImage.replace("100x100bb.jpg", "600x600bb.jpg");
+            }
+            
+            return {
+                title: item.collectionName || "Unknown Title",
+                artist: item.artistName || "Unknown Artist",
+                year: item.releaseDate ? item.releaseDate.substring(0, 4) : "",
+                genre: item.primaryGenreName ? [item.primaryGenreName] : [],
+                thumb: hiResImage,
+                label: [item.copyright || ""],
+                format: ["Digital / Vinyl"],
+                id: item.collectionId
+            };
+        });
+
+        return e.json(200, { results: mappedResults });
+    } catch (err) {
+        return e.json(500, { error: "Music Proxy Crash: " + err.message, stack: err.stack, name: err.name });
+    }
+});

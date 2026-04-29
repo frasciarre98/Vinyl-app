@@ -1,0 +1,24 @@
+#!/usr/bin/expect -f
+set timeout 30
+log_user 1
+
+spawn ssh -t fraadmin@192.168.0.250 "sudo /share/CACHEDEV1_DATA/.qpkg/Tailscale/Tailscale.sh start ; sudo /share/CACHEDEV1_DATA/.qpkg/Tailscale/tailscale up"
+
+expect {
+    -re "(.*)assword:" {
+        send "Lormar96!2026@\r"
+        exp_continue
+    }
+    -re "To authenticate, visit: (https://login.tailscale.com/a/\[a-zA-Z0-9]+)" {
+        puts "\n\nTAILSCALE_LINK_FOUND: $expect_out(1,string)\n\n"
+        sleep 2
+        exit 0
+    }
+    -re "Success" {
+        puts "\n\nGIA CONNESSO\n\n"
+        exit 0
+    }
+    eof {
+        exit 1
+    }
+}

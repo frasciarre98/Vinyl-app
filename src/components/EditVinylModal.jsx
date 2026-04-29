@@ -879,9 +879,9 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             <button
                                 type="button"
                                 onClick={handleDelete}
-                                className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1 px-2 py-1 hover:bg-red-900/10 rounded transition-colors"
+                                className="bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500 hover:text-white text-sm flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-bold shadow-lg"
                             >
-                                <Trash2 className="w-4 h-4" /> Delete
+                                <Trash2 className="w-4 h-4" /> Delete Record
                             </button>
                             <div className="flex gap-2">
                                 <button

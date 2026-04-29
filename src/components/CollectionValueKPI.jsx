@@ -74,9 +74,9 @@ export function CollectionValueKPI({ vinyls }) {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                    <TrendingUp className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[10px] font-medium text-emerald-200 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-800/80 backdrop-blur border border-emerald-700/50 rounded-full shadow-sm">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-100" />
+                    <span className="text-xs font-bold text-emerald-50 whitespace-nowrap">
                         {vinyls.length} items
                     </span>
                 </div>
