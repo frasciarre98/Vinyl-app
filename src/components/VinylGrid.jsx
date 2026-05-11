@@ -394,9 +394,17 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
             if (!aPending && bPending) return 1;
 
             if (sortOrder === 'newest') {
-                const dateA = new Date(a.$createdAt || a.created || 0);
-                const dateB = new Date(b.$createdAt || b.created || 0);
-                return dateB - dateA;
+                const dateA = new Date(a.$createdAt || a.created || 0).getTime();
+                const dateB = new Date(b.$createdAt || b.created || 0).getTime();
+                if (dateB !== dateA) return dateB - dateA;
+
+                // Fallback 1: sort_priority (so pinned items like Led Zeppelin stay on top if dates are equal)
+                const prioA = Number(a.sort_priority) || 0;
+                const prioB = Number(b.sort_priority) || 0;
+                if (prioB !== prioA) return prioB - prioA;
+
+                // Fallback 2: Descending ID (Guarantees identical ordering on Vercel and Local)
+                return (b.id || '').localeCompare(a.id || '');
             }
 
             // sortOrder === 'artist_asc'
