@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle, Youtube } from 'lucide-react';
+import { Trash2, Edit2, CheckCircle, Disc, AlertCircle, Wand2, Loader2, Sparkles as LucideSparkles, PlayCircle, Youtube, ShoppingCart } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 
@@ -8,8 +8,10 @@ const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit, onUpdate, selectionMode, isSelected, onToggleSelect, isFlipped, onFlip, onViewDetail }) {
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState(null);
+    const [imageLoaded, setImageLoaded] = useState(false);
     // Local state to show updates immediately without full grid refresh
     const [localVinyl, setLocalVinyl] = useState(vinyl);
+
 
     useEffect(() => {
         setLocalVinyl(vinyl);
@@ -18,6 +20,19 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
     // ... handleAnalyze ...
     const isPending = localVinyl.artist === 'Pending AI' || localVinyl.artist === 'Error';
     const isActiveAnalysis = localVinyl.artist === 'Pending AI';
+    const isWantlistItem = localVinyl.is_wantlist === true || String(localVinyl.is_wantlist).toLowerCase() === 'true';
+
+    const handleMoveToCollection = async (e) => {
+        e.stopPropagation();
+        try {
+            await pb.collection('vinyls').update(localVinyl.id, { is_wantlist: false });
+            const updated = { ...localVinyl, is_wantlist: false };
+            setLocalVinyl(updated);
+            if (onUpdate) onUpdate(localVinyl.id, { is_wantlist: false });
+        } catch (err) {
+            alert('Errore: ' + err.message);
+        }
+    };
 
     const missingFields = useMemo(() => {
         const fields = [];
@@ -153,16 +168,21 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
 
                     {/* Full Image */}
                     {localVinyl.image_url ? (
-                        <div className="w-full h-full relative">
+                        <div className="w-full h-full relative bg-zinc-900">
+                            {!imageLoaded && (
+                                <div className="absolute inset-0 animate-shimmer" />
+                            )}
                             <img
                                 src={localVinyl.image_url}
                                 alt={`${localVinyl.artist} - ${localVinyl.title} `}
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                                 loading="lazy"
+                                onLoad={() => setImageLoaded(true)}
                             />
                             {/* Gradient Overlay for Text */}
                             <div className="hidden md:flex absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/60 to-transparent p-4 flex-col justify-end min-h-[40%] translate-y-2 group-hover:translate-y-0 transition-transform">
                                 <h3 className="font-bold text-white truncate text-lg leading-tight dropshadow-md">{localVinyl.title || 'Unknown Album'}</h3>
+
                                 <p className="text-gray-300 truncate text-sm font-medium flex items-center gap-2">
                                     {localVinyl.artist === 'Pending AI' ? <><Loader2 className="w-3 h-3 animate-spin" /> Analyzing...</> : (localVinyl.artist || 'Unknown Artist')}
                                 </p>
@@ -202,9 +222,19 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 <Youtube className="w-5 h-5 md:w-6 md:h-6 filter drop-shadow-sm" />
                             </a>
                         </div >
+                    )}                    {/* Wantlist badge - "Ho acquistato" on front face */}
+                    {isWantlistItem && !selectionMode && !IS_STATIC && (
+                        <button
+                            onClick={handleMoveToCollection}
+                            className="absolute bottom-3 left-3 z-50 flex items-center gap-1.5 bg-purple-600 hover:bg-green-500 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-full shadow-lg transition-all duration-200 active:scale-95 group/btn"
+                            title="Ho acquistato questo disco — sposta nella Collection"
+                        >
+                            <ShoppingCart className="w-3 h-3 group-hover/btn:hidden" />
+                            <CheckCircle className="w-3 h-3 hidden group-hover/btn:block" />
+                            <span className="group-hover/btn:hidden">Wantlist</span>
+                            <span className="hidden group-hover/btn:block">Ho acquistato!</span>
+                        </button>
                     )}
-
-
 
                 </div >
 
@@ -224,7 +254,22 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                     {/* 2. Gradient Overlay for text readability */}
                     <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/70 to-black/90" />
 
-                    {/* 3. Content Container - Safe from Flip */}
+                    {/* 3. Spinning Vinyl Graphic (Decorative) */}
+                    <div className="absolute -top-16 -right-16 w-56 h-56 opacity-30 pointer-events-none z-0">
+                        <div className="w-full h-full rounded-full bg-black border border-white/10 animate-spin-slow flex items-center justify-center relative shadow-2xl overflow-hidden">
+                            {/* Vinyl Grooves */}
+                            <div className="absolute inset-2 rounded-full border border-white/5" />
+                            <div className="absolute inset-6 rounded-full border border-white/5" />
+                            <div className="absolute inset-10 rounded-full border border-white/5" />
+                            <div className="absolute inset-14 rounded-full border border-white/5" />
+                            {/* Center Label */}
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-800 to-purple-900 absolute flex items-center justify-center shadow-inner">
+                                <div className="w-2 h-2 rounded-full bg-black/80 shadow-sm" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Content Container - Safe from Flip */}
                     <div
                         className="flex-1 flex flex-col p-5 relative z-10 h-full overflow-hidden cursor-auto"
                         onClick={(e) => e.stopPropagation()}
@@ -350,7 +395,17 @@ export const VinylCard = React.memo(function VinylCard({ vinyl, onDelete, onEdit
                                 ← Back to Cover
                             </button>
 
-                            {!selectionMode && !IS_STATIC && (
+                            {!selectionMode && !IS_STATIC && isWantlistItem && (
+                                <button
+                                    onClick={handleMoveToCollection}
+                                    className="flex-1 flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition-all duration-200 active:scale-95"
+                                    title="Sposta nella Collection"
+                                >
+                                    <ShoppingCart className="w-3.5 h-3.5" />
+                                    Ho acquistato!
+                                </button>
+                            )}
+                            {!selectionMode && !IS_STATIC && !isWantlistItem && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

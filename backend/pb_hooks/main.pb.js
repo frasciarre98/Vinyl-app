@@ -1,66 +1,66 @@
-console.log(">>> MAGIC HOOK LOADED (Universal V38.10): " + new Date().toISOString());
-
-const bytesToString = function(bytes) {
-    if (!bytes) return "";
-    if (typeof bytes === 'string') return bytes;
-    let str = "";
-    for (let i = 0; i < bytes.length; i++) {
-        str += String.fromCharCode(bytes[i]);
-    }
-    return str;
-};
-
-const stringToBytes = function(str) {
-    let bytes = [];
-    for (let i = 0; i < str.length; i++) {
-        let charCode = str.charCodeAt(i);
-        if (charCode < 0x80) bytes.push(charCode);
-        else if (charCode < 0x800) {
-            bytes.push(0xc0 | (charCode >> 6), 0x80 | (charCode & 0x3f));
-        } else if (charCode < 0xd800 || charCode >= 0xe000) {
-            bytes.push(0xe0 | (charCode >> 12), 0x80 | ((charCode >> 6) & 0x3f), 0x80 | (charCode & 0x3f));
-        }
-    }
-    return bytes;
-};
-
-const optimizedBase64Encode = function(bytes) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const chunks = [];
-    const l = bytes.length;
-    for (let i = 0; i < l; i += 3) {
-        const b0 = bytes[i];
-        const b1 = i + 1 < l ? bytes[i + 1] : 0;
-        const b2 = i + 2 < l ? bytes[i + 2] : 0;
-        chunks.push(chars[b0 >> 2]);
-        chunks.push(chars[((b0 & 3) << 4) | (b1 >> 4)]);
-        if (i + 1 < l) chunks.push(chars[((b1 & 15) << 2) | (b2 >> 6)]); else chunks.push('=');
-        if (i + 2 < l) chunks.push(chars[b2 & 63]); else chunks.push('=');
-    }
-    return chunks.join('');
-};
-
-const sanitizeText = function(text) {
-    if (!text) return "";
-    let clean = text
-        .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
-        .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
-        .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
-        .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
-        .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
-        .replace(/â€™/g, "'").replace(/â€/g, '"')
-        .replace(/â€œ/g, '"').replace(/â€ /g, '"')
-        .replace(/lâ€™/g, "l'").replace(/dâ€™/g, "d'")
-        .replace(/unâ€™/g, "un'").replace(/dellâ€™/g, "dell'")
-        .replace(/â€“/g, '-').replace(/â€”/g, '-')
-        .replace(/Ã/g, 'à')
-        .replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '').replace(/# /g, '');
-    
-    return clean.trim();
-};
+console.log(">>> MAGIC HOOK LOADED (Universal V38.13): " + new Date().toISOString());
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
     try {
+        const bytesToString = function(bytes) {
+            if (!bytes) return "";
+            if (typeof bytes === 'string') return bytes;
+            let str = "";
+            for (let i = 0; i < bytes.length; i++) {
+                str += String.fromCharCode(bytes[i]);
+            }
+            return str;
+        };
+
+        const stringToBytes = function(str) {
+            let bytes = [];
+            for (let i = 0; i < str.length; i++) {
+                let charCode = str.charCodeAt(i);
+                if (charCode < 0x80) bytes.push(charCode);
+                else if (charCode < 0x800) {
+                    bytes.push(0xc0 | (charCode >> 6), 0x80 | (charCode & 0x3f));
+                } else if (charCode < 0xd800 || charCode >= 0xe000) {
+                    bytes.push(0xe0 | (charCode >> 12), 0x80 | ((charCode >> 6) & 0x3f), 0x80 | (charCode & 0x3f));
+                }
+            }
+            return bytes;
+        };
+
+        const optimizedBase64Encode = function(bytes) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            const chunks = [];
+            const l = bytes.length;
+            for (let i = 0; i < l; i += 3) {
+                const b0 = bytes[i];
+                const b1 = i + 1 < l ? bytes[i + 1] : 0;
+                const b2 = i + 2 < l ? bytes[i + 2] : 0;
+                chunks.push(chars[b0 >> 2]);
+                chunks.push(chars[((b0 & 3) << 4) | (b1 >> 4)]);
+                if (i + 1 < l) chunks.push(chars[((b1 & 15) << 2) | (b2 >> 6)]); else chunks.push('=');
+                if (i + 2 < l) chunks.push(chars[b2 & 63]); else chunks.push('=');
+            }
+            return chunks.join('');
+        };
+
+        const sanitizeText = function(text) {
+            if (!text) return "";
+            let clean = text
+                .replace(/Ã /g, 'à').replace(/Ã¡/g, 'à')
+                .replace(/Ã¨/g, 'è').replace(/Ã©/g, 'é')
+                .replace(/Ã¬/g, 'ì').replace(/Ã­/g, 'ì')
+                .replace(/Ã²/g, 'ò').replace(/Ã³/g, 'ò')
+                .replace(/Ã¹/g, 'ù').replace(/Ãº/g, 'ù')
+                .replace(/â€™/g, "'").replace(/â€/g, '"')
+                .replace(/â€œ/g, '"').replace(/â€ /g, '"')
+                .replace(/lâ€™/g, "l'").replace(/dâ€™/g, "d'")
+                .replace(/unâ€™/g, "un'").replace(/dellâ€™/g, "dell'")
+                .replace(/â€“/g, '-').replace(/â€”/g, '-')
+                .replace(/Ã/g, 'à')
+                .replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '').replace(/# /g, '');
+            
+            return clean.trim();
+        };
+
         let data = {};
 
         try { data = e.requestInfo().body || {}; } catch(err) {}
@@ -261,9 +261,28 @@ routerAdd("POST", "/api/ai/story", (e) => {
 
 routerAdd("GET", "/api/music/search", (e) => {
     try {
+        // Legge il parametro ?q= con più metodi di fallback per compatibilità con diverse versioni di PocketBase
         let query = "";
-        try { query = e.requestInfo().query?.q; } catch(err) {}
-        if (!query && typeof e.queryParam === "function") query = e.queryParam("q");
+        try {
+            // Metodo 1: URL diretta della request
+            const rawUrl = e.request().url.toString();
+            const urlMatch = rawUrl.match(/[?&]q=([^&]*)/);
+            if (urlMatch) query = decodeURIComponent(urlMatch[1]);
+        } catch(err) {}
+        if (!query) {
+            try {
+                // Metodo 2: requestInfo().query come mappa Go
+                const qMap = e.requestInfo().query;
+                if (qMap && typeof qMap.get === "function") query = qMap.get("q") || "";
+                else if (qMap && qMap.q) query = qMap.q;
+            } catch(err) {}
+        }
+        if (!query) {
+            try {
+                // Metodo 3: queryParam nativo (PocketBase 0.22+)
+                if (typeof e.queryParam === "function") query = e.queryParam("q") || "";
+            } catch(err) {}
+        }
 
         if (!query) return e.json(400, { error: "Missing query parameter" });
 

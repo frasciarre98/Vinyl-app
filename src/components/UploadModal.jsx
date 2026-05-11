@@ -4,6 +4,9 @@ import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
 import { BarcodeScanner } from './BarcodeScanner';
 
+// Base URL del backend PocketBase (es. http://192.168.x.x:8090)
+const PB_BASE_URL = pb.baseUrl.replace(/\/$/, '');
+
 // Error Boundary for debugging
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -46,7 +49,7 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug }) {
+export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug, defaultIsWantlist = false }) {
     if (!isOpen) return null;
 
     return (
@@ -56,12 +59,13 @@ export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
                 onClose={onClose}
                 onUploadComplete={onUploadComplete}
                 onOpenDebug={onOpenDebug}
+                defaultIsWantlist={defaultIsWantlist}
             />
         </ErrorBoundary>
     );
 }
 
-function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) {
+function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, defaultIsWantlist = false }) {
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState({});
@@ -93,6 +97,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
         if (isOpen) {
             setFiles([]);
             setProgress({});
+            // Reset wantlist to match whichever tab is active in the grid
+            setIsWantlist(defaultIsWantlist);
             const fetchExisting = async () => {
                 try {
                     // PocketBase list
@@ -323,7 +329,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug }) 
         setSearchingMusic(true);
         setMusicResults([]);
         try {
-            const res = await fetch(`/api/music/search?q=${encodeURIComponent(queryToUse)}`);
+            // Usa l'URL assoluto del backend PocketBase per funzionare su tutti i dispositivi
+            const res = await fetch(`${PB_BASE_URL}/api/music/search?q=${encodeURIComponent(queryToUse)}`);
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Search failed');
 

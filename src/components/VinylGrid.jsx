@@ -14,7 +14,7 @@ import staticData from '../data/vinyls-static.json';
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
-export function VinylGrid({ refreshTrigger }) {
+export function VinylGrid({ refreshTrigger, onWantlistChange }) {
     const [user, setUser] = useState(pb.authStore.model);
     useEffect(() => {
         return pb.authStore.onChange((token, model) => {
@@ -29,6 +29,7 @@ export function VinylGrid({ refreshTrigger }) {
     const [trackSearch, setTrackSearch] = useState('');
     const [selectedArtist, setSelectedArtist] = useState('');
     const [selectedGenre, setSelectedGenre] = useState('');
+    const [selectedDecade, setSelectedDecade] = useState('');
     const [selectedRating, setSelectedRating] = useState('0');
     const [showWantlist, setShowWantlist] = useState(false);
     // Sort Order: 'artist_asc' | 'newest'
@@ -37,6 +38,11 @@ export function VinylGrid({ refreshTrigger }) {
     useEffect(() => {
         localStorage.setItem('vinyl_sort_order_v2', sortOrder);
     }, [sortOrder]);
+
+    // Notify parent (App.jsx) when wantlist tab changes so UploadModal can pre-select correctly
+    useEffect(() => {
+        onWantlistChange?.(showWantlist);
+    }, [showWantlist]);
 
     // Pagination State (Local Performance Optimization)
     const [currentPage, setCurrentPage] = useState(1);
@@ -70,6 +76,12 @@ export function VinylGrid({ refreshTrigger }) {
     // Compute Filter Options
     const uniqueArtists = [...new Set(vinyls.map(v => String(v.artist || '')).filter(Boolean).sort())];
     const uniqueGenres = [...new Set(vinyls.map(v => String(v.genre || '')).filter(Boolean).map(g => g.split(',')[0].trim()).sort())];
+    const uniqueDecades = [...new Set(vinyls.map(v => {
+        if (!v.year) return null;
+        const yearMatch = String(v.year).match(/\d{4}/);
+        if (!yearMatch) return null;
+        return `${Math.floor(parseInt(yearMatch[0]) / 10) * 10}s`;
+    }).filter(Boolean).sort())];
 
     // Compute Format Counts based on active mode
     const activeVinyls = vinyls.filter(v => {
@@ -360,18 +372,28 @@ export function VinylGrid({ refreshTrigger }) {
             const matchesArtist = !selectedArtist || vinyl.artist === selectedArtist;
             const matchesGenre = !selectedGenre || (vinyl.genre && vinyl.genre.includes(selectedGenre));
 
+            let matchesDecade = true;
+            if (selectedDecade) {
+                if (vinyl.year) {
+                    const yearMatch = String(vinyl.year).match(/\d{4}/);
+                    if (yearMatch) {
+                        const year = parseInt(yearMatch[0]);
+                        const decade = `${Math.floor(year / 10) * 10}s`;
+                        matchesDecade = decade === selectedDecade;
+                    } else {
+                        matchesDecade = false;
+                    }
+                } else {
+                    matchesDecade = false;
+                }
+            }
+
             let matchesRating = true;
             if (selectedRating === 'needs_attention') {
-                // Filter for Errors OR Missing key metadata (aligned with BatchAnalysisBanner)
-                const isErrorOrPending = vinyl.artist === 'Error' || vinyl.artist === 'Pending AI';
-                // User Request: Label and Edition are no longer considered critical errors
-                // Check both field names (typo and correct)
-                const isMissingDetails = !vinyl.average_cost && !vinyl.avarege_cost;
-
-                matchesRating = isErrorOrPending ||
-                    !vinyl.artist ||
-                    vinyl.artist === 'Unknown Artist' ||
-                    !vinyl.title ||
+                const isMissingDetails = !vinyl.genre || !vinyl.year || (!vinyl.label && !vinyl.catalog_number);
+                matchesRating =
+                    vinyl.artist === 'Pending AI' ||
+                    vinyl.artist === 'Error' ||
                     vinyl.title === 'Unknown Title' ||
                     isMissingDetails;
             } else if (selectedRating === 'unrated') {
@@ -384,7 +406,7 @@ export function VinylGrid({ refreshTrigger }) {
             const isWant = vinyl.is_wantlist === true || String(vinyl.is_wantlist).toLowerCase() === 'true';
             const matchesWantlist = showWantlist ? isWant : !isWant;
 
-            return matchesSearch && matchesArtist && matchesGenre && matchesRating && matchesTrack && matchesWantlist;
+            return matchesSearch && matchesArtist && matchesGenre && matchesDecade && matchesRating && matchesTrack && matchesWantlist;
         });
 
         // Sort
@@ -410,7 +432,7 @@ export function VinylGrid({ refreshTrigger }) {
         });
 
         return result;
-    }, [vinyls, search, selectedArtist, selectedGenre, selectedRating, sortOrder, trackSearch, showWantlist]);
+    }, [vinyls, search, selectedArtist, selectedGenre, selectedDecade, selectedRating, sortOrder, trackSearch, showWantlist]);
 
     const totalPages = Math.ceil(filteredVinyls.length / pageSize);
     const visibleVinyls = filteredVinyls.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -430,7 +452,7 @@ export function VinylGrid({ refreshTrigger }) {
         }
     };
 
-    const activeFiltersCount = [selectedArtist, selectedGenre, selectedRating !== '0'].filter(Boolean).length;
+    const activeFiltersCount = [selectedArtist, selectedGenre, selectedDecade, selectedRating !== '0'].filter(Boolean).length;
     return (
         <div className="space-y-6 relative pb-24 md:pb-0">
             {/* --- UNDO TOAST --- --- --- --- --- --- --- --- --- --- --- --- */}
@@ -612,6 +634,36 @@ export function VinylGrid({ refreshTrigger }) {
                         <option value="1">1+ Star</option>
                         <option value="unrated">Unrated</option>
                     </select>
+                </div>
+
+                {/* Row 3: Filter Chips */}
+                <div className="flex flex-nowrap overflow-x-auto gap-2 pb-1 scrollbar-hide w-full items-center">
+                    <div className="text-xs font-bold text-white/40 uppercase tracking-wider shrink-0 mr-2">Quick Filters:</div>
+                    
+                    {/* Genre Chips */}
+                    {uniqueGenres.slice(0, 10).map(genre => (
+                        <button 
+                            key={genre}
+                            onClick={() => setSelectedGenre(prev => prev === genre ? '' : genre)}
+                            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedGenre === genre ? 'bg-primary text-black border-primary shadow-lg shadow-primary/20' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                        >
+                            {genre}
+                        </button>
+                    ))}
+                    
+                    {/* Divider */}
+                    <div className="w-px h-4 bg-white/10 shrink-0 mx-1" />
+                    
+                    {/* Decade Chips */}
+                    {uniqueDecades.map(decade => (
+                        <button 
+                            key={decade}
+                            onClick={() => setSelectedDecade(prev => prev === decade ? '' : decade)}
+                            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedDecade === decade ? 'bg-accent text-black border-accent shadow-lg shadow-accent/20' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                        >
+                            {decade}
+                        </button>
+                    ))}
                 </div>
             </div>
 

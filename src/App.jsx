@@ -10,6 +10,7 @@ function App() {
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isDebugOpen, setIsDebugOpen] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [showWantlist, setShowWantlist] = useState(false); // sincronizzato con VinylGrid
 
     const handleRefresh = () => {
         console.log('🔄 App: handleRefresh called, incrementing refreshTrigger from', refreshTrigger);
@@ -24,6 +25,7 @@ function App() {
         >
             <VinylGrid
                 refreshTrigger={refreshTrigger}
+                onWantlistChange={setShowWantlist}
             />
 
             {isSettingsOpen && (
@@ -38,6 +40,7 @@ function App() {
                 onClose={() => setIsUploadOpen(false)}
                 onUploadComplete={handleRefresh}
                 onOpenDebug={() => setIsDebugOpen(true)}
+                defaultIsWantlist={showWantlist}
             />
 
             <DebugModal

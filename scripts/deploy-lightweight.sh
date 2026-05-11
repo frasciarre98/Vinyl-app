@@ -3,17 +3,21 @@ set -e
 
 NAS_USER="fraadmin"
 NAS_IP="192.168.0.250"
+SSH_SOCK="/tmp/vinyl-deploy-$$.sock"
+
+# Cleanup automatico del tunnel SSH all'uscita
+trap 'ssh -S "$SSH_SOCK" -O exit "$NAS_USER@$NAS_IP" 2>/dev/null; rm -f "$SSH_SOCK"' EXIT
 
 # Auto-fix: Zsh-native way to find the script's directory and move to project root
 cd "${0:A:h}/.."
 
-echo "🚀 1. Avvio deploy lightweight V38.10 da: $(pwd)"
+echo "🚀 1. Avvio deploy lightweight V38.13 da: $(pwd)"
 npx vite build --emptyOutDir
 
-echo "🔍 Verifica build V38.10..."
-if ! grep -r "V38.10" dist/assets/ > /dev/null 2>&1; then
-    echo "❌ ERROR: La build prodotta non contiene la versione V38.10!"
-    echo "   Attesa: V38.10 nel codice sorgente."
+echo "🔍 Verifica build V38.13..."
+if ! grep -r "V38.13" dist/assets/ > /dev/null 2>&1; then
+    echo "❌ ERROR: La build prodotta non contiene la versione V38.13!"
+    echo "   Attesa: V38.13 nel codice sorgente."
     exit 1
 fi
 echo "✅ Build verificata."
@@ -22,10 +26,12 @@ echo "🧹 2. Tabula Rasa dei metadati Mac (dot_clean + no-xattrs)..."
 dot_clean -m . || true
 find . -name "._*" -delete || true
 
-echo "🚀 3. Final Bypass Activation... [SERVE PASSWORD UNA SOLA VOLTA]"
+echo "🔐 Apertura tunnel SSH (inserisci password una sola volta)..."
+ssh -M -S "$SSH_SOCK" -N -f -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP"
+echo "✅ Tunnel aperto. Deploy in corso senza ulteriori password..."
 
-# Usiamo un pipe pulito senza -t per evitare conflitti con il tar
-tar --no-xattrs -cz --exclude='._*' .env dist/ backend/pb_hooks/ backend/pb_migrations/ src/data/vinyls-static.json | ssh $NAS_USER@$NAS_IP "
+# Tutti i comandi successivi usano il tunnel già autenticato
+tar --no-xattrs -cz --exclude='._*' .env dist/ backend/pb_hooks/ backend/pb_migrations/ src/data/vinyls-static.json | ssh -S "$SSH_SOCK" "$NAS_USER@$NAS_IP" "
     set -e
     export PATH=\$PATH:/share/CACHEDEV1_DATA/.qpkg/container-station/bin:/usr/local/bin
     export DOCKER_CONFIG=\"/share/Public/.docker-config-\$RANDOM\"
@@ -94,7 +100,7 @@ tar --no-xattrs -cz --exclude='._*' .env dist/ backend/pb_hooks/ backend/pb_migr
     NEW_CONTAINER=\"vinyl-app-deploy-vinyl-app-1\"
     
     echo \"🔍 VERIFICA FINALE (VERSIONE CODICE):\"
-    docker exec \$NEW_CONTAINER grep \"Definitive Edition\" /pb/pb_hooks/main.pb.js || echo \"ERRORE: Versione non aggiornata!\"
+    docker exec \$NEW_CONTAINER grep \"V38.13\|Music Proxy\" /pb/pb_hooks/main.pb.js || echo \"ERRORE: Versione non aggiornata!\"
     
     # 🔧 SUPERUSER FORCE
     echo \">> Aggiornamento Admin...\"
@@ -106,7 +112,7 @@ tar --no-xattrs -cz --exclude='._*' .env dist/ backend/pb_hooks/ backend/pb_migr
     
     rm -rf \"\$TMP_DIR\" \"\$DOCKER_CONFIG\"
     echo \"✅ OPERAZIONE COMPLETATA!\"
-    echo \"🎉 IL SITO È ONLINE AL LINK: http://$NAS_IP:8090\"
+    echo \"🎉 IL SITO È ONLINE AL LINK: http://192.168.0.250:8090\"
 "
 
 echo "🎉 FINITO! Ricarica il browser e goditi i tuoi vinili!"
