@@ -122,7 +122,7 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
 
             const allVinyls = records.map(doc => {
                 try {
-                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || new Date().toISOString();
+                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || "1970-01-01T00:00:00.000Z";
                     return {
                         ...doc,
                         $createdAt: rawCreated,
