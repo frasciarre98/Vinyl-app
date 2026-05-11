@@ -135,18 +135,8 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
                 }
             }).filter(Boolean);
 
-            const sortedVinyls = allVinyls.sort((a, b) => {
-                const aPending = a.artist === 'Pending AI' || a.artist === 'Error';
-                const bPending = b.artist === 'Pending AI' || b.artist === 'Error';
-
-                if (aPending && !bPending) return -1;
-                if (!aPending && bPending) return 1;
-
-                // Sort simply by date (newest first)
-                return new Date(b.$createdAt) - new Date(a.$createdAt);
-            });
-
-            setVinyls(sortedVinyls);
+            // Removed redundant initial sorting, since filteredVinyls handles it perfectly.
+            setVinyls(allVinyls);
             setSelectedIds([]);
             setIsSelectionMode(false);
             setError(null);
@@ -404,6 +394,12 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
             if (!aPending && bPending) return 1;
 
             if (sortOrder === 'newest') {
+                // 1. Respect 'sort_priority' first (e.g. pinned Led Zeppelin albums)
+                const prioA = Number(a.sort_priority) || 0;
+                const prioB = Number(b.sort_priority) || 0;
+                if (prioA !== prioB) return prioB - prioA;
+
+                // 2. Then sort by newest date
                 const dateA = new Date(a.$createdAt || a.created || 0);
                 const dateB = new Date(b.$createdAt || b.created || 0);
                 return dateB - dateA;
