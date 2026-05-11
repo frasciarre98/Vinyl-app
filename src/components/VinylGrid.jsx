@@ -99,48 +99,35 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
         try {
             setLoading(true);
 
+            let records = [];
+            
             if (IS_STATIC) {
                 console.log("📁 Running in STATIC MODE (Reading from JSON)", staticData?.length, "records");
-                // Static data already has image_url mapped to /storage/...
-                const allVinyls = (staticData || []).map(doc => ({
-                    ...doc,
-                    $createdAt: doc.created || doc.$createdAt || new Date().toISOString()
-                }));
-                console.log("✅ Static records mapped:", allVinyls.length);
-                setVinyls(allVinyls);
-                setLoading(false); // <--- Explicitly set here just in case
-                return;
+                records = staticData || [];
+            } else {
+                try {
+                    records = await pb.collection('vinyls').getFullList({
+                        sort: '-sort_priority,-id',
+                        requestKey: `v36_1_${Date.now()}`
+                    });
+                } catch (fetchErr) {
+                    console.warn("V36.1 Fetch failed, trying fallback...", fetchErr);
+                    records = await pb.collection('vinyls').getFullList({
+                        sort: '-id',
+                        requestKey: `v36_1_fallback_${Date.now()}`
+                    });
+                }
+                if (!records) throw new Error("Empty response from NAS.");
             }
-
-            let records;
-            try {
-                // V35.7: Sort by -created (Real newest) instead of -id.
-                // We fetch everything and will sort 'Pending AI' to top in memory to ensure visibility.
-                records = await pb.collection('vinyls').getFullList({
-                    sort: '-sort_priority,-id',
-                    requestKey: `v36_1_${Date.now()}`
-                });
-            } catch (fetchErr) {
-                console.warn("V36.1 Fetch failed, trying fallback...", fetchErr);
-                records = await pb.collection('vinyls').getFullList({
-                    sort: '-id',
-                    requestKey: `v36_1_fallback_${Date.now()}`
-                });
-            }
-
-            if (!records) throw new Error("Empty response from NAS.");
-
-            // DEBUG LOG for V34.1
-            console.log(`V34.1: Fetched ${records.length} records. First: ${records[0]?.title} / Priority: ${records[0]?.sort_priority ?? 0}`);
 
             const allVinyls = records.map(doc => {
                 try {
-                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || '1970-01-01T00:00:00.000Z';
+                    const rawCreated = doc.created || doc.$created || (doc.metadata && doc.metadata.created) || new Date().toISOString();
                     return {
                         ...doc,
                         $createdAt: rawCreated,
-                        image_url: doc.image ? pb.files.getUrl(doc, doc.image, { thumb: '400x400' }) : null,
-                        full_image_url: doc.image ? pb.files.getUrl(doc, doc.image) : null
+                        image_url: doc.image && !IS_STATIC ? pb.files.getUrl(doc, doc.image, { thumb: '400x400' }) : (doc.image_url || null),
+                        full_image_url: doc.image && !IS_STATIC ? pb.files.getUrl(doc, doc.image) : (doc.full_image_url || null)
                     };
                 } catch (e) {
                     console.error("Critical: Error mapping record", doc.id, e);

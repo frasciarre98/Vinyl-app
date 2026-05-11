@@ -23,21 +23,58 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
         setLoadingFact(true);
         setLoadingCollection(true);
 
-        // Fetch Wiki
-        fetchArtistWikipediaInfo(artistName).then(data => {
-            setWikiData(data);
-            setLoadingWiki(false);
-        });
+        const loadArtistData = async () => {
+            try {
+                // Try to find in DB first
+                const records = await pb.collection('artists').getList(1, 1, {
+                    filter: pb.filter('name = {:artist}', { artist: artistName })
+                });
 
-        // Fetch AI Fun Fact
-        generateArtistFunFact(artistName).then(fact => {
-            setFunFact(fact);
+                if (records.items && records.items.length > 0) {
+                    const dbArtist = records.items[0];
+                    setWikiData({ extract: dbArtist.bio, imageUrl: dbArtist.image_url, url: `https://it.wikipedia.org/wiki/${encodeURIComponent(artistName)}` });
+                    setFunFact(dbArtist.fun_fact);
+                    setLoadingWiki(false);
+                    setLoadingFact(false);
+                    return;
+                }
+            } catch (err) {
+                console.warn("DB Artist fetch error:", err);
+            }
+
+            // Not found in DB, fallback to generation
+            let newWikiData = null;
+            try {
+                newWikiData = await fetchArtistWikipediaInfo(artistName);
+                setWikiData(newWikiData);
+            } catch (e) {
+                console.error("Wiki error:", e);
+            }
+            setLoadingWiki(false);
+
+            let newFunFact = "Nessuna curiosità disponibile al momento.";
+            try {
+                newFunFact = await generateArtistFunFact(artistName);
+                setFunFact(newFunFact);
+            } catch (err) {
+                console.error("Fun fact error:", err);
+            }
             setLoadingFact(false);
-        }).catch(err => {
-            console.error("Fun fact error:", err);
-            setFunFact("Nessuna curiosità disponibile al momento.");
-            setLoadingFact(false);
-        });
+
+            // Save back to DB if we generated it
+            try {
+                await pb.collection('artists').create({
+                    name: artistName,
+                    bio: newWikiData?.extract?.substring(0, 5000) || '',
+                    fun_fact: newFunFact,
+                    image_url: newWikiData?.imageUrl || ''
+                });
+            } catch (saveErr) {
+                console.warn("Could not save artist to DB:", saveErr);
+            }
+        };
+
+        loadArtistData();
 
         // Fetch Collection
         const fetchCollection = async () => {
