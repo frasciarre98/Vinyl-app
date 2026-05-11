@@ -656,3 +656,44 @@ function fileToBase64(file) {
         reader.onerror = error => reject(error);
     });
 }
+
+// --- ARTIST HUB ---
+export async function generateArtistFunFact(artistName) {
+    const provider = getProvider();
+    const apiKey = getApiKey(provider);
+    if (!apiKey) throw new Error("API Key not configured");
+
+    const prompt = `Tell me a single, fascinating, and lesser-known fun fact or historical anecdote about the musical artist "${artistName}". Keep it concise (max 2-3 sentences), engaging, and written in Italian.`;
+
+    if (provider === 'openai') {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey.trim()}`
+            },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.7
+            })
+        });
+        if (!response.ok) throw new Error("OpenAI error");
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || "Nessuna curiosità trovata.";
+    } else {
+        // Gemini
+        const model = 'gemini-1.5-flash';
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.7 }
+            })
+        });
+        if (!response.ok) throw new Error("Gemini error");
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "Nessuna curiosità trovata.";
+    }
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Edit2, Trash2, Calendar, Disc, Music2, AlertCircle, CheckCircle, ListMusic, Euro, PlayCircle, Youtube, Wand2, Loader2, Music } from 'lucide-react';
 import { analyzeImageUrl, getApiKey } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
+import { ArtistModal } from './ArtistModal';
 
 const icons = { PlayCircle, Youtube }; // Quick fix for previous replacement using icons.Namespace
 
@@ -18,6 +19,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
     const [vinyl, setVinyl] = useState(initialVinyl);
     const [analyzing, setAnalyzing] = useState(false);
     const [generatingStory, setGeneratingStory] = useState(false);
+    const [isArtistModalOpen, setIsArtistModalOpen] = useState(false);
 
     useEffect(() => {
         setVinyl(initialVinyl);
@@ -275,9 +277,14 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                             <h1 className="text-3xl font-black text-white leading-tight dropshadow-xl">
                                 {vinyl.title || 'Unknown Album'}
                             </h1>
-                            <p className="text-xl text-primary font-medium">
-                                {vinyl.artist || 'Unknown Artist'}
-                            </p>
+                            <button 
+                                onClick={() => setIsArtistModalOpen(true)}
+                                className="group flex items-center gap-3 text-lg text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/20 transition-all active:scale-95 w-fit mt-3 shadow-lg"
+                            >
+                                <Music2 className="w-4 h-4 text-purple-400" />
+                                <span className="font-bold">{vinyl.artist || 'Unknown Artist'}</span>
+                                <span className="text-[10px] uppercase tracking-widest text-white/50 ml-1 border-l border-white/20 pl-3">Esplora Artista &rarr;</span>
+                            </button>
                         </div>
 
 
@@ -429,6 +436,13 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
                     </div>
                 </div>
             </div>
-        </div >
+
+            {/* Render ArtistModal conditionally */}
+            <ArtistModal 
+                isOpen={isArtistModalOpen} 
+                onClose={() => setIsArtistModalOpen(false)} 
+                artistName={vinyl.artist} 
+            />
+        </div>
     );
 }
