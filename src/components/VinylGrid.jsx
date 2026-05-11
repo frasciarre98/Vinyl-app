@@ -394,12 +394,6 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
             if (!aPending && bPending) return 1;
 
             if (sortOrder === 'newest') {
-                // 1. Respect 'sort_priority' first (e.g. pinned Led Zeppelin albums)
-                const prioA = Number(a.sort_priority) || 0;
-                const prioB = Number(b.sort_priority) || 0;
-                if (prioA !== prioB) return prioB - prioA;
-
-                // 2. Then sort by newest date
                 const dateA = new Date(a.$createdAt || a.created || 0);
                 const dateB = new Date(b.$createdAt || b.created || 0);
                 return dateB - dateA;
