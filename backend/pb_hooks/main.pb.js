@@ -6,8 +6,26 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             if (!bytes) return "";
             if (typeof bytes === 'string') return bytes;
             let str = "";
-            for (let i = 0; i < bytes.length; i++) {
-                str += String.fromCharCode(bytes[i]);
+            let i = 0;
+            while (i < bytes.length) {
+                let c = bytes[i++];
+                if (c < 0x80) {
+                    str += String.fromCharCode(c);
+                } else if (c > 0xBF && c < 0xE0) {
+                    let c2 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x1F) << 6) | (c2 & 0x3F));
+                } else if (c > 0xDF && c < 0xF0) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F));
+                } else if (c > 0xEF && c < 0xF8) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    let c4 = bytes[i++];
+                    let codePoint = ((c & 0x07) << 18) | ((c2 & 0x3F) << 12) | ((c3 & 0x3F) << 6) | (c4 & 0x3F);
+                    codePoint -= 0x10000;
+                    str += String.fromCharCode((codePoint >> 10) | 0xD800, (codePoint & 0x3FF) | 0xDC00);
+                }
             }
             return str;
         };
@@ -121,7 +139,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             headers["Authorization"] = "Bearer " + apiKey;
         }
 
-        const promptSystem = "Identify this vinyl album. Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Clean Italian only (absolutely no markdown symbols like **).";
+        const promptSystem = "Identify this vinyl album from the image. Use your internal knowledge to fill in details not visible on the cover (e.g. full tracklist, label, group_members, average_cost). Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Clean Italian only (absolutely no markdown symbols like **).";
 
         const aiRes = $http.send({
             url: provider === "gemini" ? 
@@ -189,8 +207,26 @@ routerAdd("POST", "/api/ai/story", (e) => {
             if (!bytes) return "";
             if (typeof bytes === 'string') return bytes;
             let str = "";
-            for (let i = 0; i < bytes.length; i++) {
-                str += String.fromCharCode(bytes[i]);
+            let i = 0;
+            while (i < bytes.length) {
+                let c = bytes[i++];
+                if (c < 0x80) {
+                    str += String.fromCharCode(c);
+                } else if (c > 0xBF && c < 0xE0) {
+                    let c2 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x1F) << 6) | (c2 & 0x3F));
+                } else if (c > 0xDF && c < 0xF0) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F));
+                } else if (c > 0xEF && c < 0xF8) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    let c4 = bytes[i++];
+                    let codePoint = ((c & 0x07) << 18) | ((c2 & 0x3F) << 12) | ((c3 & 0x3F) << 6) | (c4 & 0x3F);
+                    codePoint -= 0x10000;
+                    str += String.fromCharCode((codePoint >> 10) | 0xD800, (codePoint & 0x3FF) | 0xDC00);
+                }
             }
             return str;
         };
@@ -300,8 +336,26 @@ routerAdd("GET", "/api/music/search", (e) => {
             if (!bytes) return "";
             if (typeof bytes === 'string') return bytes;
             let str = "";
-            for (let i = 0; i < bytes.length; i++) {
-                str += String.fromCharCode(bytes[i]);
+            let i = 0;
+            while (i < bytes.length) {
+                let c = bytes[i++];
+                if (c < 0x80) {
+                    str += String.fromCharCode(c);
+                } else if (c > 0xBF && c < 0xE0) {
+                    let c2 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x1F) << 6) | (c2 & 0x3F));
+                } else if (c > 0xDF && c < 0xF0) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F));
+                } else if (c > 0xEF && c < 0xF8) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    let c4 = bytes[i++];
+                    let codePoint = ((c & 0x07) << 18) | ((c2 & 0x3F) << 12) | ((c3 & 0x3F) << 6) | (c4 & 0x3F);
+                    codePoint -= 0x10000;
+                    str += String.fromCharCode((codePoint >> 10) | 0xD800, (codePoint & 0x3FF) | 0xDC00);
+                }
             }
             return str;
         };
@@ -358,7 +412,27 @@ routerAdd("GET", "/api/publish", (e) => {
             if (!bytes) return "";
             if (typeof bytes === 'string') return bytes;
             let str = "";
-            for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+            let i = 0;
+            while (i < bytes.length) {
+                let c = bytes[i++];
+                if (c < 0x80) {
+                    str += String.fromCharCode(c);
+                } else if (c > 0xBF && c < 0xE0) {
+                    let c2 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x1F) << 6) | (c2 & 0x3F));
+                } else if (c > 0xDF && c < 0xF0) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F));
+                } else if (c > 0xEF && c < 0xF8) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    let c4 = bytes[i++];
+                    let codePoint = ((c & 0x07) << 18) | ((c2 & 0x3F) << 12) | ((c3 & 0x3F) << 6) | (c4 & 0x3F);
+                    codePoint -= 0x10000;
+                    str += String.fromCharCode((codePoint >> 10) | 0xD800, (codePoint & 0x3FF) | 0xDC00);
+                }
+            }
             return str;
         };
         const _stringToBytes = function(str) {
@@ -500,5 +574,42 @@ routerAdd("GET", "/api/publish", (e) => {
     } catch (err) {
         console.log("[Publish] CRASH: " + err.message);
         return e.json(500, { error: "Sync Crash: " + err.message });
+    }
+});
+
+routerAdd("GET", "/api/fix-dates-sql", (e) => {
+    try {
+        const db = $app.dao().db();
+        
+        // 1. Assign deterministic date to missing old records
+        const resultOld = db.newQuery("UPDATE vinyls SET created = '2026-04-01 10:00:00.000Z' WHERE created = '' OR created IS NULL").execute();
+        
+        // 2. We can't parse substrings easily in sqlite without extension, so we'll do it from JS for Raye
+        // Wait, Raye record has ID or specific title. Let's fetch the recent ones and fix them in loop
+        const records = $app.dao().findRecordsByFilter("vinyls", "created = '2026-04-01 10:00:00.000Z'", "", 2000);
+        let fixedRecent = 0;
+        for (let i = 0; i < records.length; i++) {
+            const r = records[i];
+            const img = r.getString("image") || "";
+            // regex to find timestamp
+            const match = img.match(/(?:cropped_|warped_|IMG_)(\d{13})/);
+            if (match && match[1]) {
+                const ts = parseInt(match[1], 10);
+                if (ts > 1000000000000) {
+                    const d = new Date(ts);
+                    const iso = d.toISOString().replace('T', ' ').replace('Z', 'Z');
+                    // update raw
+                    db.newQuery("UPDATE vinyls SET created = {:iso} WHERE id = {:id}").bind({
+                        "iso": iso,
+                        "id": r.id
+                    }).execute();
+                    fixedRecent++;
+                }
+            }
+        }
+
+        return e.json(200, { success: true, fixedRecent: fixedRecent, message: "Dates fully restored!" });
+    } catch(err) {
+        return e.json(500, { error: err.message });
     }
 });
