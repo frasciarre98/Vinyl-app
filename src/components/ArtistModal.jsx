@@ -36,7 +36,12 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
                     dbArtistRef = dbArtist;
                     
                     // If the artist has a valid bio, use it and stop here
-                    if (dbArtist.bio && dbArtist.bio.length > 20 && dbArtist.bio !== 'Biografia non trovata su Wikipedia.') {
+                    const currentBio = dbArtist.bio || '';
+                    const isMissingBio = currentBio.length < 25 || 
+                                       currentBio.toLowerCase().includes('non trovata su wikipedia') ||
+                                       currentBio.toLowerCase().includes('biografia non disponibile');
+
+                    if (!isMissingBio) {
                         setWikiData({ extract: dbArtist.bio, imageUrl: dbArtist.image_url, url: `https://it.wikipedia.org/wiki/${encodeURIComponent(artistName)}` });
                         setFunFact(dbArtist.fun_fact);
                         setLoadingWiki(false);
