@@ -38,58 +38,48 @@ async function searchWikipedia(artistName, lang) {
         }
 
         const bestMatchTitle = searchResult.query.search[0].title;
+        const encodedTitle = encodeURIComponent(bestMatchTitle.replace(/ /g, '_'));
 
-        // 2. Fetch the extract and image for the best match
-        const params = new URLSearchParams({
-            action: 'query',
-            prop: 'extracts|pageimages',
-            titles: bestMatchTitle,
-            redirects: 1, // Follow redirects
-            format: 'json',
-            exintro: 1, // Only the introductory section
-            explaintext: 1, // Plain text instead of HTML
-            pithumbsize: 800, // Large thumbnail
-            origin: '*' // CORS
+        // 2. Fetch the summary using the modern REST API
+        const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodedTitle}`;
+        
+        const summaryResponse = await fetch(summaryUrl, {
+            headers: { 'Accept': 'application/json' }
         });
 
-        const url = `https://${lang}.wikipedia.org/w/api.php?${params.toString()}`;
-        const response = await fetch(url);
-        const result = await response.json();
-
-        if (!result.query || !result.query.pages) return null;
-
-        // The pages object has dynamic keys based on the page ID
-        const pages = Object.values(result.query.pages);
-        if (pages.length === 0 || (pages[0].pageid === undefined && !pages[0].missing)) return null;
-
-        const page = pages[0];
-        
-        // If this specific page has no extract, but we have a title, 
-        // it might be a special page or a very short stub.
-        if (!page.extract && page.title) {
-            // Fallback: try to fetch without exintro to see if we get anything
-            const fallbackParams = new URLSearchParams({
+        if (!summaryResponse.ok) {
+            // Fallback to legacy API if REST fails
+            const legacyParams = new URLSearchParams({
                 action: 'query',
-                prop: 'extracts',
-                titles: page.title,
-                explaintext: 1,
-                exchars: 1200, // Get first 1200 chars
+                prop: 'extracts|pageimages',
+                titles: bestMatchTitle,
+                redirects: 1,
                 format: 'json',
+                exintro: 1,
+                explaintext: 1,
+                pithumbsize: 800,
                 origin: '*'
             });
-            const fallbackUrl = `https://${lang}.wikipedia.org/w/api.php?${fallbackParams.toString()}`;
-            const fallbackRes = await fetch(fallbackUrl);
-            const fallbackJson = await fallbackRes.json();
-            const fallbackPage = Object.values(fallbackJson.query.pages)[0];
-            if (fallbackPage && fallbackPage.extract) {
-                page.extract = fallbackPage.extract;
-            }
+            const legacyUrl = `https://${lang}.wikipedia.org/w/api.php?${legacyParams.toString()}`;
+            const legacyResponse = await fetch(legacyUrl);
+            const legacyResult = await legacyResponse.json();
+            const page = Object.values(legacyResult.query.pages)[0];
+            
+            if (!page || page.missing) return null;
+            
+            return {
+                extract: page.extract || null,
+                imageUrl: page.thumbnail ? page.thumbnail.source : null,
+                url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`
+            };
         }
 
+        const summaryData = await summaryResponse.json();
+
         return {
-            extract: page.extract || null,
-            imageUrl: page.thumbnail ? page.thumbnail.source : null,
-            url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`
+            extract: summaryData.extract || null,
+            imageUrl: summaryData.originalimage ? summaryData.originalimage.source : (summaryData.thumbnail ? summaryData.thumbnail.source : null),
+            url: summaryData.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodedTitle}`
         };
     } catch (err) {
         console.error(`Wikipedia search error for ${lang}:`, err);
