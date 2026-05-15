@@ -3,6 +3,9 @@ import { X, ExternalLink, PlayCircle, Loader2, Sparkles, Disc, Music, Calendar }
 import { fetchArtistWikipediaInfo } from '../lib/wikipedia';
 import { generateArtistFunFact } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
+import artistsStatic from '../data/artists-static.json';
+
+const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true' || window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io');
 
 export function ArtistModal({ artistName, isOpen, onClose }) {
     const [wikiData, setWikiData] = useState(null);
@@ -48,9 +51,21 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
                         setLoadingFact(false);
                         return;
                     }
-                    // Otherwise, we'll keep the fun_fact but we will fetch the wiki info again
                     setFunFact(dbArtist.fun_fact);
-                    // we'll need the ID later to update instead of create
+                } else if (IS_STATIC && artistsStatic) {
+                    // Fallback to static data on Vercel
+                    const staticArtist = artistsStatic.find(a => a.name === artistName);
+                    if (staticArtist && staticArtist.bio && staticArtist.bio.length > 25) {
+                        setWikiData({ 
+                            extract: staticArtist.bio, 
+                            imageUrl: staticArtist.image_url, 
+                            url: `https://it.wikipedia.org/wiki/${encodeURIComponent(artistName)}` 
+                        });
+                        setFunFact(staticArtist.fun_fact);
+                        setLoadingWiki(false);
+                        setLoadingFact(false);
+                        return;
+                    }
                 }
             } catch (err) {
                 console.warn("DB Artist fetch error:", err);

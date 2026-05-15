@@ -88,7 +88,15 @@ async function exportStaticData() {
         fs.writeFileSync(DATA_FILE, jsonContent, 'utf8');
         
         console.log(`✅ Exported ${staticData.length} records to ${DATA_FILE}`);
-        console.log(`✨ DONE! UTF-8 Encoding confirmed.`);
+
+        // --- EXPORT ARTISTS COLLECTION (V37.2) ---
+        console.log("🎨 Exporting Artists collection...");
+        const artists = await pb.collection('artists').getFullList();
+        const ARTISTS_FILE = path.join(__dirname, '../src/data/artists-static.json');
+        fs.writeFileSync(ARTISTS_FILE, JSON.stringify(artists, null, 2), 'utf8');
+        console.log(`✅ Exported ${artists.length} artists to ${ARTISTS_FILE}`);
+        
+        console.log(`✨ DONE! Full Static Sync complete.`);
 
     } catch (err) {
         console.error("❌ Export failed!");
