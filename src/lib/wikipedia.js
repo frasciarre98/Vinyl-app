@@ -38,48 +38,41 @@ async function searchWikipedia(artistName, lang) {
         }
 
         const bestMatchTitle = searchResult.query.search[0].title;
-        const encodedTitle = encodeURIComponent(bestMatchTitle.replace(/ /g, '_'));
 
-        // 2. Fetch the summary using the modern REST API
-        const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodedTitle}`;
-        
-        const summaryResponse = await fetch(summaryUrl, {
-            headers: { 'Accept': 'application/json' }
+        // 2. Fetch the extract and image using the legacy API (better CORS support with origin=*)
+        const params = new URLSearchParams({
+            action: 'query',
+            prop: 'extracts|pageimages',
+            titles: bestMatchTitle,
+            redirects: 1,
+            format: 'json',
+            exintro: 1,
+            explaintext: 1,
+            pithumbsize: 800,
+            origin: '*'
         });
 
-        if (!summaryResponse.ok) {
-            // Fallback to legacy API if REST fails
-            const legacyParams = new URLSearchParams({
-                action: 'query',
-                prop: 'extracts|pageimages',
-                titles: bestMatchTitle,
-                redirects: 1,
-                format: 'json',
-                exintro: 1,
-                explaintext: 1,
-                pithumbsize: 800,
-                origin: '*'
-            });
-            const legacyUrl = `https://${lang}.wikipedia.org/w/api.php?${legacyParams.toString()}`;
-            const legacyResponse = await fetch(legacyUrl);
-            const legacyResult = await legacyResponse.json();
-            const page = Object.values(legacyResult.query.pages)[0];
-            
-            if (!page || page.missing) return null;
-            
-            return {
-                extract: page.extract || null,
-                imageUrl: page.thumbnail ? page.thumbnail.source : null,
-                url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`
-            };
+        const url = `https://${lang}.wikipedia.org/w/api.php?${params.toString()}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (!result.query || !result.query.pages) {
+            console.error(`Wiki: No query/pages in result for ${lang}`, result);
+            return null;
         }
 
-        const summaryData = await summaryResponse.json();
+        const pages = Object.values(result.query.pages);
+        const page = pages[0];
+
+        if (!page || page.missing !== undefined) {
+            console.warn(`Wiki: Page missing for ${lang}: ${bestMatchTitle}`);
+            return null;
+        }
 
         return {
-            extract: summaryData.extract || null,
-            imageUrl: summaryData.originalimage ? summaryData.originalimage.source : (summaryData.thumbnail ? summaryData.thumbnail.source : null),
-            url: summaryData.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodedTitle}`
+            extract: page.extract || null,
+            imageUrl: page.thumbnail ? page.thumbnail.source : null,
+            url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`
         };
     } catch (err) {
         console.error(`Wikipedia search error for ${lang}:`, err);
