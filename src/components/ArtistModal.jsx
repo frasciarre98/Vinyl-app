@@ -167,7 +167,9 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
                         {/* Bio */}
                         <div className="flex-1 space-y-4">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-3xl font-black text-white not-italic" style={{ color: 'white' }}>{artistName}</h2>
+                                <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+                                    <h2 className="text-3xl font-black text-white not-italic" style={{ color: 'white' }}>{artistName}</h2>
+                                </div>
                                 {!loadingWiki && !wikiData?.extract && (
                                     <button 
                                         onClick={() => {
