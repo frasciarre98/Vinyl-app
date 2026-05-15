@@ -30,8 +30,10 @@ async function searchWikipedia(artistName, lang) {
     const searchUrl = `https://${lang}.wikipedia.org/w/api.php?${searchParams.toString()}`;
     
     try {
-        const searchResponse = await fetch(searchUrl);
-        const searchResult = await searchResponse.json();
+        const proxySearchUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(searchUrl)}`;
+        const searchResponse = await fetch(proxySearchUrl);
+        const proxySearchData = await searchResponse.json();
+        const searchResult = JSON.parse(proxySearchData.contents);
 
         if (!searchResult.query || !searchResult.query.search || searchResult.query.search.length === 0) {
             return null;
@@ -52,9 +54,13 @@ async function searchWikipedia(artistName, lang) {
             origin: '*'
         });
 
-        const url = `https://${lang}.wikipedia.org/w/api.php?${params.toString()}`;
+        // Use AllOrigins proxy to bypass CORS issues in some browsers
+        const targetUrl = `https://${lang}.wikipedia.org/w/api.php?${params.toString()}`;
+        const url = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+        
         const response = await fetch(url);
-        const result = await response.json();
+        const proxyData = await response.json();
+        const result = JSON.parse(proxyData.contents);
 
         if (!result.query || !result.query.pages) {
             console.error(`Wiki: No query/pages in result for ${lang}`, result);
