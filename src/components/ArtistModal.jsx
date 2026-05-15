@@ -24,6 +24,7 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
         setLoadingCollection(true);
 
         const loadArtistData = async () => {
+            let dbArtistRef = null;
             try {
                 // Try to find in DB first
                 const records = await pb.collection('artists').getList(1, 1, {
@@ -32,11 +33,19 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
 
                 if (records.items && records.items.length > 0) {
                     const dbArtist = records.items[0];
-                    setWikiData({ extract: dbArtist.bio, imageUrl: dbArtist.image_url, url: `https://it.wikipedia.org/wiki/${encodeURIComponent(artistName)}` });
+                    dbArtistRef = dbArtist;
+                    
+                    // If the artist has a valid bio, use it and stop here
+                    if (dbArtist.bio && dbArtist.bio.length > 20 && dbArtist.bio !== 'Biografia non trovata su Wikipedia.') {
+                        setWikiData({ extract: dbArtist.bio, imageUrl: dbArtist.image_url, url: `https://it.wikipedia.org/wiki/${encodeURIComponent(artistName)}` });
+                        setFunFact(dbArtist.fun_fact);
+                        setLoadingWiki(false);
+                        setLoadingFact(false);
+                        return;
+                    }
+                    // Otherwise, we'll keep the fun_fact but we will fetch the wiki info again
                     setFunFact(dbArtist.fun_fact);
-                    setLoadingWiki(false);
-                    setLoadingFact(false);
-                    return;
+                    // we'll need the ID later to update instead of create
                 }
             } catch (err) {
                 console.warn("DB Artist fetch error:", err);
@@ -53,22 +62,34 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
             setLoadingWiki(false);
 
             let newFunFact = "Nessuna curiosità disponibile al momento.";
-            try {
-                newFunFact = await generateArtistFunFact(artistName);
+            // Only generate fact if we don't have one from DB
+            if (dbArtistRef && dbArtistRef.fun_fact) {
+                newFunFact = dbArtistRef.fun_fact;
                 setFunFact(newFunFact);
-            } catch (err) {
-                console.error("Fun fact error:", err);
+                setLoadingFact(false);
+            } else {
+                try {
+                    newFunFact = await generateArtistFunFact(artistName);
+                    setFunFact(newFunFact);
+                } catch (err) {
+                    console.error("Fun fact error:", err);
+                }
+                setLoadingFact(false);
             }
-            setLoadingFact(false);
 
             // Save back to DB if we generated it
             try {
-                await pb.collection('artists').create({
+                const savePayload = {
                     name: artistName,
                     bio: newWikiData?.extract?.substring(0, 5000) || '',
                     fun_fact: newFunFact,
                     image_url: newWikiData?.imageUrl || ''
-                });
+                };
+                if (dbArtistRef && dbArtistRef.id) {
+                    await pb.collection('artists').update(dbArtistRef.id, savePayload);
+                } else {
+                    await pb.collection('artists').create(savePayload);
+                }
             } catch (saveErr) {
                 console.warn("Could not save artist to DB:", saveErr);
             }
