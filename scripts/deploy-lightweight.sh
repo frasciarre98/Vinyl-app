@@ -8,16 +8,17 @@ SSH_SOCK="/tmp/vinyl-deploy-$$.sock"
 # Cleanup automatico del tunnel SSH all'uscita
 trap 'ssh -S "$SSH_SOCK" -O exit "$NAS_USER@$NAS_IP" 2>/dev/null; rm -f "$SSH_SOCK"' EXIT
 
-# Auto-fix: Zsh-native way to find the script's directory and move to project root
-cd "${0:A:h}/.."
+# Auto-fix: Standard way to find the script's directory and move to project root
+cd "$(dirname "$0")/.."
 
-echo "🚀 1. Avvio deploy lightweight V38.13 da: $(pwd)"
-npx vite build --emptyOutDir
+echo "🚀 1. Avvio deploy lightweight V38.14 da: $(pwd)"
+npm install # Ensure dependencies are installed
+npm run build --emptyOutDir
 
-echo "🔍 Verifica build V38.13..."
-if ! grep -r "V38.13" dist/assets/ > /dev/null 2>&1; then
-    echo "❌ ERROR: La build prodotta non contiene la versione V38.13!"
-    echo "   Attesa: V38.13 nel codice sorgente."
+echo "🔍 Verifica build V38.14..."
+if ! grep -r "V38.14" dist/assets/ > /dev/null 2>&1; then
+    echo "❌ ERROR: La build prodotta non contiene la versione V38.14!"
+    echo "   Attesa: V38.14 nel codice sorgente."
     exit 1
 fi
 echo "✅ Build verificata."

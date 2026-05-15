@@ -1,4 +1,4 @@
-console.log(">>> MAGIC HOOK LOADED (Universal V38.13): " + new Date().toISOString());
+console.log(">>> MAGIC HOOK LOADED (Universal V38.14): " + new Date().toISOString());
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
     try {

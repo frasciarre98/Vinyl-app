@@ -1,11 +1,16 @@
 export async function fetchArtistWikipediaInfo(artistName) {
     try {
+        const normalizedName = artistName.toLowerCase().trim();
+        const isVarious = ['various artists', 'various', 'artisti vari', 'v.a.', 'v/a'].includes(normalizedName);
+        
         // Try Italian Wikipedia first
-        let data = await searchWikipedia(artistName, 'it');
+        const searchTermIt = isVarious ? 'Compilation' : artistName;
+        let data = await searchWikipedia(searchTermIt, 'it');
         
         // If no results, try English Wikipedia
         if (!data || !data.extract) {
-            data = await searchWikipedia(artistName, 'en');
+            const searchTermEn = isVarious ? 'Compilation album' : artistName;
+            data = await searchWikipedia(searchTermEn, 'en');
         }
 
         return data;
@@ -20,10 +25,10 @@ async function searchWikipedia(artistName, lang) {
     const searchParams = new URLSearchParams({
         action: 'query',
         list: 'search',
-        srsearch: artistName,
+        srsearch: `${artistName} musica`,
         utf8: '',
         format: 'json',
-        srlimit: 1,
+        srlimit: 3,
         origin: '*'
     });
 

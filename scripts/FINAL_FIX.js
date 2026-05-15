@@ -13,7 +13,7 @@ async function getWikiData(artistName) {
         const searchParams = new URLSearchParams({
             action: 'query',
             list: 'search',
-            srsearch: artistName,
+            srsearch: `${artistName} musica`,
             utf8: '',
             format: 'json',
             srlimit: 1
