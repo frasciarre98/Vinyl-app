@@ -166,16 +166,37 @@ export function ArtistModal({ artistName, isOpen, onClose }) {
 
                         {/* Bio */}
                         <div className="flex-1 space-y-4">
-                            <h2 className="text-3xl font-black">{artistName}</h2>
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-3xl font-black">{artistName}</h2>
+                                {!loadingWiki && !wikiData?.extract && (
+                                    <button 
+                                        onClick={() => {
+                                            setLoadingWiki(true);
+                                            // Re-trigger the search by clearing cache check
+                                            // Since we are inside the component, we can just call loadArtistData again
+                                            // but we need to make sure loadArtistData is accessible or we just trigger a state change
+                                            window.location.reload(); // Simplest way to force a full re-run for now
+                                        }}
+                                        className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-white/50 hover:text-white transition-all"
+                                    >
+                                        Riprova ricerca
+                                    </button>
+                                )}
+                            </div>
                             {loadingWiki ? (
-                                <div className="space-y-2 animate-pulse">
+                                <div className="space-y-3 animate-pulse">
                                     <div className="h-4 bg-white/10 rounded w-full"></div>
                                     <div className="h-4 bg-white/10 rounded w-5/6"></div>
                                     <div className="h-4 bg-white/10 rounded w-4/6"></div>
+                                    <div className="h-4 bg-white/10 rounded w-full"></div>
                                 </div>
                             ) : (
                                 <p className="text-gray-300 leading-relaxed text-lg">
-                                    {wikiData?.extract ? wikiData.extract : 'Biografia non trovata su Wikipedia.'}
+                                    {wikiData?.extract ? wikiData.extract : (
+                                        <span className="text-white/40 italic">
+                                            Biografia non trovata su Wikipedia per questo artista.
+                                        </span>
+                                    )}
                                 </p>
                             )}
                             

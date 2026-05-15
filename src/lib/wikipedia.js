@@ -44,6 +44,7 @@ async function searchWikipedia(artistName, lang) {
             action: 'query',
             prop: 'extracts|pageimages',
             titles: bestMatchTitle,
+            redirects: 1, // Follow redirects
             format: 'json',
             exintro: 1, // Only the introductory section
             explaintext: 1, // Plain text instead of HTML
@@ -59,11 +60,34 @@ async function searchWikipedia(artistName, lang) {
 
         // The pages object has dynamic keys based on the page ID
         const pages = Object.values(result.query.pages);
-        if (pages.length === 0 || pages[0].pageid === undefined) return null;
+        if (pages.length === 0 || (pages[0].pageid === undefined && !pages[0].missing)) return null;
 
         const page = pages[0];
+        
+        // If this specific page has no extract, but we have a title, 
+        // it might be a special page or a very short stub.
+        if (!page.extract && page.title) {
+            // Fallback: try to fetch without exintro to see if we get anything
+            const fallbackParams = new URLSearchParams({
+                action: 'query',
+                prop: 'extracts',
+                titles: page.title,
+                explaintext: 1,
+                exchars: 1200, // Get first 1200 chars
+                format: 'json',
+                origin: '*'
+            });
+            const fallbackUrl = `https://${lang}.wikipedia.org/w/api.php?${fallbackParams.toString()}`;
+            const fallbackRes = await fetch(fallbackUrl);
+            const fallbackJson = await fallbackRes.json();
+            const fallbackPage = Object.values(fallbackJson.query.pages)[0];
+            if (fallbackPage && fallbackPage.extract) {
+                page.extract = fallbackPage.extract;
+            }
+        }
+
         return {
-            extract: page.extract,
+            extract: page.extract || null,
             imageUrl: page.thumbnail ? page.thumbnail.source : null,
             url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`
         };
