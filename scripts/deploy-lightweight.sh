@@ -11,14 +11,14 @@ trap 'ssh -S "$SSH_SOCK" -O exit "$NAS_USER@$NAS_IP" 2>/dev/null; rm -f "$SSH_SO
 # Auto-fix: Standard way to find the script's directory and move to project root
 cd "$(dirname "$0")/.."
 
-echo "🚀 1. Avvio deploy lightweight V38.14 da: $(pwd)"
+echo "🚀 1. Avvio deploy lightweight V38.15 da: $(pwd)"
 npm install # Ensure dependencies are installed
 npm run build --emptyOutDir
 
-echo "🔍 Verifica build V38.14..."
-if ! grep -r "V38.14" dist/assets/ > /dev/null 2>&1; then
-    echo "❌ ERROR: La build prodotta non contiene la versione V38.14!"
-    echo "   Attesa: V38.14 nel codice sorgente."
+echo "🔍 Verifica build V38.15..."
+if ! grep -r "V38.15" dist/assets/ > /dev/null 2>&1; then
+    echo "❌ ERROR: La build prodotta non contiene la versione V38.15!"
+    echo "   Attesa: V38.15 nel codice sorgente."
     exit 1
 fi
 echo "✅ Build verificata."
