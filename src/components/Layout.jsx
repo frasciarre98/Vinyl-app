@@ -109,7 +109,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2 md:gap-4 shrink-0">
                         <VinylLogo className="w-14 h-14 md:w-20 md:h-20 drop-shadow-xl" />
-                        <h1 className="text-2xl md:text-4xl font-serif italic tracking-wide text-emerald-800 whitespace-nowrap" style={{ textShadow: '0 0 12px rgba(16, 185, 129, 0.35), 0 0 4px rgba(16, 185, 129, 0.2)' }}>
+                        <h1 className="text-2xl md:text-4xl font-serif italic tracking-wide text-emerald-800 whitespace-nowrap" style={{ textShadow: '-0.5px -0.5px 0 rgba(0,0,0,0.5), 0.5px -0.5px 0 rgba(0,0,0,0.5), -0.5px 0.5px 0 rgba(0,0,0,0.5), 0.5px 0.5px 0 rgba(0,0,0,0.5), 0 0 12px rgba(16, 185, 129, 0.35), 0 0 4px rgba(16, 185, 129, 0.2)' }}>
                             Vinyl Catalog
                         </h1>
                     </div>
