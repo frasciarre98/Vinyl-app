@@ -75,6 +75,7 @@ async function exportStaticData() {
                 average_cost: record.average_cost || record.avarege_cost || '', // Handle typo fallback
                 is_tracks_validated: !!record.is_tracks_validated,
                 is_price_locked: !!record.is_price_locked,
+                is_wantlist: !!record.is_wantlist,
                 image_url: localImagePath,
                 created: record.created || '',
                 updated: record.updated || ''
