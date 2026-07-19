@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug, Search as SearchIcon, Globe, Plus, ScanLine } from 'lucide-react';
-import { analyzeImage, getApiKey, resizeImage } from '../lib/openai';
+import { analyzeImage, getApiKey, resizeImage, analyzeImageUrl } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
 import { BarcodeScanner } from './BarcodeScanner';
 
@@ -219,59 +219,26 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
                         }
                     }
 
-                    // 1. SKIP AI Analysis During Upload (User will trigger manually via BatchAnalysisBanner)
-                    // This allows fast photo uploads without waiting for AI processing
+                    // 1. Upload to PB first (Create Record with File)
                     setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 20, error: null } }));
-
-                    let aiMetadata = {};
-                    // AI Analysis is now DISABLED during upload for faster performance
-                    // Users can trigger batch analysis after upload via the banner
-                    /* DISABLED - AI Analysis moved to manual trigger
-                    try {
-                        if (apiKey) {
-                            // Smart Hint: Use filename if it's not generic (IMG_XXXX)
-                            let hint = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
-                            if (/^(IMG|DSC|PXL|VIDEO|MOV|VID)[\d_-]/i.test(hint) || hint.length < 4) {
-                                hint = null; // Ignore generic camera filenames
-                            }
-
-                            const aiPromise = analyzeImage(optimizedFile, hint);
-                            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Timeout (30s)")), 30000));
-
-                            aiMetadata = await Promise.race([aiPromise, timeoutPromise]);
-                            console.log("✅ AI Analysis Success:", aiMetadata);
-                            console.log(`📊 Metadata completeness: ${Object.keys(aiMetadata).filter(k => aiMetadata[k] && aiMetadata[k] !== 'Unknown').length}/${Object.keys(aiMetadata).length} fields`);
-                        } else {
-                            console.log("No API Key, skipping AI analysis.");
-                        }
-                    } catch (aiErr) {
-                        console.warn("AI Analysis skipped:", aiErr);
-                        // Don't verify or stop, just continue to upload
-                    }
-                    */
-
-                    // 2. Upload to PB (Create Record with File)
-                    setProgress(prev => ({ ...prev, [file.name]: { status: 'uploading', progress: 50, error: null } }));
 
                     const formData = new FormData();
                     formData.append('image', optimizedFile);
 
-                    // Add Metadata
+                    // Add default temporary metadata (marked as 'Pending AI')
                     const metadata = {
-                        // Since AI is skipped, mark as 'Pending AI' for batch processing later
                         artist: 'Pending AI',
-                        title: String(aiMetadata.title || file.name.replace(/\.[^/.]+$/, "")).substring(0, 100),
-                        genre: String(aiMetadata.genre || '').substring(0, 50),
-                        year: String(aiMetadata.year || '').substring(0, 50),
-                        notes: String(aiMetadata.notes || '').substring(0, 1000),
-                        tracks: String(aiMetadata.tracks || '').substring(0, 5000),
-                        group_members: String(aiMetadata.group_members || '').substring(0, 255),
-                        condition: String(aiMetadata.condition || '').substring(0, 50),
-                        average_cost: String(aiMetadata.average_cost || '').substring(0, 50),
-                        // CRITICAL: Save AI-analyzed fields that were previously missing
-                        label: String(aiMetadata.label || '').substring(0, 100),
-                        edition: String(aiMetadata.edition || '').substring(0, 100),
-                        catalog_number: String(aiMetadata.catalog_number || '').substring(0, 50),
+                        title: file.name.replace(/\.[^/.]+$/, "").substring(0, 100),
+                        genre: '',
+                        year: '',
+                        notes: '',
+                        tracks: '',
+                        group_members: '',
+                        condition: 'N/A',
+                        average_cost: '',
+                        label: '',
+                        edition: '',
+                        catalog_number: '',
                         original_filename: file.name,
                         format: currentFormat,
                         is_wantlist: isWantlistRef.current
@@ -281,16 +248,32 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
                         formData.append(key, value);
                     }
 
-                    // 3. Insert to DB
-                    setProgress(prev => ({ ...prev, [file.name]: { status: 'saving', progress: 80, error: null } }));
+                    // 2. Insert to DB
+                    setProgress(prev => ({ ...prev, [file.name]: { status: 'saving', progress: 50, error: null } }));
 
                     const record = await pb.collection('vinyls').create(formData);
                     const publicUrl = pb.files.getUrl(record, record.image);
 
-                    // DEBUG ALERT
-                    // alert(`Saved to DB! ID: ${record.id}`);
-
                     uploadedRecords.push({ id: record.id, file, name: file.name, publicUrl });
+
+                    // 3. Auto AI Analysis (if API Key is present)
+                    if (apiKey) {
+                        setProgress(prev => ({ ...prev, [file.name]: { status: 'analyzing', progress: 80, error: null } }));
+                        try {
+                            let hint = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                            if (/^(IMG|DSC|PXL|VIDEO|MOV|VID)[\d_-]/i.test(hint) || hint.length < 4) {
+                                hint = null; // Ignore generic camera filenames
+                            }
+                            const analysis = await analyzeImageUrl(publicUrl, apiKey, hint);
+                            if (analysis) {
+                                await pb.collection('vinyls').update(record.id, analysis);
+                                console.log("✅ Auto AI Analysis Success:", analysis);
+                            }
+                        } catch (aiErr) {
+                            console.warn("Auto AI Analysis failed:", aiErr);
+                            // We don't block the upload, the user can re-trigger later
+                        }
+                    }
 
                     // 4. Complete
                     setProgress(prev => ({
@@ -358,6 +341,36 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
             formData.append('format', formatRef.current);
             formData.append('is_wantlist', isWantlistRef.current);
             formData.append('notes', 'Imported from Apple Music');
+
+            // Generate story / liner notes automatically if API key is present
+            const apiKey = getApiKey();
+            if (apiKey) {
+                try {
+                    console.log("Generating story for imported music:", release.artist, "-", release.title);
+                    const res = await fetch(`${PB_BASE_URL}/api/ai/story`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            artist: release.artist,
+                            title: release.title,
+                            apiKey: apiKey
+                        })
+                    });
+                    if (res.ok) {
+                        const storyData = await res.json();
+                        if (storyData && storyData.story) {
+                            formData.append('liner_notes', storyData.story);
+                            console.log("Story successfully generated and attached!");
+                        }
+                    } else {
+                        console.warn("Failed to generate story from API, status:", res.status);
+                    }
+                } catch (storyErr) {
+                    console.error("Failed to generate story during Apple Music import:", storyErr);
+                }
+            }
 
             if (release.thumb && !release.thumb.endsWith('spacer.gif')) {
                 try {
