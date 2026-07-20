@@ -233,9 +233,28 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
                             catalog_number: String(analysis.catalog_number || '').substring(0, 50),
                             edition: String(analysis.edition || '').substring(0, 100)
                         };
-                        await pb.collection('vinyls').update(vinyl.id, updateData);
-                        setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...updateData } : v));
-                        count++;
+
+                        // Respect User Validation & Property Locks
+                        const lockedFields = Array.isArray(vinyl.locked_fields) ? vinyl.locked_fields : [];
+                        const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost');
+
+                        lockedFields.forEach(field => {
+                            if (updateData.hasOwnProperty(field)) {
+                                delete updateData[field];
+                            }
+                        });
+
+                        if (isPriceLocked) {
+                            delete updateData.average_cost;
+                            delete updateData.avarege_cost;
+                        }
+
+                        // Only update if there are fields to update
+                        if (Object.keys(updateData).length > 0) {
+                            await pb.collection('vinyls').update(vinyl.id, updateData);
+                            setVinyls(prev => prev.map(v => v.id === vinyl.id ? { ...v, ...updateData } : v));
+                            count++;
+                        }
                     }
                     await new Promise(r => setTimeout(r, 1000));
                 } catch (e) { console.error(e); }
@@ -303,6 +322,21 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
                         edition: String(analysis.edition || '').substring(0, 100),
                         liner_notes: String(analysis.liner_notes || '').substring(0, 5000)
                     };
+
+                    // Respect User Validation & Property Locks
+                    const lockedFields = Array.isArray(vinyl.locked_fields) ? vinyl.locked_fields : [];
+                    const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost');
+
+                    lockedFields.forEach(field => {
+                        if (fullUpdate.hasOwnProperty(field)) {
+                            delete fullUpdate[field];
+                        }
+                    });
+
+                    if (isPriceLocked) {
+                        delete fullUpdate.average_cost;
+                        delete fullUpdate.avarege_cost;
+                    }
 
                     if (vinyl.is_tracks_validated) {
                         delete fullUpdate.tracks;

@@ -184,6 +184,7 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                     addLog(`🛡️ Protected ${protectedCount} field(s) from AI update`, "info");
                 }
 
+                let updatedFields = fullUpdate;
                 // Update PocketBase with analysis results
                 try {
                     await pb.collection('vinyls').update(item.id, fullUpdate);
@@ -197,10 +198,11 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                         sort_priority: 100
                     };
                     await pb.collection('vinyls').update(item.id, basicUpdate);
+                    updatedFields = basicUpdate;
                 }
 
                 addLog(`✓ Success: ${analysis.artist} - ${analysis.title} `, "success");
-                onUpdate(item.id, analysis); // Update parent state
+                onUpdate(item.id, updatedFields); // Update parent state
 
                 // Clear failure if successful
                 if (failedIdsRef.current.has(item.id)) failedIdsRef.current.delete(item.id);

@@ -142,7 +142,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
             await pb.collection('vinyls').update(vinyl.id, fullUpdate);
 
             // Update local view
-            setVinyl(prev => ({ ...prev, ...analysis }));
+            setVinyl(prev => ({ ...prev, ...fullUpdate }));
             alert("Analysis Complete!");
 
         } catch (err) {
