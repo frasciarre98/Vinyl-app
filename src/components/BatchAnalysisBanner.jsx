@@ -156,7 +156,10 @@ export const BatchAnalysisBanner = React.memo(function BatchAnalysisBanner({ vin
                 const lockedFields = Array.isArray(item.locked_fields) ? item.locked_fields : [];
 
                 // Unify locked field check for price (both typo and correct)
-                const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost');
+                const isPriceLocked = lockedFields.includes('average_cost') || 
+                                      lockedFields.includes('avarege_cost') || 
+                                      item.is_price_locked === true || 
+                                      String(item.is_price_locked).toLowerCase() === 'true';
 
                 let protectedCount = 0;
 

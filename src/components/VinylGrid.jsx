@@ -236,7 +236,7 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
 
                         // Respect User Validation & Property Locks
                         const lockedFields = Array.isArray(vinyl.locked_fields) ? vinyl.locked_fields : [];
-                        const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost');
+                        const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost') || vinyl.is_price_locked === true || String(vinyl.is_price_locked).toLowerCase() === 'true';
 
                         lockedFields.forEach(field => {
                             if (updateData.hasOwnProperty(field)) {
@@ -325,7 +325,10 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
 
                     // Respect User Validation & Property Locks
                     const lockedFields = Array.isArray(vinyl.locked_fields) ? vinyl.locked_fields : [];
-                    const isPriceLocked = lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost');
+                    const isPriceLocked = lockedFields.includes('average_cost') || 
+                                          lockedFields.includes('avarege_cost') || 
+                                          vinyl.is_price_locked === true || 
+                                          String(vinyl.is_price_locked).toLowerCase() === 'true';
 
                     lockedFields.forEach(field => {
                         if (fullUpdate.hasOwnProperty(field)) {
@@ -842,6 +845,7 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
                 onClose={() => setSelectedDetailVinyl(null)}
                 onEdit={(v) => { setSelectedDetailVinyl(null); setEditingVinyl(v); }}
                 onDelete={(id) => { setSelectedDetailVinyl(null); setTimeout(() => { handleSingleDelete(id); }, 50); }}
+                onUpdate={handleUpdateVinyl}
             />
 
             <EditVinylModal

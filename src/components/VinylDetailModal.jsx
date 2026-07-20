@@ -8,7 +8,7 @@ const icons = { PlayCircle, Youtube }; // Quick fix for previous replacement usi
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
-export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit, onDelete }) {
+export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit, onDelete, onUpdate }) {
     // Local state to handle updates immediately
     const [user, setUser] = useState(pb.authStore.model);
     useEffect(() => {
@@ -69,6 +69,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
             await pb.collection('vinyls').update(vinyl.id, fullUpdate);
 
             setVinyl(prev => ({ ...prev, liner_notes: data.story }));
+            if (onUpdate) onUpdate(vinyl.id, fullUpdate);
         } catch (err) {
             console.error(err);
             alert(`Story generation failed: ${err.message}`);
@@ -116,10 +117,14 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
 
             // Respect User Validation & Property Locks
             const lockedFields = Array.isArray(vinyl.locked_fields) ? vinyl.locked_fields : [];
+            const isPriceLocked = lockedFields.includes('average_cost') || 
+                                  lockedFields.includes('avarege_cost') || 
+                                  vinyl.is_price_locked === true || 
+                                  String(vinyl.is_price_locked).toLowerCase() === 'true';
             
             // Log for debugging
-            if (lockedFields.length > 0) {
-                console.log(">> Record has locked fields:", lockedFields);
+            if (lockedFields.length > 0 || isPriceLocked) {
+                console.log(">> Record has locked fields / price lock:", lockedFields, isPriceLocked);
             }
 
             // Remove locked fields from the update payload
@@ -130,7 +135,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
             }
 
             // Unify price lock logic for both schema typos
-            if ((lockedFields.includes('average_cost') || lockedFields.includes('avarege_cost'))) {
+            if (isPriceLocked) {
                 if (fullUpdate.avarege_cost !== undefined) delete fullUpdate.avarege_cost;
                 if (fullUpdate.average_cost !== undefined) delete fullUpdate.average_cost;
             }
@@ -143,6 +148,7 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
 
             // Update local view
             setVinyl(prev => ({ ...prev, ...fullUpdate }));
+            if (onUpdate) onUpdate(vinyl.id, fullUpdate);
             alert("Analysis Complete!");
 
         } catch (err) {
