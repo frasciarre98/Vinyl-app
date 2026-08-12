@@ -139,7 +139,7 @@ routerAdd("POST", "/api/custom-ai-analyze", (e) => {
             headers["Authorization"] = "Bearer " + apiKey;
         }
 
-        const promptSystem = "Identify this vinyl album from the image. Use your internal knowledge to fill in details not visible on the cover (e.g. full tracklist, label, group_members, average_cost). Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Clean Italian only (absolutely no markdown symbols like **).";
+        const promptSystem = "Identify this vinyl album from the image. Use your internal knowledge to fill in details not visible on the cover (e.g. full tracklist, label, group_members, average_cost). For 'liner_notes', act as an expert music critic and write a passionate story/review about this album in ITALIAN. Start it with '🤖 AI Story (ITA): '. Max 500 words. Return ONLY JSON with artist, title, genre, year, tracks, group_members, average_cost, condition, label, catalog_number, edition, notes, liner_notes. Clean Italian only (absolutely no markdown symbols like **).";
 
         const aiRes = $http.send({
             url: provider === "gemini" ? 

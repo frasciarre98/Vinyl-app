@@ -81,7 +81,7 @@ async function massGenerateStories() {
         console.log(`❌ Failed: ${failed}`);
 
     } catch (err) {
-        console.error("❌ Fatal Error:", err.message);
+        console.error("❌ Fatal Error:", err);
     }
 }
 

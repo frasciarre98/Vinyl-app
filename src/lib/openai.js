@@ -305,13 +305,24 @@ Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in th
 281: - year (original release)
 282: - tracks (full list, newline separated)
 283: - group_members (key members, comma separated)
-284: - average_cost (e.g. "€20-30" or "€150-200" if rare. STRICTLY in Euro. Differentiate between 1st Press (High Value) and Reissues (Low Value) based on cover clues. NEVER say "Varies". If unsure, default to "€15-25".)
-285: - condition (visual estimate: Good/Fair/Mint)
-286: - label (Record Label, e.g. "Blue Note", "Columbia")
-287: - catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
-288: - edition (e.g. "1st Press", "Reissue", "Red Vinyl", "Japanese Import")
-289: - notes (Detailed description including: history of the album/artist, interesting anecdotes, trivia, recording context, and musical influence. Make it engaging and comprehensive approx 300-500 words)
-290: Raw JSON only.` },
+- **VISUAL MATCHING:** Look at the back cover image. Read 2-3 unique track titles you see. Use these to find the **EXACT Edition** in your database that matches this specific tracklist.
+- If the image contains a tracklist, **TRUST THE IMAGE** over the standard album version.
+- If this is a Compilation, ensure the tracklist matches what is printed on the cover.
+Return JSON with these keys: 
+- artist
+- title
+- genre
+- year (original release)
+- tracks (full list, newline separated)
+- group_members (key members, comma separated)
+- average_cost (e.g. "€20-30" or "€150-200" if rare. STRICTLY in Euro. Differentiate between 1st Press (High Value) and Reissues (Low Value) based on cover clues. NEVER say "Varies". If unsure, default to "€15-25".)
+- condition (visual estimate: Good/Fair/Mint)
+- label (Record Label, e.g. "Blue Note", "Columbia")
+- catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
+- edition (e.g. "1st Press", "Reissue", "Red Vinyl", "Japanese Import")
+- notes (Detailed description including: history of the album/artist, interesting anecdotes, trivia, recording context, and musical influence. Make it engaging and comprehensive approx 300-500 words)
+- liner_notes (Act as an expert music critic. Write a passionate story/review about this album in ITALIAN. Start the text with "🤖 AI Story (ITA): ". Max 500 words. Clean text, no markdown.)
+Raw JSON only.` },
                             { inline_data: { mime_type: mimeType, data: base64Content } }
                         ]
                     }],
@@ -536,7 +547,8 @@ function normalizeParsedData(parsed) {
         label: parsed.label || "Unknown",
         catalog_number: parsed.catalog_number || "Unknown",
         edition: parsed.edition || "Unknown",
-        notes: parsed.notes || parsed.note || "Analyzed by AI"
+        notes: parsed.notes || parsed.note || "Analyzed by AI",
+        liner_notes: parsed.liner_notes || ""
     };
 }
 
