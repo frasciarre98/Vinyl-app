@@ -418,7 +418,7 @@ routerAdd("GET", "/api/test-app", (e) => {
 routerAdd("GET", "/api/publish", (e) => {
     try {
         console.log("[Publish] Starting GitHub Sync...");
-        const GITHUB_TOKEN = "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";
+        const GITHUB_TOKEN = $os.getenv("GITHUB_TOKEN") || "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";
         const REPO = "frasciarre98/Vinyl-app";
         const FILE_PATH = "src/data/vinyls-static.json";
 
