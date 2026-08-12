@@ -1,5 +1,20 @@
 console.log(">>> MAGIC HOOK LOADED (Universal V38.15): " + new Date().toISOString());
 
+// --- AUTO PUBLISH TRIGGERS ---
+// Triggers Vercel update automatically in background without blocking the request
+const triggerPublish = () => {
+    try {
+        $os.cmd("curl", "-s", "http://127.0.0.1:8090/api/publish").start();
+    } catch(err) {
+        console.log("Publish trigger error:", err);
+    }
+};
+
+onRecordAfterCreateRequest((e) => { triggerPublish(); }, "vinyls");
+onRecordAfterUpdateRequest((e) => { triggerPublish(); }, "vinyls");
+onRecordAfterDeleteRequest((e) => { triggerPublish(); }, "vinyls");
+
+
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
     try {
         const bytesToString = function(bytes) {
