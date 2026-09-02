@@ -50,9 +50,9 @@ export function DJModal({ isOpen, onClose }) {
         try {
             // Get user settings for API key
             const provider = localStorage.getItem('ai_provider') || 'gemini';
-            const apiKey = provider === 'gemini' 
-                ? localStorage.getItem('gemini_api_key') 
-                : localStorage.getItem('openai_api_key');
+            let apiKey = provider === 'gemini' 
+                ? (localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY)
+                : (localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY);
 
             if (!apiKey) {
                 alert("Devi prima inserire una API Key (Gemini o OpenAI) nelle Impostazioni!");
