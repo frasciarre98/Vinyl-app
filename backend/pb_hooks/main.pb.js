@@ -765,3 +765,93 @@ routerAdd("GET", "/api/discogs/price", (e) => {
         return e.json(500, { error: "Discogs Proxy Crash: " + err.message });
     }
 });
+
+routerAdd("POST", "/api/ai-dj", (e) => {
+    try {
+        const bytesToString = function(bytes) {
+            if (!bytes) return "";
+            let str = "";
+            for (let i = 0; i < bytes.length; i++) { str += String.fromCharCode(bytes[i]); }
+            return str;
+        };
+        
+        let body = {};
+        try { 
+            body = JSON.parse(bytesToString(e.requestInfo().body)); 
+        } catch (p) {}
+        
+        let { apiKey, provider, mood, timeContext, formatFilter, collection } = body;
+        
+        if (!apiKey) return e.json(400, { error: "Missing API key" });
+        if (!collection || collection.length === 0) return e.json(400, { error: "Collection is empty" });
+        
+        let prompt = `Sei un Sommelier Musicale e un DJ esperto.
+Contesto attuale: ${timeContext}
+Stato d'animo o richiesta dell'utente: "${mood}"
+Formato richiesto: ${formatFilter || "Qualsiasi"}
+
+Questa è l'intera collezione dell'utente (formato: ID | Artista | Titolo | Genere | Ultimo Ascolto):
+${collection}
+
+Il tuo compito:
+Seleziona ESATTAMENTE 4 dischi dalla collezione fornita che si adattino perfettamente alla situazione.
+Seleziona SOLO dischi presenti nell'elenco (copiando esattamente il loro ID).
+Privilegia i dischi che l'utente non ascolta da molto tempo (dove Ultimo Ascolto è "Mai" o una data vecchia).
+Non ripetere lo stesso artista se possibile.
+
+Rispondi SOLO con un JSON valido in questo formato esatto:
+{
+  "recommendations": [
+    {
+      "id": "L'ID ESATTO DEL DISCO",
+      "reason": "Spiega in italiano (max 2-3 frasi) perché l'hai scelto, parlando direttamente all'utente in modo coinvolgente ed elegante."
+    }
+  ]
+}`;
+
+        let result = {};
+        
+        if (provider === "gemini") {
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { response_mime_type: "application/json" }
+            };
+
+            const gRes = $http.send({
+                url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (gRes.statusCode !== 200) return e.json(500, { error: "Gemini Error: " + bytesToString(gRes.body) });
+
+            const gBody = JSON.parse(bytesToString(gRes.body));
+            const rawText = gBody.candidates[0].content.parts[0].text;
+            result = JSON.parse(rawText.replace(/```json/g, "").replace(/```/g, "").trim());
+
+        } else {
+            const payload = {
+                model: "gpt-4o-mini",
+                messages: [{ role: "user", content: prompt }],
+                response_format: { type: "json_object" }
+            };
+
+            const oRes = $http.send({
+                url: "https://api.openai.com/v1/chat/completions",
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+                body: JSON.stringify(payload)
+            });
+
+            if (oRes.statusCode !== 200) return e.json(500, { error: "OpenAI Error: " + bytesToString(oRes.body) });
+
+            const oBody = JSON.parse(bytesToString(oRes.body));
+            result = JSON.parse(oBody.choices[0].message.content);
+        }
+
+        return e.json(200, result);
+    } catch(err) {
+        return e.json(500, { error: "AI DJ Crash: " + err.message });
+    }
+});

@@ -4,6 +4,7 @@ import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
 import { ImportModal } from './ImportModal';
 import { MassSyncModal } from './MassSyncModal';
+import { DJModal } from './DJModal';
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
@@ -12,6 +13,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
     const [isPublishing, setIsPublishing] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [isMassSyncOpen, setIsMassSyncOpen] = useState(false);
+    const [isDJOpen, setIsDJOpen] = useState(false);
 
     // User state can be used if we want to show profile/logout in the header
     const [user, setUser] = useState(pb.authStore.model);
@@ -140,6 +142,13 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                         </button>
 
                                         <button
+                                            onClick={() => setIsDJOpen(true)}
+                                            className="hidden lg:flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-full hover:from-indigo-500 hover:to-purple-500 transition-colors font-medium text-sm shadow-md"
+                                        >
+                                            <span className="flex items-center gap-2">🎧 DJ Virtuale</span>
+                                        </button>
+
+                                        <button
                                             onClick={() => setIsMassSyncOpen(true)}
                                             className="hidden lg:flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-500 transition-colors font-medium text-sm"
                                         >
@@ -205,6 +214,11 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 isOpen={isMassSyncOpen}
                 onClose={() => setIsMassSyncOpen(false)}
                 onComplete={() => window.location.reload()}
+            />
+
+            <DJModal
+                isOpen={isDJOpen}
+                onClose={() => setIsDJOpen(false)}
             />
 
             <footer className="border-t border-border py-6 mt-4">
