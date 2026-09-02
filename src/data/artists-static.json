@@ -4210,5 +4210,32 @@
     "id": "vfowjbmx9o8s41a",
     "image_url": "",
     "name": "Francesco Battiato"
+  },
+  {
+    "bio": "Richard Galliano (Le Cannet, 12 dicembre 1950) è un fisarmonicista francese di musica jazz e tango di origini italiane.",
+    "collectionId": "pbc_4185980916",
+    "collectionName": "artists",
+    "fun_fact": "Paolo Fresu, Richard Galliano e Jan Lundgren hanno unito le forze in un progetto unico che celebra il jazz europeo, ma ciò che colpisce è che Fresu, trombettista sardo, ha scoperto la sua passione per la musica jazz ascoltando una radio pirata in gioventù. Questa ispirazione lo ha portato a diventare uno dei musicisti più innovativi del panorama jazz contemporaneo, mescolando sonorità tradizionali con influenze moderne.",
+    "id": "q8lt1q6vvb2lsz0",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Richard_Galliano.jpg?utm_source=it.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+    "name": "Paolo Fresu, Richard Galliano, Jan Lundgren"
+  },
+  {
+    "bio": "\"This Is Not America\" is a song by the English singer David Bowie and American jazz fusion band the Pat Metheny Group, taken from the soundtrack to the 1985 film The Falcon and the Snowman. It was released as a single in February 1985, reaching number 14 in the United Kingdom and number 32 in the United States.",
+    "collectionId": "pbc_4185980916",
+    "collectionName": "artists",
+    "fun_fact": "Pat Metheny Group è noto per la sua innovativa fusione di jazz, rock e musica mondiale, ma un fatto interessante è che il loro album \"Imaginary Day\" del 1997 è stato il primo a utilizzare un sistema di registrazione completamente digitale e multicanale. Questo approccio ha permesso loro di creare un sound ricco e tridimensionale, spingendo i confini della musica jazz contemporanea.",
+    "id": "hjjlr3wocb3sz0m",
+    "image_url": "",
+    "name": "Pat Metheny Group"
+  },
+  {
+    "bio": "",
+    "collectionId": "pbc_4185980916",
+    "collectionName": "artists",
+    "fun_fact": "Pat Metheny, noto chitarrista jazz, ha collaborato con il leggendario pianista Lyle Mays per oltre quattro decenni, ma ciò che rende la loro partnership unica è che Metheny ha composto la maggior parte delle sue canzoni in un periodo di intensa esplorazione musicale, creando un suono distintivo che fonde jazz, rock e musica folk. Curiosamente, il suo album \"Offramp\" del 1982 ha vinto un Grammy per il miglior album di jazz contemporaneo, segnando un momento cruciale nel suo viaggio artistico.",
+    "id": "0ufak7xicy75gys",
+    "image_url": "",
+    "name": "Pat Metheny"
   }
 ]
