@@ -770,8 +770,27 @@ routerAdd("POST", "/api/ai-dj", (e) => {
     try {
         const bytesToString = function(bytes) {
             if (!bytes) return "";
+            if (typeof bytes === 'string') return bytes;
             let str = "";
-            for (let i = 0; i < bytes.length; i++) { str += String.fromCharCode(bytes[i]); }
+            let i = 0;
+            while (i < bytes.length) {
+                let c = bytes[i++];
+                if (c < 0x80) {
+                    str += String.fromCharCode(c);
+                } else if (c > 0xBF && c < 0xE0) {
+                    let c2 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x1F) << 6) | (c2 & 0x3F));
+                } else if (c > 0xDF && c < 0xF0) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F));
+                } else if (c > 0xEF && c < 0xF8) {
+                    let c2 = bytes[i++];
+                    let c3 = bytes[i++];
+                    let c4 = bytes[i++];
+                    str += String.fromCharCode(((c & 0x07) << 18) | ((c2 & 0x3F) << 12) | ((c3 & 0x3F) << 6) | (c4 & 0x3F));
+                }
+            }
             return str;
         };
         
