@@ -2,17 +2,18 @@ console.log(">>> MAGIC HOOK LOADED (Universal V38.15): " + new Date().toISOStrin
 
 // --- AUTO PUBLISH TRIGGERS ---
 // Triggers Vercel update automatically in background without blocking the request
-const triggerPublish = () => {
+const triggerPublish = (e) => {
     try {
+        if (!e.collection || e.collection.name !== "vinyls") return;
         $os.cmd("curl", "-s", "http://127.0.0.1:8090/api/publish").start();
     } catch(err) {
         console.log("Publish trigger error:", err);
     }
 };
 
-onRecordAfterCreateSuccess((e) => { triggerPublish(); }, "vinyls");
-onRecordAfterUpdateSuccess((e) => { triggerPublish(); }, "vinyls");
-onRecordAfterDeleteSuccess((e) => { triggerPublish(); }, "vinyls");
+onRecordAfterCreateSuccess((e) => { triggerPublish(e); });
+onRecordAfterUpdateSuccess((e) => { triggerPublish(e); });
+onRecordAfterDeleteSuccess((e) => { triggerPublish(e); });
 
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
@@ -647,8 +648,7 @@ routerAdd("GET", "/api/discogs/price", (e) => {
             return str;
         };
 
-        let query = encodeURIComponent(artist + " " + title);
-        if (catno) query = encodeURIComponent(catno);
+        let query = encodeURIComponent(artist + " " + title + (catno ? " " + catno : ""));
 
         let formatStr = "";
         let fLow = format.toLowerCase();
