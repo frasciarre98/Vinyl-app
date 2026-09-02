@@ -647,7 +647,6 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                     if (analysis.average_cost && canUpdate('average_cost')) {
                                                         const cleanCost = String(analysis.average_cost).substring(0, 50);
                                                         updates.average_cost = cleanCost;
-                                                        if ('avarege_cost' in vinyl) updates.avarege_cost = cleanCost;
                                                     }
                                                     if (analysis.label && canUpdate('label')) updates.label = String(analysis.label).substring(0, 100);
                                                     if (analysis.catalog_number && canUpdate('catalog_number')) updates.catalog_number = String(analysis.catalog_number).substring(0, 50);
@@ -706,7 +705,6 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                             average_cost: cleanCost,
                                                             is_price_locked: true
                                                         };
-                                                        if ('avarege_cost' in vinyl) updates.avarege_cost = cleanCost;
                                                         
                                                         setFormData(prev => ({ ...prev, ...updates }));
                                                         await pb.collection('vinyls').update(vinyl.id, updates);

@@ -4,7 +4,7 @@ console.log(">>> MAGIC HOOK LOADED (Universal V38.15): " + new Date().toISOStrin
 // Triggers Vercel update automatically in background without blocking the request
 const triggerPublish = (e) => {
     try {
-        if (!e.collection || e.collection.name !== "vinyls") return;
+        if (!e.record || e.record.collection().name !== "vinyls") return;
         $os.cmd("curl", "-s", "http://127.0.0.1:8090/api/publish").start();
     } catch(err) {
         console.log("Publish trigger error:", err);
@@ -637,7 +637,7 @@ routerAdd("GET", "/api/discogs/price", (e) => {
         let title = e.requestInfo().query.title || "";
         let catno = e.requestInfo().query.catno || "";
         let format = e.requestInfo().query.format || "";
-        let token = $os.getenv("DISCOGS_TOKEN") || "rXqQOvtKbxLhIrtwFhWhXoUaKXZVnXlXnFwWkUZb";
+        let token = "TZHpdTqpbILfljqYsaQCuhvDuCYigAuwVAQrNMsN";
 
         const _bytesToString = function(bytes) {
             if (!bytes) return "";
