@@ -793,13 +793,24 @@ routerAdd("POST", "/api/ai-dj", (e) => {
             }
             return str;
         };
+
+        const payloadModel = new DynamicModel({
+            apiKey: "",
+            provider: "",
+            mood: "",
+            timeContext: "",
+            formatFilter: "",
+            collection: ""
+        });
         
-        let body = {};
-        try { 
-            body = JSON.parse(bytesToString(e.requestInfo().body)); 
-        } catch (p) {}
+        e.bindBody(payloadModel);
         
-        let { apiKey, provider, mood, timeContext, formatFilter, collection } = body;
+        let apiKey = payloadModel.apiKey;
+        let provider = payloadModel.provider;
+        let mood = payloadModel.mood;
+        let timeContext = payloadModel.timeContext;
+        let formatFilter = payloadModel.formatFilter;
+        let collection = payloadModel.collection;
         
         if (!apiKey) return e.json(400, { error: "Missing API key" });
         if (!collection || collection.length === 0) return e.json(400, { error: "Collection is empty" });

@@ -1,0 +1,4 @@
+2026/09/02 16:04:32 Server started at http://127.0.0.1:8090
+├─ REST API:  http://127.0.0.1:8090/api/
+└─ Dashboard: http://127.0.0.1:8090/_/
+File ../scratch/test_body.pb.js changed, restarting...
