@@ -10,9 +10,9 @@ const triggerPublish = () => {
     }
 };
 
-onRecordAfterCreateRequest((e) => { triggerPublish(); }, "vinyls");
-onRecordAfterUpdateRequest((e) => { triggerPublish(); }, "vinyls");
-onRecordAfterDeleteRequest((e) => { triggerPublish(); }, "vinyls");
+onRecordAfterCreateSuccess((e) => { triggerPublish(); }, "vinyls");
+onRecordAfterUpdateSuccess((e) => { triggerPublish(); }, "vinyls");
+onRecordAfterDeleteSuccess((e) => { triggerPublish(); }, "vinyls");
 
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
@@ -630,110 +630,3 @@ routerAdd("GET", "/api/fix-dates-sql", (e) => {
 });
 
 
-routerAdd("GET", "/api/discogs/price", (e) => {
-    try {
-        let artist = "";
-        let title = "";
-        let catno = "";
-        
-        try {
-            if (typeof e.queryParam === "function") {
-                artist = e.queryParam("artist") || "";
-                title = e.queryParam("title") || "";
-                catno = e.queryParam("catno") || "";
-            }
-        } catch(err) {}
-
-        if (!artist && !title) return e.json(400, { error: "Missing artist or title" });
-
-        console.log("[Discogs Proxy] Searching: " + artist + " - " + title + " (" + catno + ")");
-        
-        const token = $os.getenv("DISCOGS_TOKEN") || "TZHpdTqpbILfljqYsaQCuhvDuCYigAuwVAQrNMsN";
-        
-        let searchUrl = "https://api.discogs.com/database/search?type=release&token=" + token;
-        if (artist) searchUrl += "&artist=" + encodeURIComponent(artist);
-        if (title) searchUrl += "&release_title=" + encodeURIComponent(title);
-        if (catno) searchUrl += "&catno=" + encodeURIComponent(catno);
-
-        const _bytesToString = function(bytes) {
-            if (!bytes) return "";
-            if (typeof bytes === 'string') return bytes;
-            let str = "";
-            let i = 0;
-            while (i < bytes.length) {
-                let c = bytes[i++];
-                if (c < 0x80) str += String.fromCharCode(c);
-                else if (c > 0xBF && c < 0xE0) str += String.fromCharCode(((c & 0x1F) << 6) | (bytes[i++] & 0x3F));
-                else if (c > 0xDF && c < 0xF0) str += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F));
-                else if (c > 0xEF && c < 0xF8) {
-                    let codePoint = ((c & 0x07) << 18) | ((bytes[i++] & 0x3F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F);
-                    codePoint -= 0x10000;
-                    str += String.fromCharCode((codePoint >> 10) | 0xD800, (codePoint & 0x3FF) | 0xDC00);
-                }
-            }
-            return str;
-        };
-
-        const searchRes = $http.send({
-            url: searchUrl,
-            method: "GET",
-            headers: { "User-Agent": "VinylApp/1.0" }
-        });
-
-        let body = {};
-        try { 
-            body = JSON.parse(_bytesToString(searchRes.body)); 
-        } catch (p) {}
-        
-        if (searchRes.statusCode !== 200 || !body.results || body.results.length === 0) {
-            // Fallback: try a generic query
-            const genericQuery = encodeURIComponent(artist + " " + title);
-            const genericUrl = "https://api.discogs.com/database/search?q=" + genericQuery + "&type=release&token=" + token;
-            
-            const gRes = $http.send({
-                url: genericUrl,
-                method: "GET",
-                headers: { "User-Agent": "VinylApp/1.0" }
-            });
-            
-            try {
-                body = JSON.parse(_bytesToString(gRes.body));
-            } catch(x) {}
-            
-            if (!body.results || body.results.length === 0) {
-                 return e.json(404, { error: "No results found on Discogs" });
-            }
-        }
-
-        const releaseId = body.results[0].id;
-        const uri = body.results[0].uri;
-        console.log("[Discogs Proxy] Found release ID: " + releaseId);
-
-        const releaseRes = $http.send({
-            url: "https://api.discogs.com/releases/" + releaseId + "?token=" + token,
-            method: "GET",
-            headers: { "User-Agent": "VinylApp/1.0" }
-        });
-        
-        let rBody = {};
-        try {
-             rBody = JSON.parse(_bytesToString(releaseRes.body));
-        } catch(x) {}
-
-        if (releaseRes.statusCode !== 200) {
-            return e.json(releaseRes.statusCode, { error: "Failed to fetch release details from Discogs" });
-        }
-
-        return e.json(200, {
-            id: releaseId,
-            lowest_price: rBody.lowest_price,
-            num_for_sale: rBody.num_for_sale,
-            title: rBody.title,
-            year: rBody.year,
-            url: uri
-        });
-
-    } catch (err) {
-        return e.json(500, { error: "Discogs Proxy Crash: " + err.message });
-    }
-});
