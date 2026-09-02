@@ -639,6 +639,7 @@ routerAdd("GET", "/api/discogs/price", (e) => {
         let title = e.requestInfo().query.title || "";
         let catno = e.requestInfo().query.catno || "";
         let format = e.requestInfo().query.format || "";
+        let condition = e.requestInfo().query.condition || "";
         let token = "TZHpdTqpbILfljqYsaQCuhvDuCYigAuwVAQrNMsN";
 
         const _bytesToString = function(bytes) {
@@ -731,9 +732,29 @@ routerAdd("GET", "/api/discogs/price", (e) => {
         const finalRelease = bestRelease || fallbackRelease;
         const rBody = finalRelease.body;
 
+        let multiplier = 1.0;
+        let condLow = condition.toLowerCase().trim();
+        if (condLow.includes("mint") || condLow === "m" || condLow === "nm" || condLow === "near mint") {
+            multiplier = 2.5;
+        } else if (condLow.includes("very good+") || condLow.includes("vg+") || condLow === "very good plus") {
+            multiplier = 1.5;
+        } else if (condLow.includes("very good") || condLow === "vg") {
+            multiplier = 1.2;
+        }
+
+        let finalPriceStr = rBody.lowest_price;
+        if (rBody.lowest_price) {
+            let basePrice = parseFloat(rBody.lowest_price);
+            if (!isNaN(basePrice)) {
+                finalPriceStr = (Math.round((basePrice * multiplier) * 100) / 100).toFixed(2);
+            }
+        }
+
         return e.json(200, {
             id: finalRelease.id,
-            lowest_price: rBody.lowest_price,
+            lowest_price: finalPriceStr,
+            base_price: rBody.lowest_price,
+            multiplier: multiplier,
             num_for_sale: rBody.num_for_sale,
             title: rBody.title,
             year: rBody.year,

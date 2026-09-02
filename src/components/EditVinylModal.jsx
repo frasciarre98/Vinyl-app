@@ -695,7 +695,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                             artist: formData.artist,
                                                             title: formData.title,
                                                             catno: formData.catalog_number,
-                                                            format: formData.format || vinyl.format 
+                                                            format: formData.format || vinyl.format,
+                                                            condition: formData.condition || vinyl.condition
                                                         }
                                                     });
                                                     

@@ -61,7 +61,8 @@ export function MassSyncModal({ isOpen, onClose, onComplete }) {
                         artist: record.artist,
                         title: record.title,
                         catno: record.catalog_number,
-                        format: record.format
+                        format: record.format,
+                        condition: record.condition
                     }
                 });
 
@@ -71,7 +72,7 @@ export function MassSyncModal({ isOpen, onClose, onComplete }) {
                         average_cost: cleanCost,
                         is_price_locked: true
                     });
-                    log(`✅ Trovato: ${cleanCost} (${res.title})`);
+                    log(`✅ Trovato: ${cleanCost} (Base: €${res.base_price} x ${res.multiplier})`);
                 } else {
                     log(`⚠️ Nessun prezzo di mercato trovato.`);
                 }
