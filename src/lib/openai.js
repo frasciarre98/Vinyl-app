@@ -294,17 +294,6 @@ async function analyzeGemini(base64Content, mimeType, apiKey, hint = null) {
                             {
                                 text: `Identify this vinyl album. ${hint ? `The user states this is: '${hint}'. Verify this against the cover image.` : 'Identify the album from the artwork.'}
 Once identified, use your internal knowledge (Discogs/MusicBrainz) to fill in the metadata. 
-273: **CRITICAL FOR ACCURACY:**
-274: - **VISUAL MATCHING:** Look at the back cover image. Read 2-3 unique track titles you see. Use these to find the **EXACT Edition** in your database that matches this specific tracklist.
-275: - If the image contains a tracklist, **TRUST THE IMAGE** over the standard album version.
-276: - If this is a Compilation, ensure the tracklist matches what is printed on the cover.
-277: Return JSON with these keys: 
-278: - artist
-279: - title
-280: - genre
-281: - year (original release)
-282: - tracks (full list, newline separated)
-283: - group_members (key members, comma separated)
 - **VISUAL MATCHING:** Look at the back cover image. Read 2-3 unique track titles you see. Use these to find the **EXACT Edition** in your database that matches this specific tracklist.
 - If the image contains a tracklist, **TRUST THE IMAGE** over the standard album version.
 - If this is a Compilation, ensure the tracklist matches what is printed on the cover.
@@ -315,7 +304,7 @@ Return JSON with these keys:
 - year (original release)
 - tracks (full list, newline separated)
 - group_members (key members, comma separated)
-- average_cost (e.g. "€20-30" or "€150-200" if rare. STRICTLY in Euro. Differentiate between 1st Press (High Value) and Reissues (Low Value) based on cover clues. NEVER say "Varies". If unsure, default to "€15-25".)
+- average_cost (Estimate the CURRENT MARKET VALUE based on Discogs data for this specific edition. e.g. "€20-30" or "€150-200" if rare. BE REALISTIC. If it is a common/cheap record, estimate "€5-10". Do not blindly guess. STRICTLY in Euro.)
 - condition (visual estimate: Good/Fair/Mint)
 - label (Record Label, e.g. "Blue Note", "Columbia")
 - catalog_number (Catalog ID on spine/back, e.g. "PCS 7027")
@@ -553,36 +542,29 @@ function normalizeParsedData(parsed) {
 }
 
 function sanitizeCurrency(cost) {
-    // FORCE DEFAULT IF EMPTY
-    if (!cost) return "€20-35 (Est)";
+    if (!cost) return "Da verificare";
     let str = String(cost);
 
-    // Filter out "Varies" or "Unknown" with a Forced Fallback
-    if (str.match(/varies|unknown|tbd|check/i)) {
-        return "€20-35 (Analyst Est)";
+    if (str.match(/varies|unknown|tbd|check|da verificare/i)) {
+        return "Da verificare";
     }
 
-    // Replace USD variants with €
-    // Matches: USD, U.S.D, Dollars, $, etc. case insensitive
     if (str.match(/USD|U\.S\.D|Dollar|\$/i)) {
         str = str.replace(/USD|U\.S\.D|Dollar|\$/gi, "").trim();
-        // Remove trailing '.' if left by U.S.D.
         str = str.replace(/\.+$/, "").trim();
-        if (!str) return "€20-35 (Est)"; // Fallback if it was just "$"
-        return "€" + str; // Force Euro prefix
+        if (!str) return "Da verificare";
+        return "€" + str;
     }
-    // Ensure it has a Euro symbol if it's just numbers
+    
     if (!str.includes("€") && !str.includes("EUR")) {
-        // Check if it looks like a number or range "20-30"
         if (/\d/.test(str)) return "€" + str;
     }
-    // Normalize "EUR 20" to "€20"
+    
     if (str.includes("EUR")) {
         str = str.replace("EUR", "€").trim();
     }
-
-    // Final sanity check: if string length is weirdly short (e.g. "€") -> Default
-    if (str.length < 2) return "€20-35 (Est)";
+    
+    if (str.length < 2) return "Da verificare";
 
     return str;
 }

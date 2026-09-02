@@ -1,0 +1,65 @@
+--- main.pb.js
++++ main.pb.js
+@@ -654,12 +654,26 @@
+             url: searchUrl,
+             method: "GET",
+             headers: { "User-Agent": "VinylApp/1.0" }
+         });
+ 
+         const _bytesToString = function(bytes) {
+             if (!bytes) return "";
+             if (typeof bytes === 'string') return bytes;
+             let str = "";
+-            for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
++            let i = 0;
++            while (i < bytes.length) {
++                let c = bytes[i++];
++                if (c < 0x80) str += String.fromCharCode(c);
++                else if (c > 0xBF && c < 0xE0) str += String.fromCharCode(((c & 0x1F) << 6) | (bytes[i++] & 0x3F));
++                else if (c > 0xDF && c < 0xF0) str += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F));
++                else if (c > 0xEF && c < 0xF8) {
++                    let codePoint = ((c & 0x07) << 18) | ((bytes[i++] & 0x3F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F);
++                    codePoint -= 0x10000;
++                    str += String.fromCharCode((codePoint >> 10) | 0xD800, (codePoint & 0x3FF) | 0xDC00);
++                }
++            }
+             return str;
+         };
+ 
+         let body = {};
+         try { 
+@@ -671,9 +685,8 @@
+         
+         if (!body.results) {
+              try {
+-                  const rawStr = String.fromCharCode.apply(null, searchRes.body);
+-                  body = JSON.parse(rawStr);
++                  body = JSON.parse(_bytesToString(searchRes.body));
+              } catch(x) {}
+         }
+ 
+         if (searchRes.statusCode !== 200 || !body.results || body.results.length === 0) {
+@@ -685,10 +698,9 @@
+                 headers: { "User-Agent": "VinylApp/1.0" }
+             });
+             
+             try {
+-                const gStr = String.fromCharCode.apply(null, gRes.body);
+-                body = JSON.parse(gStr);
++                body = JSON.parse(_bytesToString(gRes.body));
+             } catch(x) {}
+             
+             if (!body.results || body.results.length === 0) {
+                  return e.json(404, { error: "No results found on Discogs" });
+@@ -702,10 +714,9 @@
+             headers: { "User-Agent": "VinylApp/1.0" }
+         });
+         
+         let rBody = {};
+         try {
+-             const rStr = String.fromCharCode.apply(null, releaseRes.body);
+-             rBody = JSON.parse(rStr);
++             rBody = JSON.parse(_bytesToString(releaseRes.body));
+         } catch(x) {}
+ 
+         if (releaseRes.statusCode !== 200) {

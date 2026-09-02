@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera, ShieldCheck, ShieldAlert, Database } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { resizeImage, analyzeImageUrl, getApiKey } from '../lib/openai';
 import Cropper from 'react-easy-crop';
@@ -625,8 +625,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             </div>
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
-                                        <label className="block text-sm font-semibold text-white/90">Estimated Value (AI)</label>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <label className="block text-sm font-semibold text-white/90">Estimated Value</label>
                                         <button
                                             type="button"
                                             onClick={async () => {
@@ -634,10 +634,6 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                 if (!apiKey) return alert("API Key missing.");
                                                 if (!vinyl.image_url) return alert("No image to analyze.");
 
-                                                const originalText = "Estimated Value (AI)";
-                                                const label = document.querySelector("label[for='avg_cost_label']"); // Hacky selector or just change button state
-
-                                                // Visual feedback
                                                 const btn = document.getElementById('refresh-price-btn');
                                                 if (btn) btn.classList.add('animate-spin');
 
@@ -645,20 +641,18 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                     const hint = `${formData.artist} - ${formData.title}`;
                                                     const analysis = await analyzeImageUrl(vinyl.image_url, apiKey, hint);
 
-                                                    // 1. Prepare Updates & Respect locks
                                                     const updates = {};
                                                     const canUpdate = (field) => !lockedFields.includes(field);
 
                                                     if (analysis.average_cost && canUpdate('average_cost')) {
                                                         const cleanCost = String(analysis.average_cost).substring(0, 50);
                                                         updates.average_cost = cleanCost;
-                                                        updates.avarege_cost = cleanCost; // DB Typo
+                                                        updates.avarege_cost = cleanCost;
                                                     }
                                                     if (analysis.label && canUpdate('label')) updates.label = String(analysis.label).substring(0, 100);
                                                     if (analysis.catalog_number && canUpdate('catalog_number')) updates.catalog_number = String(analysis.catalog_number).substring(0, 50);
                                                     if (analysis.edition && canUpdate('edition')) updates.edition = String(analysis.edition).substring(0, 100);
 
-                                                    // Artist/Title/Genre/Year protection
                                                     if (analysis.artist && canUpdate('artist')) updates.artist = String(analysis.artist).substring(0, 100);
                                                     if (analysis.title && canUpdate('title')) updates.title = String(analysis.title).substring(0, 100);
                                                     if (analysis.genre && canUpdate('genre')) updates.genre = String(analysis.genre).substring(0, 100);
@@ -666,12 +660,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                     if (analysis.tracks && !formData.is_tracks_validated && canUpdate('tracks')) updates.tracks = analysis.tracks;
 
                                                     if (Object.keys(updates).length > 0) {
-                                                        // 2. Update Local State
                                                         setFormData(prev => ({ ...prev, ...updates }));
-
-                                                        // 3. IMMEDIATE SAVE
                                                         const pbPayload = { ...updates };
-
                                                         await pb.collection('vinyls').update(vinyl.id, pbPayload);
                                                         onUpdate();
                                                     } else {
@@ -685,10 +675,52 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                 }
                                             }}
                                             id="refresh-price-btn"
-                                            className="p-1 rounded-full bg-white/5 hover:bg-white/10 text-xs text-blue-300 transition-colors"
-                                            title="Re-run AI Valuation"
+                                            className="px-2 py-0.5 rounded bg-blue-600/30 hover:bg-blue-600/50 text-xs text-blue-200 border border-blue-400/40 font-medium flex items-center gap-1 transition-all shadow-sm"
+                                            title="Stima automatica con AI"
                                         >
                                             <RotateCcw className="w-3 h-3" />
+                                            <span>AI</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const btn = document.getElementById('discogs-price-btn');
+                                                if (btn) btn.classList.add('animate-pulse');
+                                                try {
+                                                    const res = await pb.send('/api/discogs/price', {
+                                                        query: { 
+                                                            artist: formData.artist,
+                                                            title: formData.title,
+                                                            catno: formData.catalog_number 
+                                                        }
+                                                    });
+                                                    
+                                                    if (res.lowest_price) {
+                                                        const cleanCost = `€ ${res.lowest_price}`;
+                                                        const updates = {
+                                                            average_cost: cleanCost,
+                                                            avarege_cost: cleanCost,
+                                                            is_price_locked: true
+                                                        };
+                                                        setFormData(prev => ({ ...prev, ...updates }));
+                                                        await pb.collection('vinyls').update(vinyl.id, updates);
+                                                        if (typeof onUpdate === 'function') onUpdate();
+                                                        alert(`Trovato su Discogs: ${res.title}\nPrezzo di partenza: € ${res.lowest_price}\nIn vendita: ${res.num_for_sale} copie`);
+                                                    } else {
+                                                        alert("Trovato su Discogs, ma nessun prezzo di mercato disponibile in questo momento.");
+                                                    }
+                                                } catch(e) {
+                                                    alert("Errore Discogs: " + (e.data?.error || e.message));
+                                                } finally {
+                                                    if (btn) btn.classList.remove('animate-pulse');
+                                                }
+                                            }}
+                                            id="discogs-price-btn"
+                                            className="px-2 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-xs text-emerald-200 border border-emerald-400/40 font-medium flex items-center gap-1 transition-all shadow-sm"
+                                            title="Cerca quotazione reale su Discogs"
+                                        >
+                                            <Database className="w-3 h-3" />
+                                            <span>Discogs</span>
                                         </button>
                                     </div>
                                     <FieldLock field="average_cost" />
@@ -702,7 +734,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                     className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-accent text-slate-900 placeholder-slate-400"
                                 />
                                 <div className="mt-1 flex justify-end">
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs select-none text-secondary hover:text-primary transition-colors">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs select-none text-white/80 hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded border border-white/10">
                                         <input
                                             type="checkbox"
                                             checked={formData.is_price_locked}

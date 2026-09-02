@@ -11,9 +11,9 @@ export function CollectionValueKPI({ vinyls }) {
                 let costStr = String(vinyl.average_cost || vinyl.avarege_cost || '');
                 if (!costStr) return acc;
 
-                // Handle "Varies" or "Unknown" with a reasonable optimistic estimate
-                if (costStr.match(/varies|unknown|tbd|check/i)) {
-                    return acc + 25; // Optimistic average for unpriced items
+                // Skip "Varies" or "Unknown" or "Da verificare" without adding fake estimates
+                if (costStr.match(/varies|unknown|tbd|check|da verificare/i)) {
+                    return acc;
                 }
 
                 // Remove all non-numeric chars except dash and dot
