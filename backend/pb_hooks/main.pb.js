@@ -11,9 +11,11 @@ const triggerPublish = (e) => {
     }
 };
 
-onRecordAfterCreateSuccess((e) => { triggerPublish(e); });
-onRecordAfterUpdateSuccess((e) => { triggerPublish(e); });
-onRecordAfterDeleteSuccess((e) => { triggerPublish(e); });
+/*
+// onRecordAfterCreateSuccess((e) => { triggerPublish(e); });
+// onRecordAfterUpdateSuccess((e) => { triggerPublish(e); });
+// onRecordAfterDeleteSuccess((e) => { triggerPublish(e); });
+*/
 
 
 routerAdd("POST", "/api/custom-ai-analyze", (e) => {
