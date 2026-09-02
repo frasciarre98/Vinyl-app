@@ -647,7 +647,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                     if (analysis.average_cost && canUpdate('average_cost')) {
                                                         const cleanCost = String(analysis.average_cost).substring(0, 50);
                                                         updates.average_cost = cleanCost;
-                                                        updates.avarege_cost = cleanCost;
+                                                        if ('avarege_cost' in vinyl) updates.avarege_cost = cleanCost;
                                                     }
                                                     if (analysis.label && canUpdate('label')) updates.label = String(analysis.label).substring(0, 100);
                                                     if (analysis.catalog_number && canUpdate('catalog_number')) updates.catalog_number = String(analysis.catalog_number).substring(0, 50);
@@ -668,8 +668,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                         alert("AI analysis skipped: All affected fields are locked.");
                                                     }
                                                 } catch (e) {
-                                                    console.error(e);
-                                                    alert("Analysis failed: " + e.message);
+                                                    console.error("AI Update Error:", e);
+                                                    let details = "";
+                                                    if (e.data && e.data.data) {
+                                                        details = "\n" + JSON.stringify(e.data.data);
+                                                    }
+                                                    alert("Analysis failed: " + e.message + details);
                                                 } finally {
                                                     if (btn) btn.classList.remove('animate-spin');
                                                 }
@@ -691,7 +695,8 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                         query: { 
                                                             artist: formData.artist,
                                                             title: formData.title,
-                                                            catno: formData.catalog_number 
+                                                            catno: formData.catalog_number,
+                                                            format: formData.format || vinyl.format 
                                                         }
                                                     });
                                                     
@@ -699,9 +704,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                                         const cleanCost = `€ ${res.lowest_price}`;
                                                         const updates = {
                                                             average_cost: cleanCost,
-                                                            avarege_cost: cleanCost,
                                                             is_price_locked: true
                                                         };
+                                                        if ('avarege_cost' in vinyl) updates.avarege_cost = cleanCost;
+                                                        
                                                         setFormData(prev => ({ ...prev, ...updates }));
                                                         await pb.collection('vinyls').update(vinyl.id, updates);
                                                         if (typeof onUpdate === 'function') onUpdate();

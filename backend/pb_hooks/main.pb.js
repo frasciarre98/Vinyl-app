@@ -630,3 +630,115 @@ routerAdd("GET", "/api/fix-dates-sql", (e) => {
 });
 
 
+routerAdd("GET", "/api/discogs/price", (e) => {
+    try {
+        let artist = e.requestInfo().query.artist || "";
+        let title = e.requestInfo().query.title || "";
+        let catno = e.requestInfo().query.catno || "";
+        let format = e.requestInfo().query.format || "";
+        let token = $os.getenv("DISCOGS_TOKEN") || "rXqQOvtKbxLhIrtwFhWhXoUaKXZVnXlXnFwWkUZb";
+
+        const _bytesToString = function(bytes) {
+            if (!bytes) return "";
+            let str = "";
+            for (let i = 0; i < bytes.length; i++) {
+                str += String.fromCharCode(bytes[i]);
+            }
+            return str;
+        };
+
+        let query = encodeURIComponent(artist + " " + title);
+        if (catno) query = encodeURIComponent(catno);
+
+        let formatStr = "";
+        let fLow = format.toLowerCase();
+        if (fLow.indexOf("vinyl") !== -1) {
+            formatStr = "&format=Vinyl";
+        } else if (fLow.indexOf("cd") !== -1) {
+            formatStr = "&format=CD";
+        } else if (fLow.indexOf("cassette") !== -1) {
+            formatStr = "&format=Cassette";
+        }
+
+        const queryUrl = "https://api.discogs.com/database/search?q=" + query + "&type=release" + formatStr + "&token=" + token;
+
+        const searchRes = $http.send({
+            url: queryUrl,
+            method: "GET",
+            headers: { "User-Agent": "VinylApp/1.0" }
+        });
+
+        let body = {};
+        try { 
+            body = JSON.parse(_bytesToString(searchRes.body)); 
+        } catch (p) {}
+        
+        if (searchRes.statusCode !== 200 || !body.results || body.results.length === 0) {
+            // Fallback: try generic query without format constraint
+            const genericQuery = encodeURIComponent(artist + " " + title);
+            const genericUrl = "https://api.discogs.com/database/search?q=" + genericQuery + "&type=release&token=" + token;
+            
+            const gRes = $http.send({
+                url: genericUrl,
+                method: "GET",
+                headers: { "User-Agent": "VinylApp/1.0" }
+            });
+            
+            try {
+                body = JSON.parse(_bytesToString(gRes.body));
+            } catch(x) {}
+            
+            if (!body.results || body.results.length === 0) {
+                 return e.json(404, { error: "No results found on Discogs" });
+            }
+        }
+
+        // We check the top 3 results to find one with a valid lowest_price
+        const limit = Math.min(body.results.length, 3);
+        let bestRelease = null;
+        let fallbackRelease = null;
+
+        for (let i = 0; i < limit; i++) {
+            let releaseId = body.results[i].id;
+            let uri = body.results[i].uri;
+            
+            const releaseRes = $http.send({
+                url: "https://api.discogs.com/releases/" + releaseId + "?token=" + token,
+                method: "GET",
+                headers: { "User-Agent": "VinylApp/1.0" }
+            });
+            
+            let rBody = {};
+            try {
+                 rBody = JSON.parse(_bytesToString(releaseRes.body));
+            } catch(x) {}
+
+            if (releaseRes.statusCode === 200) {
+                if (!fallbackRelease) fallbackRelease = { id: releaseId, uri: uri, body: rBody };
+                if (rBody.lowest_price) {
+                    bestRelease = { id: releaseId, uri: uri, body: rBody };
+                    break;
+                }
+            }
+        }
+
+        if (!bestRelease && !fallbackRelease) {
+            return e.json(404, { error: "Failed to fetch release details from Discogs" });
+        }
+
+        const finalRelease = bestRelease || fallbackRelease;
+        const rBody = finalRelease.body;
+
+        return e.json(200, {
+            id: finalRelease.id,
+            lowest_price: rBody.lowest_price,
+            num_for_sale: rBody.num_for_sale,
+            title: rBody.title,
+            year: rBody.year,
+            url: finalRelease.uri
+        });
+
+    } catch (err) {
+        return e.json(500, { error: "Discogs Proxy Crash: " + err.message });
+    }
+});
