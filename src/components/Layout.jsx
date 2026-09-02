@@ -3,6 +3,7 @@ import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircl
 import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
 import { ImportModal } from './ImportModal';
+import { MassSyncModal } from './MassSyncModal';
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
@@ -10,6 +11,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
     const [isExporting, setIsExporting] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const [isMassSyncOpen, setIsMassSyncOpen] = useState(false);
 
     // User state can be used if we want to show profile/logout in the header
     const [user, setUser] = useState(pb.authStore.model);
@@ -138,6 +140,12 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                         </button>
 
                                         <button
+                                            onClick={() => setIsMassSyncOpen(true)}
+                                            className="hidden lg:flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-500 transition-colors font-medium text-sm"
+                                        >
+                                            <span>Sync Discogs</span>
+                                        </button>
+                                        <button
                                             onClick={onOpenUpload}
                                             className="hidden lg:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
                                         >
@@ -191,6 +199,12 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     // Force refresh
                     window.location.reload();
                 }}
+            />
+
+            <MassSyncModal 
+                isOpen={isMassSyncOpen}
+                onClose={() => setIsMassSyncOpen(false)}
+                onComplete={() => window.location.reload()}
             />
 
             <footer className="border-t border-border py-6 mt-4">
