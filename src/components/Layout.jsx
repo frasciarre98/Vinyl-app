@@ -181,7 +181,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                 {user && (
                                     <button
                                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                        className="lg:hidden p-2 text-secondary hover:text-primary transition-colors hover:bg-white/5 rounded-full"
+                                        className="lg:hidden flex p-2 text-secondary hover:text-primary transition-colors hover:bg-white/5 rounded-full"
                                         title="Menu"
                                     >
                                         {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
