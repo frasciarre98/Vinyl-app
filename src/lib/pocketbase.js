@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 
-// Usa l'IP del NAS se non specificato altrimenti, in modo che funzioni anche dal cellulare.
-const pbHost = import.meta.env.VITE_PB_URL || 'http://192.168.0.250:8090';
+// Usa l'IP Tailscale del NAS per permettere l'accesso in mobilità
+const pbHost = import.meta.env.VITE_PB_URL || 'http://100.104.254.127:8090';
 export const pb = new PocketBase(pbHost);
 pb.autoCancellation(false);
 
