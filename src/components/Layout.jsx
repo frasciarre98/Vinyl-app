@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle, Upload } from 'lucide-react';
+import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle, Upload, Menu, X } from 'lucide-react';
 import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
 import { ImportModal } from './ImportModal';
@@ -14,6 +14,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [isMassSyncOpen, setIsMassSyncOpen] = useState(false);
     const [isDJOpen, setIsDJOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // User state can be used if we want to show profile/logout in the header
     const [user, setUser] = useState(pb.authStore.model);
@@ -108,7 +109,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                     `
             }} />
 
-            <header className="glass-panel sticky top-0 z-50 border-b-0">
+            <header className="glass-panel sticky top-0 z-50 border-b-0 relative">
 
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2 md:gap-4 shrink-0">
@@ -177,11 +178,57 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                                 >
                                     <Settings className="w-5 h-5" />
                                 </button>
+                                {user && (
+                                    <button
+                                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                        className="lg:hidden p-2 text-secondary hover:text-primary transition-colors hover:bg-white/5 rounded-full"
+                                        title="Menu"
+                                    >
+                                        {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                                    </button>
+                                )}
                             </>
                         )}
                     </nav>
                 </div>
-            </header >
+                
+                {/* Mobile Menu Dropdown */}
+                {isMobileMenuOpen && user && (
+                    <div className="lg:hidden absolute top-full left-0 right-0 bg-slate-900 border-b border-white/10 p-4 flex flex-col gap-3 shadow-xl z-50">
+                        <button
+                            onClick={() => { setIsDJOpen(true); setIsMobileMenuOpen(false); }}
+                            className="flex justify-center items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 rounded-xl font-bold shadow-md"
+                        >
+                            <span className="flex items-center gap-2">🎧 DJ Virtuale</span>
+                        </button>
+
+                        <button
+                            onClick={() => { setIsMassSyncOpen(true); setIsMobileMenuOpen(false); }}
+                            className="flex justify-center items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl font-medium"
+                        >
+                            <span>Sync Discogs</span>
+                        </button>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => { handleExport(); setIsMobileMenuOpen(false); }}
+                                disabled={isExporting}
+                                className="flex justify-center items-center gap-2 bg-surface text-secondary px-4 py-3 rounded-xl border border-border font-medium"
+                            >
+                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                <span>Export</span>
+                            </button>
+                            <button
+                                onClick={() => { setIsImportOpen(true); setIsMobileMenuOpen(false); }}
+                                className="flex justify-center items-center gap-2 bg-surface text-secondary px-4 py-3 rounded-xl border border-border font-medium"
+                            >
+                                <Upload className="w-4 h-4" />
+                                <span>Import</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </header>
 
             <main className="flex-1 container mx-auto px-4 py-0 md:py-8">
                 {children}
