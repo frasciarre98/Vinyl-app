@@ -49,13 +49,22 @@ export function DJModal({ isOpen, onClose }) {
 
         try {
             // Get user settings for API key
-            const provider = localStorage.getItem('ai_provider') || 'gemini';
+            let provider = localStorage.getItem('ai_provider');
+            if (!provider) {
+                // Se non c'è in locale, usa openai se gemini manca ma openai c'è
+                if (!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_OPENAI_API_KEY) {
+                    provider = 'openai';
+                } else {
+                    provider = 'gemini';
+                }
+            }
+            
             let apiKey = provider === 'gemini' 
                 ? (localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY)
                 : (localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY);
 
             if (!apiKey) {
-                alert("Devi prima inserire una API Key (Gemini o OpenAI) nelle Impostazioni!");
+                alert(`Devi prima inserire una API Key (${provider}) nelle Impostazioni!`);
                 setStep(1);
                 return;
             }
