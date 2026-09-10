@@ -24,9 +24,9 @@ export function setProvider(provider) {
 export function getApiKey(provider = null) {
     const current = provider || getProvider();
     if (current === 'openai') {
-        return localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY;
+        return localStorage.getItem('openai_api_key') || pb.authStore.model?.openai_api_key || import.meta.env.VITE_OPENAI_API_KEY;
     }
-    return localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
+    return localStorage.getItem('gemini_api_key') || pb.authStore.model?.gemini_api_key || import.meta.env.VITE_GEMINI_API_KEY;
 }
 
 export function saveApiKey(key, provider = 'gemini') {

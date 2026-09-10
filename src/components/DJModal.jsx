@@ -60,7 +60,7 @@ export function DJModal({ isOpen, onClose }) {
             }
             
             let apiKey = provider === 'gemini' 
-                ? (localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY)
+                ? (localStorage.getItem('gemini_api_key') || pb.authStore.model?.gemini_api_key || import.meta.env.VITE_GEMINI_API_KEY)
                 : (localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY);
 
             if (!apiKey) {
