@@ -469,15 +469,22 @@ export function SettingsModal({ onClose, onSave }) {
                             <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
                                 <div className="space-y-2">
                                     <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Gemini API Key</label>
-                                    <div className="relative">
-                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
+                                    <div className="relative flex items-center">
+                                        <Key className="absolute left-3 w-4 h-4 text-secondary" />
                                         <input
-                                            type="password"
+                                            type={window.showApiKey ? "text" : "password"}
                                             value={apiKey}
                                             onChange={(e) => setApiKey(e.target.value)}
                                             placeholder="AIzaSy..."
-                                            className="w-full bg-white/50 border border-slate-200 rounded-lg py-2 pl-10 pr-4 text-slate-900 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm font-mono"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg py-2 pl-10 pr-10 text-slate-900 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm font-mono"
                                         />
+                                        <button 
+                                            onClick={() => { window.showApiKey = !window.showApiKey; setApiKey(apiKey + " "); setTimeout(() => setApiKey(apiKey), 10); }} 
+                                            className="absolute right-3 p-1 text-slate-400 hover:text-slate-700"
+                                            title="Mostra/Nascondi"
+                                        >
+                                            👁️
+                                        </button>
                                     </div>
                                 </div>
 
@@ -528,15 +535,22 @@ export function SettingsModal({ onClose, onSave }) {
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
                                 <div className="space-y-2">
                                     <label className="text-xs font-semibold text-secondary uppercase tracking-wider">OpenAI API Key</label>
-                                    <div className="relative">
-                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
+                                    <div className="relative flex items-center">
+                                        <Key className="absolute left-3 w-4 h-4 text-secondary" />
                                         <input
-                                            type="password"
+                                            type={window.showOpenAiKey ? "text" : "password"}
                                             value={openaiKey}
                                             onChange={(e) => setOpenaiKey(e.target.value)}
                                             placeholder="sk-..."
-                                            className="w-full bg-white/50 border border-slate-200 rounded-lg py-2 pl-10 pr-4 text-slate-900 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm font-mono"
+                                            className="w-full bg-white/50 border border-slate-200 rounded-lg py-2 pl-10 pr-10 text-slate-900 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm font-mono"
                                         />
+                                        <button 
+                                            onClick={() => { window.showOpenAiKey = !window.showOpenAiKey; setOpenaiKey(openaiKey + " "); setTimeout(() => setOpenaiKey(openaiKey), 10); }} 
+                                            className="absolute right-3 p-1 text-slate-400 hover:text-slate-700"
+                                            title="Mostra/Nascondi"
+                                        >
+                                            👁️
+                                        </button>
                                     </div>
                                     <p className="text-[10px] text-secondary">Uses <b>gpt-4o-mini</b>. Extremely fast & cheap ($0.15/1M tokens).</p>
                                 </div>
