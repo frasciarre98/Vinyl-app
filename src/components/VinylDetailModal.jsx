@@ -46,6 +46,27 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
 
     if (!isOpen || !vinyl) return null;
 
+    const handlePlay = async () => {
+        setAnalyzing(true);
+        try {
+            const currentCount = vinyl.play_count || 0;
+            const fullUpdate = {
+                last_played: new Date().toISOString(),
+                play_count: currentCount + 1
+            };
+            await pb.collection('vinyls').update(vinyl.id, fullUpdate);
+            
+            setVinyl(prev => ({ ...prev, ...fullUpdate }));
+            if (onUpdate) onUpdate(vinyl.id, fullUpdate);
+            alert("Messo sul piatto! Buon ascolto.");
+        } catch (e) {
+            console.error(e);
+            alert("Errore durante l'aggiornamento dell'ascolto.");
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
     const handleGenerateStory = async () => {
         if (!vinyl.artist || !vinyl.title) {
             alert("Artist and Title are required to generate a story.");
@@ -277,20 +298,29 @@ export function VinylDetailModal({ vinyl: initialVinyl, isOpen, onClose, onEdit,
 
                     {/* Metadata Container */}
                     <div className="px-6 -mt-12 relative z-10 space-y-8">
-
                         {/* Title & Artist */}
                         <div className="space-y-2">
                             <h1 className="text-3xl font-black text-white leading-tight dropshadow-xl">
                                 {vinyl.title || 'Unknown Album'}
                             </h1>
-                            <button 
-                                onClick={() => setIsArtistModalOpen(true)}
-                                className="group flex items-center gap-3 text-lg text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/20 transition-all active:scale-95 w-fit mt-3 shadow-lg"
-                            >
-                                <Music2 className="w-4 h-4 text-purple-400" />
-                                <span className="font-bold">{vinyl.artist || 'Unknown Artist'}</span>
-                                <span className="text-[10px] uppercase tracking-widest text-white/50 ml-1 border-l border-white/20 pl-3">Esplora Artista &rarr;</span>
-                            </button>
+                            <div className="flex flex-wrap items-center gap-3 mt-3">
+                                <button 
+                                    onClick={() => setIsArtistModalOpen(true)}
+                                    className="group flex items-center gap-3 text-lg text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full border border-white/20 transition-all active:scale-95 shadow-lg"
+                                >
+                                    <Music2 className="w-4 h-4 text-purple-400" />
+                                    <span className="font-bold">{vinyl.artist || 'Unknown Artist'}</span>
+                                    <span className="text-[10px] uppercase tracking-widest text-white/50 ml-1 border-l border-white/20 pl-3">Esplora Artista &rarr;</span>
+                                </button>
+
+                                <button
+                                    onClick={handlePlay}
+                                    className="group flex items-center gap-2 text-lg text-white bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-full shadow-lg shadow-indigo-900/50 transition-all active:scale-95"
+                                >
+                                    <PlayCircle className="w-5 h-5" />
+                                    <span className="font-bold">Mettilo sul Piatto!</span>
+                                </button>
+                            </div>
                         </div>
 
 
