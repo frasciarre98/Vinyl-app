@@ -63,6 +63,22 @@ export function DJModal({ isOpen, onClose }) {
                 ? (localStorage.getItem('gemini_api_key') || pb.authStore.model?.gemini_api_key || import.meta.env.VITE_GEMINI_API_KEY)
                 : (localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY);
 
+            // Fetch from pocketbase if still missing
+            if (!apiKey && pb.authStore.isValid && pb.authStore.model) {
+                try {
+                    const user = await pb.collection('users').getOne(pb.authStore.model.id);
+                    if (provider === 'gemini' && user.gemini_api_key) {
+                        apiKey = user.gemini_api_key;
+                        localStorage.setItem('gemini_api_key', apiKey);
+                    } else if (provider === 'openai' && user.openai_api_key) {
+                        apiKey = user.openai_api_key;
+                        localStorage.setItem('openai_api_key', apiKey);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch user API key:", e);
+                }
+            }
+
             if (!apiKey) {
                 alert(`Devi prima inserire una API Key (${provider}) nelle Impostazioni!`);
                 setStep(1);
