@@ -3,8 +3,9 @@ import { X, Lock, LogIn, Loader2 } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 
 export function LoginModal({ isOpen, onClose, onLoginSuccess }) {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState(() => localStorage.getItem('pb_admin_email') || '');
+    const [password, setPassword] = useState(() => localStorage.getItem('pb_admin_password') || '');
+    const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('pb_admin_password'));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -17,13 +18,27 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
         try {
             await pb.admins.authWithPassword(email, password);
+            if (rememberMe) {
+                localStorage.setItem('pb_admin_email', email);
+                localStorage.setItem('pb_admin_password', password);
+            } else {
+                localStorage.removeItem('pb_admin_email');
+                localStorage.removeItem('pb_admin_password');
+            }
             if (onLoginSuccess) onLoginSuccess();
             onClose();
         } catch (err) {
             console.error("Login failed:", err);
-            // Try as regular auth user if admin fails (just in case they use that)
+            // Try as regular auth user if admin fails
             try {
                 await pb.collection('users').authWithPassword(email, password);
+                if (rememberMe) {
+                    localStorage.setItem('pb_admin_email', email);
+                    localStorage.setItem('pb_admin_password', password);
+                } else {
+                    localStorage.removeItem('pb_admin_email');
+                    localStorage.removeItem('pb_admin_password');
+                }
                 if (onLoginSuccess) onLoginSuccess();
                 onClose();
             } catch (err2) {
@@ -59,6 +74,7 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            autoComplete="username"
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-primary outline-none"
                             placeholder="admin@example.com"
                             required
@@ -71,10 +87,24 @@ export function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            autoComplete="current-password"
                             className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-primary outline-none"
                             placeholder="••••••••"
                             required
                         />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                        <input 
+                            type="checkbox" 
+                            id="rememberMe" 
+                            checked={rememberMe} 
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="w-4 h-4 rounded border-white/20 bg-black/40 accent-primary"
+                        />
+                        <label htmlFor="rememberMe" className="text-sm text-white/70 cursor-pointer select-none">
+                            Ricorda credenziali su questo dispositivo
+                        </label>
                     </div>
 
                     <button
