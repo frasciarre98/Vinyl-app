@@ -29,3 +29,7 @@ yarn-debug.log*
 yarn-error.log*
 .vercel
 backend/pb_hooks/secrets.json
+tmp_pb_sync/
+backup/
+backend/pb_data/
+vinyl-app-deploy*.zip
