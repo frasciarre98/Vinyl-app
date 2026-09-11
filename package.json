@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
     "preview": "vite preview",
     "export:static": "node scripts/export-static.js",
     "backend": "set -a; source .env || true; set +a; cd backend && ./pocketbase serve --http=0.0.0.0:8090",
