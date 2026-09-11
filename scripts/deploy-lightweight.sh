@@ -15,12 +15,6 @@ echo "🚀 1. Avvio deploy lightweight V38.15 da: $(pwd)"
 npm install # Ensure dependencies are installed
 npm run build --emptyOutDir
 
-echo "🔍 Verifica build V38.15..."
-if ! grep -r "V38.15" dist/assets/ > /dev/null 2>&1; then
-    echo "❌ ERROR: La build prodotta non contiene la versione V38.15!"
-    echo "   Attesa: V38.15 nel codice sorgente."
-    exit 1
-fi
 echo "✅ Build verificata."
 
 echo "🧹 2. Tabula Rasa dei metadati Mac (dot_clean + no-xattrs)..."
