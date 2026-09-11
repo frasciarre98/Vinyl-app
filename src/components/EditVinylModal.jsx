@@ -291,12 +291,12 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="glass-heavy rounded-xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 glass-panel z-10">
-                    <h2 className="text-lg font-semibold">
+                <div className="flex items-center justify-between p-4 border-b border-black/10 sticky top-0 bg-white z-10">
+                    <h2 className="text-xl font-bold text-slate-800">
                         {isCropping ? (perspectiveMode ? 'Perspective Fix' : 'Crop & Rotate') : 'Edit Album'}
                     </h2>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
+                    <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-600 hover:text-slate-900">
+                        <X className="w-6 h-6" />
                     </button>
                 </div>
 
