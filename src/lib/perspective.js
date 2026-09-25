@@ -99,7 +99,7 @@ export async function warpImage(image, corners) {
     let height = Math.max(heightLeft, heightRight);
 
     // Limit max resolution for OUTPUT
-    const MAX_DIM = 1200;
+    const MAX_DIM = 800;
     if (width > MAX_DIM || height > MAX_DIM) {
         const scale = Math.min(MAX_DIM / width, MAX_DIM / height);
         width = Math.round(width * scale);
@@ -114,7 +114,7 @@ export async function warpImage(image, corners) {
 
     // --- OPTIMIZATION START ---
     // Handle Source Image Scaling (Mobile Memory Protection)
-    const MAX_SRC_DIM = 2048;
+    const MAX_SRC_DIM = 800;
     let srcW = image.naturalWidth || image.width;
     let srcH = image.naturalHeight || image.height;
     let srcScale = 1;
@@ -169,18 +169,17 @@ export async function warpImage(image, corners) {
         srcCtx.drawImage(image, 0, 0, srcCanvas.width, srcCanvas.height);
         srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height).data;
 
-        // Validation: Check if source is empty/black
-        let hasContent = false;
-        // Sample center pixel
-        const cx = Math.floor(srcCanvas.width / 2);
-        const cy = Math.floor(srcCanvas.height / 2);
-        const centerIdx = (cy * srcCanvas.width + cx) * 4;
-        if (srcData[centerIdx + 3] > 0) hasContent = true;
+        
+        // Validation: Check if source is empty/black (iOS Canvas Crash)
+        let isAllZero = true;
+        for (let i = 3; i < srcData.length; i += 4000) { // Sample every 1000 pixels
+            if (srcData[i] > 0) {
+                isAllZero = false;
+                break;
+            }
+        }
+        if (isAllZero) throw new Error("iOS memory limit exceeded. The canvas is empty.");
 
-        // Robust check requires looping (slow), relying on center + sample is usually enough
-        // but let's trust that if drawImage worked, it worked. 
-        // If center is empty, it might be a weird image, but usually indicates failure.
-        if (srcData.length === 0) throw new Error("Source image data is empty");
 
     } catch (e) {
         console.error("Canvas Error:", e);
