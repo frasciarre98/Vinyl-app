@@ -64,24 +64,28 @@ export default async function getCroppedImg(
     // draw image
     ctx.drawImage(image, 0, 0);
 
-    const data = ctx.getImageData(
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = pixelCrop.width;
+    croppedCanvas.height = pixelCrop.height;
+    const croppedCtx = croppedCanvas.getContext('2d');
+
+    // extract the cropped region using drawImage instead of getImageData/putImageData (Safari bug fix)
+    croppedCtx.drawImage(
+        canvas,
         pixelCrop.x,
         pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
         pixelCrop.width,
         pixelCrop.height
     );
 
-    // set canvas width to final desired crop size - this will clear existing context
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-
-    // paste generated rotate image at the top left corner
-    ctx.putImageData(data, 0, 0);
-
     // As Blob
     return new Promise((resolve, reject) => {
-        canvas.toBlob((file) => {
+        croppedCanvas.toBlob((file) => {
             resolve(file);
-        }, 'image/jpeg');
+        }, 'image/jpeg', 0.9);
     });
 }
