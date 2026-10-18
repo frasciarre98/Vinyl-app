@@ -1,0 +1,11 @@
+services:
+  vinyl-app:
+    image: vinyl-app-deploy-vinyl-app
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - /share/Container/vinyl-app-build/backend/pb_data:/pb/pb_data
+      - /share/Container/vinyl-app-build/pb_public:/pb/pb_public
+    env_file:
+      - /share/Container/vinyl-app-build/.env

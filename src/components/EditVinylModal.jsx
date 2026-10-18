@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, Lock, Unlock, CheckCircle, Move, Camera, ShieldCheck, ShieldAlert, Database } from 'lucide-react';
+import { X, Save, Trash2, Upload, Image as ImageIcon, Crop, RotateCcw, RotateCw, Lock, Unlock, CheckCircle, Move, Camera, ShieldCheck, ShieldAlert, Database, Globe } from 'lucide-react';
 import { pb } from '../lib/pocketbase';
 import { resizeImage, analyzeImageUrl, getApiKey } from '../lib/openai';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../lib/imageUtils';
 import { PerspectiveCropper } from './PerspectiveCropper';
+import { CoverSearchModal } from './CoverSearchModal';
 
 export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
     const [formData, setFormData] = useState({
@@ -44,6 +45,7 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
     const [zoom, setZoom] = useState(1);
     const [rotation, setRotation] = useState(0);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [isOnlineCoverSearchOpen, setIsOnlineCoverSearchOpen] = useState(false);
 
     useEffect(() => {
         if (vinyl) {
@@ -145,18 +147,30 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Read file as URL for cropper
-        const reader = new FileReader();
-        reader.addEventListener('load', () => {
-            setCropImageSrc(reader.result);
+        try {
+            // Fix orientation and resize immediately before cropping
+            // This prevents EXIF rotation issues and memory crashes on iOS
+            const resizedDataUrl = await resizeImage(file);
+            setCropImageSrc(resizedDataUrl);
             setIsCropping(true);
             setZoom(1);
             setRotation(0);
-        });
-        reader.readAsDataURL(file);
+        } catch (err) {
+            console.error("Resize before crop failed", err);
+            // Fallback
+            const reader = new FileReader();
+            reader.addEventListener('load', () => {
+                setCropImageSrc(reader.result);
+                setIsCropping(true);
+                setZoom(1);
+                setRotation(0);
+            });
+            reader.readAsDataURL(file);
+        }
 
         // Reset input so same file can be selected again
         if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
     };
 
     const handleEditExisting = async () => {
@@ -260,6 +274,58 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
         }
     };
 
+    const handleSelectOnlineCover = async (coverFile, metadata) => {
+        setUploadingImage(true);
+        try {
+            const pbFormData = new FormData();
+            pbFormData.append('image', coverFile);
+
+            const updates = {};
+            if (metadata) {
+                if (metadata.title && (!formData.title || formData.title === 'Pending AI')) {
+                    pbFormData.append('title', metadata.title);
+                    updates.title = metadata.title;
+                }
+                if (metadata.artist && (!formData.artist || formData.artist === 'Pending AI')) {
+                    pbFormData.append('artist', metadata.artist);
+                    updates.artist = metadata.artist;
+                }
+                if (metadata.year && !formData.year) {
+                    pbFormData.append('year', metadata.year);
+                    updates.year = metadata.year;
+                }
+                if (metadata.genre && !formData.genre) {
+                    pbFormData.append('genre', metadata.genre);
+                    updates.genre = metadata.genre;
+                }
+                if (metadata.label && !formData.label) {
+                    pbFormData.append('label', metadata.label);
+                    updates.label = metadata.label;
+                }
+                if (metadata.tracks && !formData.tracks) {
+                    pbFormData.append('tracks', metadata.tracks);
+                    updates.tracks = metadata.tracks;
+                    updates.is_tracks_validated = true;
+                }
+            }
+
+            const record = await pb.collection('vinyls').update(vinyl.id, pbFormData);
+            const publicUrl = pb.files.getUrl(record, record.image);
+            setDisplayImageUrl(publicUrl);
+
+            if (Object.keys(updates).length > 0) {
+                setFormData(prev => ({ ...prev, ...updates }));
+            }
+
+            if (typeof onUpdate === 'function') onUpdate();
+        } catch (err) {
+            console.error("Failed to apply online cover:", err);
+            alert("Errore nell'aggiornamento della copertina: " + err.message);
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
     // Auto-lock validation when user types in tracks
     const handleTracksChange = (newTracks) => {
         setFormData(prev => ({
@@ -339,8 +405,24 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                         className="flex-1 accent-primary h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
                                     />
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-xs text-secondary w-12">Rotate</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-secondary w-10">Ruota</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setRotation(prev => ((Number(prev) - 90) % 360 + 360) % 360)}
+                                        className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-xs flex items-center gap-1 transition-colors font-medium"
+                                        title="Ruota di 90° in senso antiorario"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" /> -90°
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setRotation(prev => (Number(prev) + 90) % 360)}
+                                        className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-xs flex items-center gap-1 transition-colors font-medium"
+                                        title="Ruota di 90° in senso orario"
+                                    >
+                                        <RotateCw className="w-3.5 h-3.5" /> +90°
+                                    </button>
                                     <input
                                         type="range"
                                         value={rotation}
@@ -348,9 +430,10 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                                         max={360}
                                         step={1}
                                         aria-labelledby="Rotation"
-                                        onChange={(e) => setRotation(e.target.value)}
+                                        onChange={(e) => setRotation(Number(e.target.value))}
                                         className="flex-1 accent-primary h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
                                     />
+                                    <span className="text-xs text-white/60 min-w-[32px] text-right font-mono">{rotation}°</span>
                                 </div>
 
                                 <div className="flex justify-end gap-2 pt-2">
@@ -386,6 +469,17 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                             <div className="flex-1">
                                 <label className="block text-sm font-medium text-secondary mb-1">Cover Image</label>
                                 <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOnlineCoverSearchOpen(true)}
+                                        disabled={uploadingImage}
+                                        className="text-xs bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-400/40 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 font-medium shadow-sm"
+                                        title="Cerca copertina originale in alta risoluzione su Apple Music"
+                                    >
+                                        <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Cerca Online</span>
+                                    </button>
+
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
@@ -941,7 +1035,15 @@ export function EditVinylModal({ vinyl, isOpen, onClose, onUpdate, onDelete }) {
                     </form>
                 )}
             </div>
-        </div >
+
+            <CoverSearchModal
+                isOpen={isOnlineCoverSearchOpen}
+                onClose={() => setIsOnlineCoverSearchOpen(false)}
+                initialArtist={formData.artist}
+                initialTitle={formData.title}
+                onSelectCover={handleSelectOnlineCover}
+            />
+        </div>
     );
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle, Upload, Menu, X } from 'lucide-react';
+import { Settings, Plus, Download, Loader2, Bug, Globe, CheckCircle2, AlertCircle, Upload, Menu, X, Search } from 'lucide-react';
 import { VinylLogo } from './VinylLogo';
 import { pb } from '../lib/pocketbase';
 import { ImportModal } from './ImportModal';
@@ -151,12 +151,20 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
                                         <button
                                             onClick={() => setIsMassSyncOpen(true)}
-                                            className="hidden lg:flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-500 transition-colors font-medium text-sm"
+                                            className="hidden lg:flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-full hover:bg-slate-700 transition-colors font-medium text-sm border border-white/10"
                                         >
                                             <span>Sync Discogs</span>
                                         </button>
                                         <button
-                                            onClick={onOpenUpload}
+                                            onClick={() => onOpenUpload('music', '')}
+                                            className="hidden lg:flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-500 transition-colors font-medium text-sm shadow-md"
+                                            title="Cerca Artisti e Copertine su Apple Music"
+                                        >
+                                            <Search className="w-4 h-4" />
+                                            <span>Cerca Online</span>
+                                        </button>
+                                        <button
+                                            onClick={() => onOpenUpload('upload', '')}
                                             className="hidden lg:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors font-medium text-sm"
                                         >
                                             <Plus className="w-4 h-4" />
@@ -196,6 +204,14 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
                 {isMobileMenuOpen && user && (
                     <div className="lg:hidden absolute top-full left-0 right-0 bg-slate-900 border-b border-white/10 p-4 flex flex-col gap-3 shadow-xl z-50">
                         <button
+                            onClick={() => { onOpenUpload('music', ''); setIsMobileMenuOpen(false); }}
+                            className="flex justify-center items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold shadow-md"
+                        >
+                            <Search className="w-5 h-5" />
+                            <span>Cerca Artisti & Copertine</span>
+                        </button>
+
+                        <button
                             onClick={() => { setIsDJOpen(true); setIsMobileMenuOpen(false); }}
                             className="flex justify-center items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 rounded-xl font-bold shadow-md"
                         >
@@ -204,7 +220,7 @@ export function Layout({ children, onOpenSettings, onOpenUpload, onOpenDebug }) 
 
                         <button
                             onClick={() => { setIsMassSyncOpen(true); setIsMobileMenuOpen(false); }}
-                            className="flex justify-center items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl font-medium"
+                            className="flex justify-center items-center gap-2 bg-slate-800 text-white px-4 py-3 rounded-xl font-medium border border-white/10"
                         >
                             <span>Sync Discogs</span>
                         </button>

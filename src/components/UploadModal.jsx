@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug, Search as SearchIcon, Globe, Plus, ScanLine } from 'lucide-react';
+import { X, Upload as UploadIcon, Loader2, Disc as ImageIcon, CheckCircle, Clock, Camera, Bug, Search as SearchIcon, Globe, Plus, ScanLine, Heart, Check, Sparkles } from 'lucide-react';
 import { analyzeImage, getApiKey, resizeImage, analyzeImageUrl } from '../lib/openai';
 import { pb } from '../lib/pocketbase';
 import { BarcodeScanner } from './BarcodeScanner';
+import { searchAppleMusic, fetchAlbumTracks, downloadCoverAsFile } from '../lib/musicSearch';
 
 // Base URL del backend PocketBase (es. http://192.168.x.x:8090)
 const PB_BASE_URL = pb.baseUrl.replace(/\/$/, '');
@@ -49,7 +50,7 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug, defaultIsWantlist = false }) {
+export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug, defaultIsWantlist = false, initialTab = 'music', initialQuery = '' }) {
     if (!isOpen) return null;
 
     return (
@@ -60,22 +61,25 @@ export function UploadModal({ isOpen, onClose, onUploadComplete, onOpenDebug, de
                 onUploadComplete={onUploadComplete}
                 onOpenDebug={onOpenDebug}
                 defaultIsWantlist={defaultIsWantlist}
+                initialTab={initialTab}
+                initialQuery={initialQuery}
             />
         </ErrorBoundary>
     );
 }
 
-function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, defaultIsWantlist = false }) {
+function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, defaultIsWantlist = false, initialTab = 'music', initialQuery = '' }) {
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
+    const [addingId, setAddingId] = useState(null);
     const [progress, setProgress] = useState({});
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
     const [existingFilenames, setExistingFilenames] = useState(new Set());
     const [format, setFormat] = useState('Vinyl'); // Default format
-    const [isWantlist, setIsWantlist] = useState(false);
-    const [tab, setTab] = useState('upload'); // 'upload' or 'music'
-    const [musicQuery, setMusicQuery] = useState('');
+    const [isWantlist, setIsWantlist] = useState(defaultIsWantlist);
+    const [tab, setTab] = useState(initialTab || 'music'); // 'music' (Cerca Online) or 'upload'
+    const [musicQuery, setMusicQuery] = useState(initialQuery || '');
     const [musicResults, setMusicResults] = useState([]);
     const [searchingMusic, setSearchingMusic] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
@@ -92,13 +96,16 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
         isWantlistRef.current = isWantlist;
     }, [isWantlist]);
 
-    // ENABLE LOGIC AGAIN TO CATCH THE ERROR
     useEffect(() => {
         if (isOpen) {
             setFiles([]);
             setProgress({});
-            // Reset wantlist to match whichever tab is active in the grid
             setIsWantlist(defaultIsWantlist);
+            setTab(initialTab || 'music');
+            if (initialQuery) {
+                setMusicQuery(initialQuery);
+                handleSearchMusic(null, initialQuery);
+            }
             const fetchExisting = async () => {
                 try {
                     // PocketBase list
@@ -116,7 +123,7 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
             };
             fetchExisting();
         }
-    }, [isOpen]);
+    }, [isOpen, initialTab, initialQuery, defaultIsWantlist]);
 
     const handleFileSelect = (e) => {
         const selectedFiles = Array.from(e.target.files);
@@ -312,12 +319,8 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
         setSearchingMusic(true);
         setMusicResults([]);
         try {
-            // Usa l'URL assoluto del backend PocketBase per funzionare su tutti i dispositivi
-            const res = await fetch(`${PB_BASE_URL}/api/music/search?q=${encodeURIComponent(queryToUse)}`);
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Search failed');
-
-            setMusicResults(data.results || []);
+            const results = await searchAppleMusic(queryToUse, 30);
+            setMusicResults(results || []);
         } catch (err) {
             console.error("Music search error:", err);
             alert(`Search error: ${err.message}`);
@@ -326,21 +329,35 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
         }
     };
 
-    const handleAddFromMusic = async (release) => {
-        setUploading(true);
+    const handleAddFromMusic = async (release, forceWantlist = null) => {
+        const targetWantlist = forceWantlist !== null ? forceWantlist : isWantlistRef.current;
+        setAddingId(release.id);
         try {
             const formData = new FormData();
 
             formData.append('title', String(release.title || 'Unknown Title').substring(0, 100));
             formData.append('artist', String(release.artist || 'Unknown Artist').substring(0, 100));
             formData.append('year', String(release.year || '').substring(0, 50));
-            formData.append('genre', Array.isArray(release.genre) ? release.genre.join(', ').substring(0, 50) : '');
-            formData.append('label', Array.isArray(release.label) ? String(release.label[0]).substring(0, 100) : '');
+            formData.append('genre', release.genre || '');
+            formData.append('label', release.label || '');
             formData.append('catalog_number', '');
 
             formData.append('format', formatRef.current);
-            formData.append('is_wantlist', isWantlistRef.current);
+            formData.append('is_wantlist', targetWantlist ? 'true' : 'false');
             formData.append('notes', 'Imported from Apple Music');
+
+            // Auto-fetch tracklist
+            if (release.collectionId) {
+                try {
+                    const tracklist = await fetchAlbumTracks(release.collectionId);
+                    if (tracklist) {
+                        formData.append('tracks', tracklist);
+                        formData.append('is_tracks_validated', 'true');
+                    }
+                } catch (trErr) {
+                    console.warn("Failed to fetch tracks:", trErr);
+                }
+            }
 
             // Generate story / liner notes automatically if API key is present
             const apiKey = getApiKey();
@@ -362,37 +379,33 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
                         const storyData = await res.json();
                         if (storyData && storyData.story) {
                             formData.append('liner_notes', storyData.story);
-                            console.log("Story successfully generated and attached!");
                         }
-                    } else {
-                        console.warn("Failed to generate story from API, status:", res.status);
                     }
                 } catch (storyErr) {
-                    console.error("Failed to generate story during Apple Music import:", storyErr);
+                    console.warn("Story generation skipped:", storyErr);
                 }
             }
 
+            // Download cover
             if (release.thumb && !release.thumb.endsWith('spacer.gif')) {
                 try {
-                    const imgRes = await fetch(release.thumb);
-                    const blob = await imgRes.blob();
-                    formData.append('image', new File([blob], 'music_cover.jpg', { type: 'image/jpeg' }));
+                    const coverFile = await downloadCoverAsFile(release.thumb, 'cover.jpg');
+                    formData.append('image', coverFile);
                 } catch (imgErr) {
-                    console.warn("Failed to download cover", imgErr);
+                    console.warn("Failed to download cover:", imgErr);
                 }
             }
 
             await pb.collection('vinyls').create(formData);
-
             onUploadComplete();
-            setTimeout(() => {
-                onClose();
-            }, 500);
+            alert(`"${release.title}" aggiunto con successo alla ${targetWantlist ? 'Wantlist' : 'Collezione'}!`);
+            onClose();
 
         } catch (err) {
             console.error("Failed to add from Music DB", err);
             alert("Error adding record: " + err.message);
-            setUploading(false);
+        } finally {
+            setAddingId(null);
         }
     };
 
@@ -419,17 +432,17 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                         {/* Tab Switcher */}
                         <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 shrink-0 w-full md:w-auto">
-                            <button onClick={() => setTab('upload')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'upload' ? 'bg-white/10 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><UploadIcon className="w-4 h-4" /> Upload</button>
-                            <button onClick={() => setTab('music')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'music' ? 'bg-white/10 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><Globe className="w-4 h-4" /> Apple Music</button>
+                            <button onClick={() => setTab('music')} className={`flex-1 md:flex-none justify-center px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'music' ? 'bg-emerald-600 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><Globe className="w-4 h-4 text-emerald-300" /> Cerca Online</button>
+                            <button onClick={() => setTab('upload')} className={`flex-1 md:flex-none justify-center px-3.5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${tab === 'upload' ? 'bg-white/10 text-white shadow-lg' : 'text-secondary hover:text-white'}`}><Camera className="w-4 h-4" /> Foto / File</button>
                         </div>
 
                         <div className="flex items-center gap-3 w-full md:w-auto md:ml-auto">
                             <div className="flex flex-1 md:flex-none bg-black/20 rounded-lg p-1 border border-white/10 shrink-0">
-                                <button onClick={() => setFormat('Vinyl')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${format === 'Vinyl' ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>Vinyl</button>
-                                <button onClick={() => setFormat('CD')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${format === 'CD' ? 'bg-primary text-black shadow-lg' : 'text-secondary hover:text-white'}`}>CD</button>
+                                <button onClick={() => setFormat('Vinyl')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${format === 'Vinyl' ? 'bg-primary text-black shadow-lg font-bold' : 'text-secondary hover:text-white'}`}>Vinile</button>
+                                <button onClick={() => setFormat('CD')} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${format === 'CD' ? 'bg-primary text-black shadow-lg font-bold' : 'text-secondary hover:text-white'}`}>CD</button>
                             </div>
                             <div className="flex flex-1 md:flex-none bg-purple-900/20 rounded-lg p-1 border border-purple-500/20 shrink-0">
-                                <button onClick={() => setIsWantlist(false)} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${!isWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-300 hover:text-white'}`}>Collection</button>
+                                <button onClick={() => setIsWantlist(false)} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${!isWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-300 hover:text-white'}`}>Collezione</button>
                                 <button onClick={() => setIsWantlist(true)} className={`flex-1 md:flex-none justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${isWantlist ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-300 hover:text-white'}`}>Wantlist</button>
                             </div>
                         </div>
@@ -444,60 +457,86 @@ function UploadModalContent({ isOpen, onClose, onUploadComplete, onOpenDebug, de
                                     type="text"
                                     value={musicQuery}
                                     onChange={(e) => setMusicQuery(e.target.value)}
-                                    placeholder="Search Apple Music by artist, album..."
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-11 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                                    placeholder="Cerca su Apple Music per artista, album, titolo..."
+                                    className="w-full bg-slate-800/80 border border-white/15 rounded-xl px-4 py-3 pl-11 text-white placeholder-white/40 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-base"
+                                    autoFocus
                                 />
                                 <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                                 <button
                                     type="submit"
                                     disabled={searchingMusic || !musicQuery.trim()}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-black px-4 py-1.5 rounded-lg font-bold text-sm disabled:opacity-50"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg font-bold text-sm disabled:opacity-50 transition-colors shadow-md"
                                 >
-                                    {searchingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                                    {searchingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cerca'}
                                 </button>
                             </form>
 
                             <button
                                 type="button"
                                 onClick={() => setIsScanning(true)}
-                                className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl px-4 py-3 transition-colors"
+                                className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white rounded-xl px-4 py-2.5 transition-colors text-sm"
                             >
-                                <ScanLine className="w-5 h-5" />
-                                Scan Barcode using Camera
+                                <ScanLine className="w-4 h-4 text-emerald-400" />
+                                <span>Scansiona Codice a Barre con Fotocamera</span>
                             </button>
 
-                            {musicResults.length > 0 && (
+                            {searchingMusic && (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
+                                    <p className="text-sm text-white/60">Ricerca su Apple Music...</p>
+                                </div>
+                            )}
+
+                            {!searchingMusic && musicResults.length > 0 && (
                                 <div className="space-y-3">
-                                    {musicResults.map((release, i) => (
-                                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10 hover:border-primary/50 transition-colors">
-                                            {release.thumb && !release.thumb.endsWith('spacer.gif') && (
-                                                <div className="w-16 h-16 bg-black/50 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-                                                    <img src={release.thumb} alt="cover" className="w-full h-full object-cover" />
-                                                </div>
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-white text-lg leading-tight">{release.title}</h4>
-                                                <p className="text-primary font-medium mb-1">{release.artist}</p>
-                                                <p className="text-sm text-secondary flex flex-wrap gap-2 mt-2">
-                                                    {release.year && <span className="bg-white/10 px-2 py-0.5 rounded">{release.year}</span>}
-                                                    {Array.isArray(release.label) && <span className="bg-white/10 px-2 py-0.5 rounded">{release.label[0]}</span>}
-                                                </p>
+                                    {musicResults.map((release) => (
+                                        <div key={release.id} className="flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-800/60 p-4 rounded-xl border border-white/10 hover:border-emerald-500/40 transition-colors shadow-sm">
+                                            <div className="w-20 h-20 bg-black/60 rounded-xl overflow-hidden shrink-0 flex items-center justify-center border border-white/10 shadow">
+                                                {release.thumb ? (
+                                                    <img src={release.thumb} alt="cover" className="w-full h-full object-cover" loading="lazy" />
+                                                ) : (
+                                                    <ImageIcon className="w-8 h-8 text-white/20" />
+                                                )}
                                             </div>
-                                            <button
-                                                onClick={() => handleAddFromMusic(release)}
-                                                disabled={uploading}
-                                                className="shrink-0 p-3 bg-white/10 hover:bg-primary hover:text-black text-white rounded-xl transition-all"
-                                                title="Import"
-                                            >
-                                                {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                                            </button>
+
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-bold text-white text-base leading-snug">{release.title}</h4>
+                                                <p className="text-emerald-400 font-medium text-sm mb-1">{release.artist}</p>
+                                                <div className="text-xs text-white/50 flex flex-wrap gap-2 mt-1.5">
+                                                    {release.year && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5">{release.year}</span>}
+                                                    {release.genre && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5">{release.genre}</span>}
+                                                    {release.label && <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5 truncate max-w-[140px]">{release.label}</span>}
+                                                    {release.trackCount > 0 && <span className="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20">{release.trackCount} tracce</span>}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                                                <button
+                                                    onClick={() => handleAddFromMusic(release, false)}
+                                                    disabled={addingId !== null}
+                                                    className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                                                    title="Aggiungi alla Collezione"
+                                                >
+                                                    {addingId === release.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                                                    <span>+ Collezione</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAddFromMusic(release, true)}
+                                                    disabled={addingId !== null}
+                                                    className="flex-1 sm:flex-none px-3.5 py-2 bg-pink-600/30 hover:bg-pink-600 text-pink-200 hover:text-white border border-pink-500/40 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                                                    title="Aggiungi alla Wantlist"
+                                                >
+                                                    <Heart className="w-3.5 h-3.5 text-pink-400" />
+                                                    <span>Wantlist</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
 
                             {!searchingMusic && musicResults.length === 0 && musicQuery && (
-                                <p className="text-center text-white/40 mt-8 mb-8">No results found on Apple Music.</p>
+                                <p className="text-center text-white/40 mt-8 mb-8">Nessun risultato trovato su Apple Music per "{musicQuery}".</p>
                             )}
                         </div>
                     ) : (

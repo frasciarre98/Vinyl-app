@@ -33,3 +33,7 @@ tmp_pb_sync/
 backup/
 backend/pb_data/
 vinyl-app-deploy*.zip
+*.tar.gz
+*.exp
+backend/pb_public/
+backend/pb_public copia/

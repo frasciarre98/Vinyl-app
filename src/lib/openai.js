@@ -569,74 +569,150 @@ function sanitizeCurrency(cost) {
     return str;
 }
 
-// Helper to resize image using Canvas (Memory Optimized for Mobile)
+// Helper to extract EXIF orientation from JPEG blobs
+export function getExifOrientation(fileOrBlob) {
+    return new Promise((resolve) => {
+        if (!fileOrBlob || typeof fileOrBlob === 'string' || !(fileOrBlob instanceof Blob)) {
+            return resolve(1);
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const view = new DataView(e.target.result);
+                if (view.byteLength < 2 || view.getUint16(0, false) !== 0xFFD8) return resolve(1);
+                const length = view.byteLength;
+                let offset = 2;
+                while (offset < length) {
+                    if (offset + 2 > length) return resolve(1);
+                    const marker = view.getUint16(offset, false);
+                    offset += 2;
+                    if (marker === 0xFFE1) {
+                        if (offset + 6 > length) return resolve(1);
+                        if (view.getUint32(offset += 2, false) !== 0x45786966) return resolve(1);
+                        const little = view.getUint16(offset += 6, false) === 0x4949;
+                        offset += view.getUint32(offset + 4, little);
+                        if (offset + 2 > length) return resolve(1);
+                        const tags = view.getUint16(offset, little);
+                        offset += 2;
+                        for (let i = 0; i < tags; i++) {
+                            const tagOffset = offset + (i * 12);
+                            if (tagOffset + 10 > length) return resolve(1);
+                            if (view.getUint16(tagOffset, little) === 0x0112) {
+                                return resolve(view.getUint16(tagOffset + 8, little));
+                            }
+                        }
+                    } else if ((marker & 0xFF00) !== 0xFF00) {
+                        break;
+                    } else {
+                        if (offset + 2 > length) return resolve(1);
+                        offset += view.getUint16(offset, false);
+                    }
+                }
+            } catch (err) {
+                console.warn("EXIF read error:", err);
+            }
+            return resolve(1);
+        };
+        reader.onerror = () => resolve(1);
+        reader.readAsArrayBuffer(fileOrBlob.slice(0, 65536));
+    });
+}
+
+// Helper to resize image using Canvas (Memory Optimized for Mobile + EXIF Rotation Fix)
 export function resizeImage(fileOrBlob) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
             const isUrl = typeof fileOrBlob === 'string';
-            const url = isUrl ? fileOrBlob : URL.createObjectURL(fileOrBlob);
+            const orientation = await getExifOrientation(fileOrBlob);
             const img = new Image();
 
-            console.log(`[Resize V35.4] Initializing load for: ${isUrl ? 'URL' : 'Blob'}`);
-
-            // img.crossOrigin = 'Anonymous'; // REMOVED V35.4: Causes issues on same-origin Safari HEIC loads
+            console.log(`[Resize V35.5] Initializing load for: ${isUrl ? 'URL' : 'Blob'} (EXIF orientation: ${orientation})`);
 
             img.onload = () => {
                 try {
-                    console.log(`[Resize V35.4] Image load success: ${img.width}x${img.height}`);
+                    console.log(`[Resize V35.5] Image load success: ${img.width}x${img.height}`);
                     
-                    const maxWidth = 1024;
-                    const maxHeight = 1024;
-                    let width = img.width;
-                    let height = img.height;
+                    const maxDim = 1024;
+                    let canvasW = img.width;
+                    let canvasH = img.height;
+                    let drawW = img.width;
+                    let drawH = img.height;
 
-                    if (width > height) {
-                        if (width > maxWidth) {
-                            height *= maxWidth / width;
-                            width = maxWidth;
-                        }
-                    } else {
-                        if (height > maxHeight) {
-                            width *= maxHeight / height;
-                            height = maxHeight;
-                        }
+                    // If EXIF says rotated 90 or 270 degrees, final canvas width & height are swapped
+                    if (orientation === 6 || orientation === 8) {
+                        canvasW = img.height;
+                        canvasH = img.width;
                     }
 
+                    let scale = 1;
+                    if (Math.max(canvasW, canvasH) > maxDim) {
+                        scale = maxDim / Math.max(canvasW, canvasH);
+                    }
+
+                    const finalCanvasW = Math.round(canvasW * scale);
+                    const finalCanvasH = Math.round(canvasH * scale);
+                    const finalDrawW = Math.round(drawW * scale);
+                    const finalDrawH = Math.round(drawH * scale);
+
                     const canvas = document.createElement('canvas');
-                    canvas.width = width;
-                    canvas.height = height;
+                    canvas.width = finalCanvasW;
+                    canvas.height = finalCanvasH;
                     const ctx = canvas.getContext('2d');
 
                     if (!ctx) {
-                        if (!isUrl) URL.revokeObjectURL(url);
                         reject(new Error("Canvas context failure"));
                         return;
                     }
 
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    if (!isUrl) URL.revokeObjectURL(url);
+                    if (orientation === 6) {
+                        // 90° CW: translate and rotate
+                        ctx.translate(finalCanvasW, 0);
+                        ctx.rotate(Math.PI / 2);
+                        ctx.drawImage(img, 0, 0, finalDrawW, finalDrawH);
+                    } else if (orientation === 8) {
+                        // 270° CW (90° CCW): translate and rotate
+                        ctx.translate(0, finalCanvasH);
+                        ctx.rotate(-Math.PI / 2);
+                        ctx.drawImage(img, 0, 0, finalDrawW, finalDrawH);
+                    } else if (orientation === 3) {
+                        // 180°: translate and rotate
+                        ctx.translate(finalCanvasW, finalCanvasH);
+                        ctx.rotate(Math.PI);
+                        ctx.drawImage(img, 0, 0, finalDrawW, finalDrawH);
+                    } else {
+                        // Normal 0°
+                        ctx.drawImage(img, 0, 0, finalDrawW, finalDrawH);
+                    }
 
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                    console.log(`[Resize V35.4] Canvas conversion success: ${Math.round(dataUrl.length / 1024)} KB`);
+                    console.log(`[Resize V35.5] Canvas conversion success: ${Math.round(dataUrl.length / 1024)} KB`);
                     resolve(dataUrl);
                 } catch (e) {
-                    if (!isUrl) URL.revokeObjectURL(url);
-                    console.error("[Resize V35.4] Canvas error:", e);
+                    console.error("[Resize V35.5] Canvas error:", e);
                     reject(new Error("Processing error: " + e.message));
                 }
             };
 
             img.onerror = (e) => {
-                if (!isUrl) URL.revokeObjectURL(url);
-                console.error("[Resize V35.4] Native Image Load Error:", e);
+                console.error("[Resize V35.5] Native Image Load Error:", e);
                 reject(new Error("Browser refused to load image. If on iPhone, ensure the photo is valid and visible."));
             };
 
-            img.src = url;
+            if (isUrl) {
+                img.src = fileOrBlob;
+            } else {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.src = e.target.result;
+                };
+                reader.onerror = (e) => {
+                    reject(new Error("FileReader failed to read blob"));
+                };
+                reader.readAsDataURL(fileOrBlob);
+            }
 
         } catch (e) {
-            console.error("[Resize V35.4] Setup error:", e);
+            console.error("[Resize V35.5] Setup error:", e);
             reject(new Error("Resize setup failed: " + e.message));
         }
     });

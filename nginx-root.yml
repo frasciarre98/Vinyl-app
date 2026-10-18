@@ -1,0 +1,9 @@
+services:
+  mobile-app:
+    image: nginx:alpine
+    restart: unless-stopped
+    user: root
+    ports:
+      - "8091:80"
+    volumes:
+      - /share/Container/vinyl-app-build/dist:/usr/share/nginx/html:ro

@@ -4,7 +4,7 @@ import {
     PieChart as RechartsPie, Pie,
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { Disc, ShoppingCart, Star } from 'lucide-react';
+import { Disc, ShoppingCart, Star, Wallet, Calendar, Coins } from 'lucide-react';
 
 
 export function StatsModal({ isOpen, onClose, vinyls }) {
@@ -17,6 +17,8 @@ export function StatsModal({ isOpen, onClose, vinyls }) {
         let totalValue = 0;
         let wantlistTotalRecords = 0;
         let wantlistTotalValue = 0;
+        let totalPurchasePrice = 0;
+        const purchaseYearSpending = {};
         const genreCounts = {};
         const genreValues = {};
         const artistCounts = {};
@@ -55,6 +57,32 @@ export function StatsModal({ isOpen, onClose, vinyls }) {
 
             totalRecords++;
             totalValue += parsedValue;
+
+            // Purchase Price & Year calculation
+            let pPrice = 0;
+            if (v.purchase_price) {
+                const cleanP = String(v.purchase_price).replace('€', '').replace(/\s+/g, '').replace(',', '.');
+                const parsedP = parseFloat(cleanP);
+                if (!isNaN(parsedP) && parsedP > 0) {
+                    pPrice = parsedP;
+                    totalPurchasePrice += pPrice;
+                }
+            }
+
+            let pYear = null;
+            if (v.purchase_year) {
+                const yMatch = String(v.purchase_year).match(/\d{4}/);
+                if (yMatch) pYear = yMatch[0];
+            }
+
+            if (pYear || pPrice > 0) {
+                const yearKey = pYear || 'Sconosciuto';
+                if (!purchaseYearSpending[yearKey]) {
+                    purchaseYearSpending[yearKey] = { total: 0, count: 0 };
+                }
+                purchaseYearSpending[yearKey].total += pPrice;
+                purchaseYearSpending[yearKey].count += 1;
+            }
 
             if (parsedValue > 0) {
                 allRecordsWithValue.push({ ...v, parsedValue });
@@ -104,6 +132,27 @@ export function StatsModal({ isOpen, onClose, vinyls }) {
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => a.name.localeCompare(b.name));
 
+        const purchaseYearData = Object.entries(purchaseYearSpending)
+            .map(([year, info]) => ({
+                name: year,
+                spesa: Math.round(info.total * 100) / 100,
+                dischi: info.count
+            }))
+            .sort((a, b) => {
+                if (a.name === 'Sconosciuto') return 1;
+                if (b.name === 'Sconosciuto') return -1;
+                return a.name.localeCompare(b.name);
+            });
+
+        const activeYears = Object.keys(purchaseYearSpending).filter(y => y !== 'Sconosciuto');
+        let totalPurchasedWithYear = 0;
+        activeYears.forEach(y => {
+            totalPurchasedWithYear += purchaseYearSpending[y].count;
+        });
+
+        const avgPurchasePerYear = activeYears.length > 0 ? (totalPurchasePrice / activeYears.length) : 0;
+        const avgDischiPerYear = activeYears.length > 0 ? (totalPurchasedWithYear / activeYears.length) : 0;
+
         const topUntouchables = allRecordsWithValue
             .sort((a, b) => b.parsedValue - a.parsedValue)
             .slice(0, 5);
@@ -111,6 +160,7 @@ export function StatsModal({ isOpen, onClose, vinyls }) {
         return { 
             totalRecords, totalValue, 
             wantlistTotalRecords, wantlistTotalValue, 
+            totalPurchasePrice, avgPurchasePerYear, avgDischiPerYear, totalPurchasedWithYear, purchaseYearData,
             pieData, genreValueData, barData, decadeData, 
             topUntouchables 
         };
@@ -134,30 +184,55 @@ export function StatsModal({ isOpen, onClose, vinyls }) {
             <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 pb-32">
 
                 {/* Top KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center">
-                        <span className="text-white/50 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <Music className="w-4 h-4" /> Collection
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                        <span className="text-white/50 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Music className="w-4 h-4 text-primary" /> Collezione
                         </span>
-                        <span className="text-4xl font-black text-white">{stats?.totalRecords || 0}</span>
+                        <span className="text-3xl font-black text-white">{stats?.totalRecords || 0}</span>
+                        <span className="text-[11px] text-white/40 mt-1">vinili totali</span>
                     </div>
-                    <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-2xl p-6 flex flex-col items-center justify-center">
-                        <span className="text-emerald-400/70 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" /> Coll. Value
+
+                    <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                        <span className="text-emerald-400/70 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="w-4 h-4 text-emerald-400" /> Valore Stimato
                         </span>
-                        <span className="text-3xl md:text-4xl font-black text-emerald-400">€ {Math.round(stats?.totalValue || 0).toLocaleString()}</span>
+                        <span className="text-2xl lg:text-3xl font-black text-emerald-400">€ {Math.round(stats?.totalValue || 0).toLocaleString()}</span>
+                        <span className="text-[11px] text-emerald-400/50 mt-1">valore di mercato</span>
                     </div>
-                    <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-6 flex flex-col items-center justify-center">
-                        <span className="text-purple-400/70 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2 text-center">
-                            <ShoppingCart className="w-4 h-4" /> Wantlist Items
+
+                    <div className="bg-amber-900/20 border border-amber-500/30 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                        <span className="text-amber-400/70 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Wallet className="w-4 h-4 text-amber-400" /> Spesa Totale
                         </span>
-                        <span className="text-3xl md:text-4xl font-black text-purple-400">{stats?.wantlistTotalRecords || 0}</span>
+                        <span className="text-2xl lg:text-3xl font-black text-amber-400">€ {Math.round(stats?.totalPurchasePrice || 0).toLocaleString()}</span>
+                        <span className="text-[11px] text-amber-400/50 mt-1">costo acquisti</span>
                     </div>
-                    <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-6 flex flex-col items-center justify-center">
-                        <span className="text-purple-400/70 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2 text-center">
-                            <ShoppingCart className="w-4 h-4" /> Wantlist Cost
+
+                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                        <span className="text-blue-400/70 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4 text-blue-400" /> Spesa / Anno
                         </span>
-                        <span className="text-3xl md:text-4xl font-black text-purple-400">€ {Math.round(stats?.wantlistTotalValue || 0).toLocaleString()}</span>
+                        <span className="text-2xl lg:text-3xl font-black text-blue-400">€ {Math.round(stats?.avgPurchasePerYear || 0).toLocaleString()}</span>
+                        <span className="text-[11px] text-blue-400/50 mt-1">media spesa annua</span>
+                    </div>
+
+                    <div className="bg-cyan-900/20 border border-cyan-500/30 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                        <span className="text-cyan-400/70 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <Disc className="w-4 h-4 text-cyan-400" /> Dischi / Anno
+                        </span>
+                        <span className="text-2xl lg:text-3xl font-black text-cyan-400">
+                            {stats?.avgDischiPerYear ? stats.avgDischiPerYear.toFixed(1) : 0}
+                        </span>
+                        <span className="text-[11px] text-cyan-400/50 mt-1">media acquisti annui</span>
+                    </div>
+
+                    <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                        <span className="text-purple-400/70 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <ShoppingCart className="w-4 h-4 text-purple-400" /> Desideri
+                        </span>
+                        <span className="text-3xl font-black text-purple-400">{stats?.wantlistTotalRecords || 0}</span>
+                        <span className="text-[11px] text-purple-400/50 mt-1">€ {Math.round(stats?.wantlistTotalValue || 0).toLocaleString()} stimati</span>
                     </div>
                 </div>
 
@@ -199,6 +274,58 @@ export function StatsModal({ isOpen, onClose, vinyls }) {
 
                 {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                    {/* Purchase Spending & Volume by Year Chart */}
+                    {stats?.purchaseYearData?.length > 0 && (
+                        <div className="bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-500/20 rounded-2xl p-6 lg:col-span-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                                <div>
+                                    <h3 className="text-lg font-bold flex items-center gap-2 text-amber-400">
+                                        <Wallet className="w-5 h-5 text-amber-400" /> Spesa e Dischi Acquistati per Anno
+                                    </h3>
+                                    <p className="text-xs text-white/50 mt-1">Confronto tra spesa economica (€) e volume di acquisti (dischi)</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs bg-black/30 px-3 py-1.5 rounded-xl border border-white/10">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+                                        <span className="text-amber-400 font-bold">Spesa (€)</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2.5 h-2.5 rounded-sm bg-sky-400" />
+                                        <span className="text-sky-400 font-bold">Dischi (N°)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={stats?.purchaseYearData || []} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                                        <XAxis dataKey="name" tick={{ fill: '#e2e8f0', fontSize: 12 }} />
+                                        <YAxis yAxisId="spesa" tick={{ fill: '#f59e0b', fontSize: 11 }} tickFormatter={(val) => `€${val}`} />
+                                        <YAxis yAxisId="dischi" orientation="right" tick={{ fill: '#38bdf8', fontSize: 11 }} allowDecimals={false} />
+                                        <Tooltip 
+                                            formatter={(value, name) => [name === 'spesa' ? `€ ${value}` : `${value} dischi`, name === 'spesa' ? 'Spesa Totale' : 'Dischi Acquistati']}
+                                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} 
+                                        />
+                                        <Bar yAxisId="spesa" dataKey="spesa" name="spesa" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                        <Bar yAxisId="dischi" dataKey="dischi" name="dischi" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* Year breakdown badges */}
+                            <div className="flex flex-wrap gap-2.5 justify-center mt-6 pt-4 border-t border-white/10">
+                                {stats?.purchaseYearData?.map((item) => (
+                                    <div key={item.name} className="flex items-center gap-2 bg-white/5 border border-white/10 px-3.5 py-1.5 rounded-xl text-xs">
+                                        <span className="font-bold text-white">{item.name}:</span>
+                                        <span className="text-amber-400 font-bold">€ {item.spesa.toLocaleString()}</span>
+                                        <span className="text-white/30">•</span>
+                                        <span className="text-sky-400 font-bold">{item.dischi} {item.dischi === 1 ? 'disco' : 'dischi'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Genre Pie Chart */}
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6">

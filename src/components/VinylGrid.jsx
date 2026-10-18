@@ -14,7 +14,7 @@ import staticData from '../data/vinyls-static.json';
 
 const IS_STATIC = import.meta.env.VITE_STATIC_MODE === 'true';
 
-export function VinylGrid({ refreshTrigger, onWantlistChange }) {
+export function VinylGrid({ refreshTrigger, onWantlistChange, onOpenOnlineSearch }) {
     const [user, setUser] = useState(pb.authStore.model);
     useEffect(() => {
         return pb.authStore.onChange((token, model) => {
@@ -583,7 +583,17 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
 
                     <div className="relative flex-1 min-w-[200px] max-w-2xl">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-secondary" /></div>
-                        <input type="text" name="main_search" autoComplete="off" placeholder="Search records..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-3 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm shadow-inner" />
+                        <input type="text" name="main_search" autoComplete="off" placeholder="Search records..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full pl-10 pr-28 py-3 border border-border rounded-full leading-5 bg-surface text-primary placeholder-secondary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 text-sm shadow-inner" />
+                        {search && onOpenOnlineSearch && (
+                            <button
+                                onClick={() => onOpenOnlineSearch(search)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-600/30 hover:bg-emerald-600 text-emerald-200 hover:text-white border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-all shadow-sm"
+                                title="Cerca su Apple Music"
+                            >
+                                <Search className="w-3 h-3" />
+                                <span>Cerca Online</span>
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex items-center flex-wrap gap-2 shrink-0">
@@ -716,9 +726,22 @@ export function VinylGrid({ refreshTrigger, onWantlistChange }) {
             {/* Grid */}
             <div className="relative">
                 {filteredVinyls.length === 0 && !loading && !error ? (
-                    <div className="text-center py-20 text-secondary">
-                        <p className="text-xl font-light">No records found.</p>
-                        <p className="text-sm mt-2">Try adjusting your search or add some vinyls.</p>
+                    <div className="text-center py-20 text-secondary space-y-4">
+                        <p className="text-xl font-light text-white/80">Nessun disco trovato nella tua collezione.</p>
+                        {search && onOpenOnlineSearch ? (
+                            <div className="flex flex-col items-center gap-3">
+                                <p className="text-sm text-white/50">Vuoi cercarlo online su Apple Music?</p>
+                                <button
+                                    onClick={() => onOpenOnlineSearch(search)}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95"
+                                >
+                                    <Search className="w-4 h-4" />
+                                    <span>Cerca "{search}" su Apple Music</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-white/40">Prova a modificare i filtri o aggiungi nuovi dischi.</p>
+                        )}
                     </div>
                 ) : (
                     <div className={`grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-4 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>

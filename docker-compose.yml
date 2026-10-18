@@ -3,7 +3,7 @@ services:
     build:
       context: .
       args:
-        PB_VERSION: 0.36.1
+        PB_VERSION: 0.23.0
     restart: unless-stopped
     ports:
       - "8090:8090"
@@ -11,3 +11,12 @@ services:
       - ./backend/pb_data:/pb/pb_data # Persist data on host
     env_file:
       - .env
+
+  mobile-app:
+    image: nginx:alpine
+    user: root
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
